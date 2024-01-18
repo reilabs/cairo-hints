@@ -1,7 +1,7 @@
 mod hint_processor_utils;
 
 use core::any::Any;
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Read};
 
 use cairo_lang_casm::{hints::{Hint, StarknetHint}, operand::{ResOperand, CellRef}};
 use cairo_lang_utils::bigint::BigIntAsHex;
@@ -237,7 +237,24 @@ impl<'a> RpcHintProcessor<'a> {
             }
             "oracle_ask" => {
                 println!("asking oracle {:?}", self.state);
-                self.state = OracleState::Receiving(json!({"n": 42}));
+                
+                let OracleState::Sending(state) = &self.state else {
+                    panic!("not in sending mode");
+                };
+
+                let client = reqwest::blocking::Client::new();
+                let resp: Value = client.post(self.server.as_ref().unwrap())
+                    .json(state)
+                    .send()
+                    .unwrap()
+                    .json::<Value>()
+                    .unwrap();
+                let output = resp;
+                let result = output["result"].clone();
+
+                println!("Output: {output:?}");
+
+                self.state = OracleState::Receiving(result);
             }
             "oracle" => {
                 println!("local variables: {:?}", exec_scopes);
