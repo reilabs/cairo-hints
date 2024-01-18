@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = [
+    "cairo-proto-build",
+    "cairo-oracle-hint-processor",
+    "scarb-hints-new",
+    "scarb-hints-gen-oracle",
+    "scarb-hints-run",
+    "scarb-hints-test",
+]
+
