@@ -8,4 +8,6 @@ members = [
     "scarb-hints-run",
     "scarb-hints-test",
 ]
-
+exclude = [
+    "examples/hints_poc/rust"
+]
