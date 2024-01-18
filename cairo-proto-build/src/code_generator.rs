@@ -628,53 +628,59 @@ trait Sendable<T> {
 // TODO: missing implementation for builtin types
 impl Sendableu64 of Sendable<u64> {
     fn send(self: @u64) {
-        cheatcode::<'oracle_value_push'>(array![11, 0].span());
+        let val: felt252 = (*self).into();
+        cheatcode::<'oracle_value_push'>(array!['u64', val].span());
     }
     fn recv() -> u64 {
-        let mut bytes = cheatcode::<'oracle_value_pop'>(array![11].span()); // could enforce type here!
+        let mut bytes = cheatcode::<'oracle_value_pop'>(array!['u64'].span()); // could enforce type here!
         Serde::<u64>::deserialize(ref bytes).unwrap()
     }
 }
 
 impl Sendableu32 of Sendable<u32> {
     fn send(self: @u32) {
-        cheatcode::<'oracle_value_push'>(array![12, 0].span());
+        let val: felt252 = (*self).into();
+        cheatcode::<'oracle_value_push'>(array!['u32', val].span());
     }
     fn recv() -> u32 {
-        let mut bytes = cheatcode::<'oracle_value_pop'>(array![12].span()); // could enforce type here!
+        let mut bytes = cheatcode::<'oracle_value_pop'>(array!['u32'].span()); // could enforce type here!
         Serde::<u32>::deserialize(ref bytes).unwrap()
     }
 }
 
 impl Sendablei32 of Sendable<i32> {
     fn send(self: @i32) {
-        cheatcode::<'oracle_value_push'>(array![12, 0].span());
+        let val: felt252 = (*self).into();
+        cheatcode::<'oracle_value_push'>(array!['i32', val].span());
     }
     fn recv() -> i32 {
-        let mut bytes = cheatcode::<'oracle_value_pop'>(array![12].span()); // could enforce type here!
+        let mut bytes = cheatcode::<'oracle_value_pop'>(array!['i32'].span()); // could enforce type here!
         Serde::<i32>::deserialize(ref bytes).unwrap()
     }
 }
 
 impl optionimpl<T, +Sendable<T>> of Sendable<Option<T>> {
     fn send(self: @Option<T>) {
+        cheatcode::<'oracle_path_push'>(array!['struct'].span());
 
         match self {
             Option::Some(v) => {
-                cheatcode::<'oracle_key_push'>(array!['presence'].span());            // key start
+                cheatcode::<'oracle_key_push'>(array!['presence'].span());
                 Sendable::<u64>::send(@1); // present
-                cheatcode::<'oracle_key_pop'>(array!['presence'].span());            // key start
+                cheatcode::<'oracle_key_pop'>(array!['presence'].span());
 
-                cheatcode::<'oracle_key_push'>(array!['value'].span());            // key start
+                cheatcode::<'oracle_key_push'>(array!['value'].span());
                 Sendable::<T>::send(v); // present
-                cheatcode::<'oracle_key_pop'>(array!['value'].span());            // key start
+                cheatcode::<'oracle_key_pop'>(array!['value'].span());
             },
             Option::None => {
-                cheatcode::<'oracle_key_push'>(array!['presence'].span());            // key start
+                cheatcode::<'oracle_key_push'>(array!['presence'].span());
                 Sendable::<u64>::send(@0); // not present
-                cheatcode::<'oracle_key_pop'>(array!['presence'].span());            // key start
+                cheatcode::<'oracle_key_pop'>(array!['presence'].span());
             }
         }
+
+        cheatcode::<'oracle_path_pop'>(array!['struct'].span());
     }
     fn recv() -> Option<T> {
         Option::None
