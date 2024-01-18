@@ -1,27 +1,12 @@
-fn main() -> felt252 {
-    fib(16)
-}
+mod oracle;
 
-fn fib(mut n: felt252) -> felt252 {
-    let mut a: felt252 = 0;
-    let mut b: felt252 = 1;
-    loop {
-        if n == 0 {
-            break a;
-        }
-        n = n - 1;
-        let temp = b;
-        b = a + b;
-        a = temp;
-    }
-}
+use oracle::{Request, Inner, SqrtOracle};
 
-#[cfg(test)]
-mod tests {
-    use super::fib;
+fn main() -> bool {
+    let num = 1764;
 
-    #[test]
-    fn it_works() {
-        assert(fib(16) == 987, 'it works!');
-    }
-}
+    let request = Request { n: num, x: Option::Some(Inner { inner: 5 }), y: array![],  };
+    let result = SqrtOracle::sqrt(request);
+
+    result.n * result.n == num
+}   
