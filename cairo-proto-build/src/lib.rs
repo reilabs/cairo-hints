@@ -158,6 +158,18 @@ impl Config {
         Config::default()
     }
     
+    /// Configures the output directory where generated Rust files will be written.
+    ///
+    /// If unset, defaults to the `OUT_DIR` environment variable. `OUT_DIR` is set by Cargo when
+    /// executing build scripts, so `out_dir` typically does not need to be configured.
+    pub fn out_dir<P>(&mut self, path: P) -> &mut Self
+    where
+        P: Into<PathBuf>,
+    {
+        self.out_dir = Some(path.into());
+        self
+    }
+
     /// Compile `.proto` files into Rust files during a Cargo build with additional code generator
     /// configuration options.
     ///
@@ -275,16 +287,8 @@ impl Config {
     /// }
     /// ```
     pub fn compile_fds(&mut self, fds: FileDescriptorSet) -> std::io::Result<()> {
-        let mut target_is_env = false;
-        let target: PathBuf = self.out_dir.clone().map(Ok).unwrap_or_else(|| {
-            env::var_os("OUT_DIR")
-                .ok_or_else(|| {
-                    Error::new(ErrorKind::Other, "OUT_DIR environment variable is not set")
-                })
-                .map(|val| {
-                    target_is_env = true;
-                    Into::into(val)
-                })
+        let target: PathBuf = self.out_dir.clone().ok_or_else(|| {
+            Error::new(ErrorKind::Other, "out_dir configuration option is not set")
         })?;
 
         let requests = fds
