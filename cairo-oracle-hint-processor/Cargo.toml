@@ -8,7 +8,8 @@ edition = "2021"
 [dependencies]
 cairo-lang-casm = "2.4.4"
 cairo-lang-utils = "2.4.4"
-cairo-vm = { version = "0.9.2", features = ["cairo-1-hints"] }
+cairo-lang-runner = "2.4.4"
+cairo-vm = "0.8.4-rc.0"
 num-bigint = "0.4.4"
 num-integer = "0.1.45"
 num-traits = "0.2.17"

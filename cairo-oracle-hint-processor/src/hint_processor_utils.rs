@@ -1,7 +1,6 @@
 use std::ops::Neg;
 
 use cairo_vm::felt::Felt252;
-use cairo_vm::stdlib::prelude::*;
 use cairo_vm::types::{errors::math_errors::MathError, relocatable::Relocatable};
 use cairo_vm::utils::CAIRO_PRIME;
 use cairo_vm::vm::errors::{hint_errors::HintError, vm_errors::VirtualMachineError};

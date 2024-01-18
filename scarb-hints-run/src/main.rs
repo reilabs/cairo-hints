@@ -2,13 +2,26 @@ use std::env;
 use std::fs;
 
 use anyhow::{bail, ensure, Context, Result};
+use cairo_lang_runner::Arg;
+use cairo_lang_runner::CairoHintProcessor;
+use cairo_lang_runner::RunnerError;
+use cairo_lang_runner::build_hints_dict;
 use cairo_lang_runner::short_string::as_cairo_short_string;
 use cairo_lang_runner::{RunResultStarknet, RunResultValue, SierraCasmRunner, StarknetState};
+use cairo_lang_sierra::program::Function;
 use cairo_lang_sierra::program::VersionedProgram;
+use cairo_lang_sierra_to_casm::compiler::CairoProgram;
+use cairo_lang_sierra_to_casm::metadata::MetadataComputationConfig;
+use cairo_lang_sierra_to_casm::metadata::MetadataError;
+use cairo_lang_sierra_to_casm::metadata::calc_metadata;
+use cairo_lang_sierra_to_casm::metadata::calc_metadata_ap_change_only;
+use cairo_oracle_hint_processor::RpcHintProcessor;
+use cairo_vm::vm::runners::cairo_runner::RunResources;
 use camino::Utf8PathBuf;
 use clap::Parser;
 use indoc::formatdoc;
 use serde::Serializer;
+use itertools::chain;
 
 use scarb_metadata::{Metadata, MetadataCommand, ScarbCommand};
 use scarb_ui::args::PackagesFilter;
@@ -40,6 +53,11 @@ struct Args {
     /// Input to the program.
     #[arg(default_value = "[]")]
     program_input: deserialization::Args,
+
+    /// Oracle server URL.
+    #[arg(long)]
+    oracle_server: Option<String>,
+    
 }
 
 fn main() -> Result<()> {
@@ -87,22 +105,33 @@ fn main() -> Result<()> {
         bail!("program requires gas counter, please provide `--available-gas` argument");
     }
 
+    let metadata_config = if available_gas.is_disabled() {
+        None
+    } else {
+        Some(Default::default())
+    };
     let runner = SierraCasmRunner::new(
-        sierra_program.program,
-        if available_gas.is_disabled() {
-            None
-        } else {
-            Some(Default::default())
-        },
+        sierra_program.program.clone(),
+        metadata_config.clone(),
         Default::default(),
     )?;
 
-    let result = runner
-        .run_function_with_starknet_context(
+    // TODO: this shouldn't be needed. we should call into cairo-lang-runner
+    let metadata = create_metadata(&sierra_program.program, metadata_config.clone())?;
+    let casm_program = cairo_lang_sierra_to_casm::compiler::compile(
+        &sierra_program.program,
+        &metadata,
+        metadata_config.is_some(),
+    )?;
+
+    let result = run_with_oracle_hint_processor(
+            &runner,
+            &casm_program,
             runner.find_function("::main")?,
             &args.program_input,
             available_gas.value(),
             StarknetState::default(),
+            &args.oracle_server,
         )
         .context("failed to run the function")?;
 
@@ -114,6 +143,41 @@ fn main() -> Result<()> {
 
     Ok(())
 }
+
+/// Runs the vm starting from a function in the context of a given starknet state.
+pub fn run_with_oracle_hint_processor(
+    runner: &SierraCasmRunner,
+    casm_program: &CairoProgram,
+    func: &Function,
+    args: &[Arg],
+    available_gas: Option<usize>,
+    starknet_state: StarknetState,
+    oracle_server: &Option<String>,
+) -> Result<RunResultStarknet, RunnerError> {
+    let initial_gas = runner.get_initial_available_gas(func, available_gas)?;
+    let (entry_code, builtins) = runner.create_entry_code(func, args, initial_gas)?;
+    let footer = runner.create_code_footer();
+    let instructions =
+        chain!(entry_code.iter(), casm_program.instructions.iter(), footer.iter());
+    let (hints_dict, string_to_hint) = build_hints_dict(instructions.clone());
+    let cairo_hint_processor = CairoHintProcessor {
+        runner: Some(runner),
+        starknet_state: starknet_state.clone(),
+        string_to_hint,
+        run_resources: RunResources::default(),
+    };
+    let mut hint_processor = RpcHintProcessor::new(cairo_hint_processor, oracle_server);
+
+    runner.run_function(func, &mut hint_processor, hints_dict, instructions, builtins).map(|v| {
+        RunResultStarknet {
+            gas_counter: v.gas_counter,
+            memory: v.memory,
+            value: v.value,
+            starknet_state: hint_processor.starknet_state(),
+        }
+    })
+}
+
 
 struct Summary {
     result: RunResultStarknet,
@@ -197,4 +261,21 @@ impl GasLimit {
             GasLimit::Unlimited => Some(usize::MAX),
         }
     }
+}
+
+
+/// Creates the metadata required for a Sierra program lowering to casm.
+fn create_metadata(
+    sierra_program: &cairo_lang_sierra::program::Program,
+    metadata_config: Option<MetadataComputationConfig>,
+) -> Result<cairo_lang_sierra_to_casm::metadata::Metadata, RunnerError> {
+    if let Some(metadata_config) = metadata_config {
+        calc_metadata(sierra_program, metadata_config)
+    } else {
+        calc_metadata_ap_change_only(sierra_program)
+    }
+    .map_err(|err| match err {
+        MetadataError::ApChangeError(err) => RunnerError::ApChangeError(err),
+        MetadataError::CostError(_) => RunnerError::FailedGasCalculation,
+    })
 }
