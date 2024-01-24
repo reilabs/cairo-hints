@@ -19,7 +19,9 @@ It uses protocol buffers to define messages shared between Cairo and RPC server,
 2. Define messages in a .proto file
 3. Run `scarb hints-gen-oracle path-to-project-root`
 4. Start RPC server that accepts json requests
-5. Run `scarb hints-run --oracle-server http://0.0.0.0:3000` # insert your own server url`
+5. Run `scarb hints-run --oracle-server http://0.0.0.0:3000 # insert your own server url`
+6. Run integration tests using `scarb hints-test --oracle-server http://0.0.0.0:3000 # insert your own server url`
+
 
 ## Example Project
 [See example project](https://github.com/reilabs/cairo-hints/tree/main/examples/hints_poc)
