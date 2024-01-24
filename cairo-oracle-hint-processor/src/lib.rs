@@ -10,9 +10,8 @@ use serde_json::{Value, Map, json};
 use cairo_lang_runner::{CairoHintProcessor, StarknetState};
 use cairo_vm::{hint_processor::hint_processor_definition::HintProcessorLogic, felt::Felt252, vm::errors::vm_errors::VirtualMachineError};
 use cairo_vm::vm::runners::cairo_runner::ResourceTracker;
-
 use cairo_vm::{vm::{errors::{hint_errors::HintError, memory_errors::MemoryError}, vm_core::VirtualMachine}, types::{exec_scope::ExecutionScopes, relocatable::{Relocatable, MaybeRelocatable}}};
-use cairo_vm::hint_processor::hint_processor_definition::{HintReference};
+use cairo_vm::hint_processor::hint_processor_definition::HintReference;
 use hint_processor_utils::{extract_buffer, get_ptr, cell_ref_to_relocatable};
 
 #[derive(Debug, PartialEq)]
