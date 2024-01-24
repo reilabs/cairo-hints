@@ -9,3 +9,4 @@ It calculates sqrt using an RPC server implemented in Rust.
 3. In a new shell tab
     * `cd rust; cargo run`
 4. Run `scarb hints-run --oracle-server http://0.0.0.0:3000`
+5. Integration tests: `scarb hints-test --oracle-server http://0.0.0.0:3000`
