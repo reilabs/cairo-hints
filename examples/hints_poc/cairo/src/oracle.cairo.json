@@ -1,0 +1,4 @@
+{ "messages": {"Inner": [{"name": "inner", "type": "u32"}]
+, "Request": [{"name": "n", "type": "u64"}, {"name": "x", "type": "option", "value": "Inner"}, {"name": "y", "type": "array", "value": "i32"}, {"name": "map", "type": "dictionary", "key": "ByteArray", "value": "Inner", "map": true}]
+, "Response": [{"name": "n", "type": "u64"}]
+}, "services": {"SqrtOracle": {"sqrt" : { "input": "Request", "output": "Response" }, }} }

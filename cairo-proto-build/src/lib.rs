@@ -317,18 +317,22 @@ impl Config {
             let file_name = file_names
                 .get(module)
                 .expect("every module should have a filename");
-            let output_path = target.join(file_name);
+            let code_output_path = target.join(file_name);
+            let config_output_path = target.join(&format!("{file_name}.json"));
 
-            let previous_content = fs::read(&output_path);
+            let unchanged_code = fs::read(&code_output_path)
+                .map(|previous_content| previous_content == content.0.as_bytes())
+                .unwrap_or(false);
+            let unchanged_config = fs::read(&config_output_path)
+                .map(|previous_content| previous_content == content.0.as_bytes())
+                .unwrap_or(false);
 
-            if previous_content
-                .map(|previous_content| previous_content == content.as_bytes())
-                .unwrap_or(false)
-            {
+            if unchanged_code && unchanged_config {
                 trace!("unchanged: {:?}", file_name);
             } else {
                 trace!("writing: {:?}", file_name);
-                fs::write(output_path, content)?;
+                fs::write(code_output_path, &content.0)?;
+                fs::write(config_output_path, &content.1)?;
             }
         }
 
@@ -344,7 +348,7 @@ impl Config {
     pub fn generate(
         &mut self,
         requests: Vec<(Module, FileDescriptorProto)>,
-    ) -> std::io::Result<HashMap<Module, String>> {
+    ) -> std::io::Result<HashMap<Module, (String, String)>> {
         let mut modules = HashMap::new();
         let mut packages = HashMap::new();
 
@@ -358,11 +362,11 @@ impl Config {
             if !request_fd.service.is_empty() {
                 packages.insert(request_module.clone(), request_fd.package().to_string());
             }
-            let buf = modules
+            let (code_buf, config_buf) = modules
                 .entry(request_module.clone())
-                .or_insert_with(String::new);
-            CodeGenerator::generate(self, &message_graph, &extern_paths, request_fd, buf);
-            if buf.is_empty() {
+                .or_insert_with(|| (String::new(), String::new()));
+            CodeGenerator::generate(self, &message_graph, &extern_paths, request_fd, code_buf, config_buf);
+            if code_buf.is_empty() {
                 // Did not generate any code, remove from list to avoid inclusion in include file or output file list
                 modules.remove(&request_module);
             }
@@ -374,7 +378,7 @@ impl Config {
     }
 
     #[cfg(feature = "format")]
-    fn fmt_modules(&mut self, modules: &mut HashMap<Module, String>) {
+    fn fmt_modules(&mut self, modules: &mut HashMap<Module, (String, String)>) {
         for buf in modules.values_mut() {
             let file = syn::parse_file(buf).unwrap();
             let formatted = prettyplease::unparse(&file);
@@ -383,7 +387,7 @@ impl Config {
     }
 
     #[cfg(not(feature = "format"))]
-    fn fmt_modules(&mut self, _: &mut HashMap<Module, String>) {}
+    fn fmt_modules(&mut self, _: &mut HashMap<Module, (String, String)>) {}
 }
 
 

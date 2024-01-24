@@ -8,8 +8,9 @@ message Inner {
 
 message Request {
     uint64 n = 1;
-    Inner x = 3;
+    optional Inner x = 3;
     repeated int32 y = 4;
+    map<string, Inner> map = 5;
 }
 
 message Response {

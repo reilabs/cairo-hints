@@ -120,6 +120,7 @@ struct Request {
     n: u64,
     x: Option<Inner>,
     y: Array<i32>,
+    map: Felt252Dict<Inner>,
 }
 impl SendableRequest of Sendable<Request> {
     fn send(self: @Request) {
@@ -133,6 +134,9 @@ impl SendableRequest of Sendable<Request> {
         cheatcode::<'oracle_key_push'>(array!['y'].span());
         self.y.send();
         cheatcode::<'oracle_key_pop'>(array!['y'].span());
+        cheatcode::<'oracle_key_push'>(array!['map'].span());
+        self.map.send();
+        cheatcode::<'oracle_key_pop'>(array!['map'].span());
         cheatcode::<'oracle_path_pop'>(array!['struct'].span());
     }
     fn recv() -> Request {
@@ -146,8 +150,11 @@ impl SendableRequest of Sendable<Request> {
         cheatcode::<'oracle_key_push'>(array!['y'].span());
         let y = Sendable::<Array<i32>>::recv();
         cheatcode::<'oracle_key_pop'>(array!['y'].span());
+        cheatcode::<'oracle_key_push'>(array!['map'].span());
+        let map = Sendable::<Array<request::MapEntry>>::recv();
+        cheatcode::<'oracle_key_pop'>(array!['map'].span());
         cheatcode::<'oracle_path_pop'>(array!['struct'].span());
-        Request { n, x, y }
+        Request { n, x, y, map }
     }
 }
 #[derive(Serde, Drop)]

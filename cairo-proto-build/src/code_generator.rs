@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::iter;
+use std::ops::Add;
 
 use itertools::{Either, Itertools};
 use log::debug;
@@ -35,7 +36,8 @@ pub struct CodeGenerator<'a> {
     extern_paths: &'a ExternPaths,
     depth: u8,
     path: Vec<i32>,
-    buf: &'a mut String,
+    code_buf: &'a mut String,
+    config_buf: &'a mut String,
 }
 
 fn push_indent(buf: &mut String, depth: u8) {
@@ -50,7 +52,8 @@ impl<'a> CodeGenerator<'a> {
         message_graph: &MessageGraph,
         extern_paths: &ExternPaths,
         file: FileDescriptorProto,
-        buf: &mut String,
+        code_buf: &mut String,
+        config_buf: &mut String,
     ) {
         let source_info = file.source_code_info.map(|mut s| {
             s.location.retain(|loc| {
@@ -77,7 +80,8 @@ impl<'a> CodeGenerator<'a> {
             extern_paths,
             depth: 0,
             path: Vec::new(),
-            buf,
+            code_buf,
+            config_buf,
         };
 
         debug!(
@@ -88,11 +92,16 @@ impl<'a> CodeGenerator<'a> {
 
         code_gen.append_header();
 
+        let message_count = file.message_type.len();
         code_gen.path.push(4);
         for (idx, message) in file.message_type.into_iter().enumerate() {
             code_gen.path.push(idx as i32);
             code_gen.append_message(message);
             code_gen.path.pop();
+
+            if idx + 1 != message_count {
+                code_gen.config_buf.push_str(", ");
+            }
         }
         code_gen.path.pop();
 
@@ -101,6 +110,8 @@ impl<'a> CodeGenerator<'a> {
             panic!("enums are not supported");
         }
         code_gen.path.pop();
+
+        code_gen.config_buf.push_str("}, \"services\": {");
 
         code_gen.path.push(6);
         for (idx, service) in file.service.into_iter().enumerate() {
@@ -182,12 +193,16 @@ impl<'a> CodeGenerator<'a> {
                 }
             });
 
+        let struct_name = to_upper_camel(&message_name);
+
         self.push_indent();
-        self.buf.push_str("#[derive(Serde, Drop)]\n");
+        self.code_buf.push_str("#[derive(Serde, Drop)]\n");
         self.push_indent();
-        self.buf.push_str("struct ");
-        self.buf.push_str(&to_upper_camel(&message_name));
-        self.buf.push_str(" {\n");
+        self.code_buf.push_str("struct ");
+        self.code_buf.push_str(&struct_name);
+        self.code_buf.push_str(" {\n");
+
+        self.config_buf.push_str(&format!("\"{struct_name}\": ["));
 
         self.depth += 1;
         self.path.push(2);
@@ -201,7 +216,13 @@ impl<'a> CodeGenerator<'a> {
                 Some(&(ref key, ref value)) => {
                     self.append_map_field(&fq_message_name, field, key, value)
                 }
-                None => self.append_field(&fq_message_name, field),
+                None => {
+                    self.append_field(&fq_message_name, field)
+                },
+            }
+
+            if idx + 1 != fields.len() {
+                self.config_buf.push_str(", ");
             }
             self.path.pop();
         }
@@ -226,7 +247,7 @@ impl<'a> CodeGenerator<'a> {
 
         self.depth -= 1;
         self.push_indent();
-        self.buf.push_str("}\n");
+        self.code_buf.push_str("}\n");
 
         if !message.enum_type.is_empty() || !nested_types.is_empty() || !oneof_fields.is_empty() {
             self.push_mod(&message_name);
@@ -265,21 +286,21 @@ impl<'a> CodeGenerator<'a> {
         }
 
         let type_name = to_upper_camel(&message_name);
-        self.buf.push_str(&format!("impl Sendable{type_name} of Sendable<{type_name}> {{\n"));
-        self.buf.push_str(&format!("    fn send(self: @{type_name}) {{\n"));
-        self.buf.push_str("        cheatcode::<'oracle_path_push'>(array!['struct'].span());\n");
+        self.code_buf.push_str(&format!("impl Sendable{type_name} of Sendable<{type_name}> {{\n"));
+        self.code_buf.push_str(&format!("    fn send(self: @{type_name}) {{\n"));
+        self.code_buf.push_str("        cheatcode::<'oracle_path_push'>(array!['struct'].span());\n");
         for (field, idx) in fields.clone() {
             let name = to_snake(field.name());
-            self.buf.push_str(&format!("        cheatcode::<'oracle_key_push'>(array!['{name}'].span());\n"));
-            self.buf.push_str(&format!("        self.{name}.send();\n"));
-            self.buf.push_str(&format!("        cheatcode::<'oracle_key_pop'>(array!['{name}'].span());\n"));
+            self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_push'>(array!['{name}'].span());\n"));
+            self.code_buf.push_str(&format!("        self.{name}.send();\n"));
+            self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_pop'>(array!['{name}'].span());\n"));
         }
-        self.buf.push_str("        cheatcode::<'oracle_path_pop'>(array!['struct'].span());\n");
+        self.code_buf.push_str("        cheatcode::<'oracle_path_pop'>(array!['struct'].span());\n");
 
-        self.buf.push_str("    }\n");
-        self.buf.push_str(&format!("    fn recv() -> {type_name} {{\n"));
+        self.code_buf.push_str("    }\n");
+        self.code_buf.push_str(&format!("    fn recv() -> {type_name} {{\n"));
 
-        self.buf.push_str("        cheatcode::<'oracle_path_push'>(array!['struct'].span());\n");
+        self.code_buf.push_str("        cheatcode::<'oracle_path_push'>(array!['struct'].span());\n");
         for (field, idx) in fields.clone() {
             let name = to_snake(field.name());
             let repeated = field.label == Some(Label::Repeated as i32);
@@ -291,16 +312,18 @@ impl<'a> CodeGenerator<'a> {
                 ty = format!("Option<{ty}>");
             }
 
-            self.buf.push_str(&format!("        cheatcode::<'oracle_key_push'>(array!['{name}'].span());\n"));
-            self.buf.push_str(&format!("        let {name} = Sendable::<{ty}>::recv();\n"));
-            self.buf.push_str(&format!("        cheatcode::<'oracle_key_pop'>(array!['{name}'].span());\n"));
+            self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_push'>(array!['{name}'].span());\n"));
+            self.code_buf.push_str(&format!("        let {name} = Sendable::<{ty}>::recv();\n"));
+            self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_pop'>(array!['{name}'].span());\n"));
         }
-        self.buf.push_str("        cheatcode::<'oracle_path_pop'>(array!['struct'].span());\n");
+        self.code_buf.push_str("        cheatcode::<'oracle_path_pop'>(array!['struct'].span());\n");
 
         let all_fields = fields.iter().map(|f| to_snake(f.0.name())).join(", ");
-        self.buf.push_str(&format!("        {type_name} {{ {all_fields} }}\n"));
-        self.buf.push_str("    }\n");
-        self.buf.push_str("}\n");
+        self.code_buf.push_str(&format!("        {type_name} {{ {all_fields} }}\n"));
+        self.code_buf.push_str("    }\n");
+        self.code_buf.push_str("}\n");
+
+        self.config_buf.push_str("]\n");
     }
 
     fn append_field(&mut self, fq_message_name: &str, field: FieldDescriptorProto) {
@@ -330,31 +353,44 @@ impl<'a> CodeGenerator<'a> {
 
         if deprecated {
             self.push_indent();
-            self.buf.push_str("#[deprecated]\n");
+            self.code_buf.push_str("#[deprecated]\n");
         }
 
+        let field_name = to_snake(field.name());
+
         self.push_indent();
-        self.buf.push_str(&to_snake(field.name()));
-        self.buf.push_str(": ");
+        self.code_buf.push_str(&field_name);
+        self.code_buf.push_str(": ");
+
+        let mut type_name = String::new();
 
         if repeated {
-            self.buf.push_str("Array<");
+            type_name.push_str("Array<");
         } else if optional {
-            self.buf.push_str("Option<");
+            type_name.push_str("Option<");
         }
         if boxed {
             panic!("boxed types not supported?");
             // self.buf
             //     .push_str(&format!("{}::alloc::boxed::Box<", prost_path));
         }
-        self.buf.push_str(&ty);
+        type_name.push_str(&ty);
         if boxed {
-            self.buf.push('>');
+            type_name.push_str(">");
         }
         if repeated || optional {
-            self.buf.push('>');
+            type_name.push_str(">");
         }
-        self.buf.push_str(",\n");
+        self.code_buf.push_str(&type_name);
+        self.code_buf.push_str(",\n");
+
+        if repeated {
+            self.config_buf.push_str(&format!("{{\"name\": \"{field_name}\", \"type\": \"array\", \"value\": \"{ty}\"}}"));
+        } else if optional {
+            self.config_buf.push_str(&format!("{{\"name\": \"{field_name}\", \"type\": \"option\", \"value\": \"{ty}\"}}"));
+        } else {
+            self.config_buf.push_str(&format!("{{\"name\": \"{field_name}\", \"type\": \"{ty}\"}}"));
+        }
     }
 
     fn append_map_field(
@@ -373,6 +409,14 @@ impl<'a> CodeGenerator<'a> {
             key_ty,
             value_ty
         );
+
+        let field_name = to_snake(field.name());
+        self.push_indent();
+        self.code_buf.push_str(&format!(
+            "{field_name}: Felt252Dict<{value_ty}>,\n"
+        ));
+
+        self.config_buf.push_str(&format!("{{\"name\": \"{field_name}\", \"type\": \"dictionary\", \"key\": \"{key_ty}\", \"value\": \"{value_ty}\", \"map\": true}}"));
     }
 
     fn location(&self) -> Option<&Location> {
@@ -447,17 +491,18 @@ impl<'a> CodeGenerator<'a> {
 
     fn append_service_def(&mut self, service: Service) {
         // Generate a trait for the service.
-        self.buf.push_str("#[generate_trait]\n");
-        self.buf.push_str(&format!("impl {} of {}Trait {{\n", &service.name, &service.name));
+        self.code_buf.push_str("#[generate_trait]\n");
+        self.code_buf.push_str(&format!("impl {} of {}Trait {{\n", &service.name, &service.name));
+        self.config_buf.push_str(&format!("\"{}\": {{", service.name));
 
         // Generate the service methods.
         for method in service.methods {
-            self.buf.push_str(&format!(
+            self.code_buf.push_str(&format!(
                 "    fn {}(arg: {}) -> {} {{",
                 method.name, method.input_type, method.output_type
             ));
 
-            self.buf.push_str(&format!(
+            self.code_buf.push_str(&format!(
                 r"
                 arg.send();
                 cheatcode::<'oracle_ask'>(array!['{}'].span());
@@ -465,27 +510,31 @@ impl<'a> CodeGenerator<'a> {
 ",
 method.name, method.output_type));
 
-            self.buf.push_str("    }\n");
+            self.code_buf.push_str("    }\n");
+            self.config_buf.push_str(
+                &format!("\"{}\" : {{ \"input\": \"{}\", \"output\": \"{}\" }}, ", method.name, method.input_type, method.output_type)
+            );
         }
 
         // Close out the trait.
-        self.buf.push_str("}\n");
+        self.code_buf.push_str("}\n");
+        self.config_buf.push_str("}");
     }
 
     fn push_indent(&mut self) {
-        push_indent(self.buf, self.depth);
+        push_indent(self.code_buf, self.depth);
     }
 
     fn push_mod(&mut self, module: &str) {
         self.push_indent();
-        self.buf.push_str("/// Nested message and enum types in `");
-        self.buf.push_str(module);
-        self.buf.push_str("`.\n");
+        self.code_buf.push_str("/// Nested message and enum types in `");
+        self.code_buf.push_str(module);
+        self.code_buf.push_str("`.\n");
 
         self.push_indent();
-        self.buf.push_str("mod ");
-        self.buf.push_str(&to_snake(module));
-        self.buf.push_str(" {\n");
+        self.code_buf.push_str("mod ");
+        self.code_buf.push_str(&to_snake(module));
+        self.code_buf.push_str(" {\n");
 
         self.type_path.push(module.into());
 
@@ -498,7 +547,7 @@ method.name, method.output_type));
         self.type_path.pop();
 
         self.push_indent();
-        self.buf.push_str("}\n");
+        self.code_buf.push_str("}\n");
     }
 
     fn resolve_type(&self, field: &FieldDescriptorProto, fq_message_name: &str) -> String {
@@ -614,10 +663,12 @@ method.name, method.output_type));
     }
 
     fn append_footer(&mut self) {
+        self.config_buf.push_str("} }");
     }
 
     fn append_header(&mut self) {
-        self.buf.push_str(
+        self.config_buf.push_str("{ \"messages\": {");
+        self.code_buf.push_str(
 r"use starknet::testing::cheatcode;
 
 trait Sendable<T> {
