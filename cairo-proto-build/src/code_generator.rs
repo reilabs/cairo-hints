@@ -13,6 +13,7 @@ use prost_types::{
     FieldOptions, FileDescriptorProto, ServiceDescriptorProto,
     SourceCodeInfo,
 };
+use cairo_proto_serde::configuration::{Configuration, Field, FieldType, MethodDeclaration};
 
 use crate::ast::{Comments, Method, Service};
 use crate::extern_paths::ExternPaths;
@@ -37,7 +38,7 @@ pub struct CodeGenerator<'a> {
     depth: u8,
     path: Vec<i32>,
     code_buf: &'a mut String,
-    config_buf: &'a mut String,
+    serde_config: &'a mut Configuration,
 }
 
 fn push_indent(buf: &mut String, depth: u8) {
@@ -53,7 +54,7 @@ impl<'a> CodeGenerator<'a> {
         extern_paths: &ExternPaths,
         file: FileDescriptorProto,
         code_buf: &mut String,
-        config_buf: &mut String,
+        serde_config: &mut Configuration,
     ) {
         let source_info = file.source_code_info.map(|mut s| {
             s.location.retain(|loc| {
@@ -81,7 +82,7 @@ impl<'a> CodeGenerator<'a> {
             depth: 0,
             path: Vec::new(),
             code_buf,
-            config_buf,
+            serde_config,
         };
 
         debug!(
@@ -98,10 +99,6 @@ impl<'a> CodeGenerator<'a> {
             code_gen.path.push(idx as i32);
             code_gen.append_message(message);
             code_gen.path.pop();
-
-            if idx + 1 != message_count {
-                code_gen.config_buf.push_str(", ");
-            }
         }
         code_gen.path.pop();
 
@@ -110,8 +107,6 @@ impl<'a> CodeGenerator<'a> {
             panic!("enums are not supported");
         }
         code_gen.path.pop();
-
-        code_gen.config_buf.push_str("}, \"services\": {");
 
         code_gen.path.push(6);
         for (idx, service) in file.service.into_iter().enumerate() {
@@ -202,10 +197,10 @@ impl<'a> CodeGenerator<'a> {
         self.code_buf.push_str(&struct_name);
         self.code_buf.push_str(" {\n");
 
-        self.config_buf.push_str(&format!("\"{struct_name}\": ["));
-
         self.depth += 1;
         self.path.push(2);
+
+        let mut fields_def = Vec::new();
         for (field, idx) in fields.clone() {
             self.path.push(idx as i32);
             match field
@@ -217,16 +212,14 @@ impl<'a> CodeGenerator<'a> {
                     self.append_map_field(&fq_message_name, field, key, value)
                 }
                 None => {
-                    self.append_field(&fq_message_name, field)
+                    let field_def = self.append_field(&fq_message_name, field);
+                    fields_def.push(field_def);
                 },
-            }
-
-            if idx + 1 != fields.len() {
-                self.config_buf.push_str(", ");
             }
             self.path.pop();
         }
         self.path.pop();
+        self.serde_config.messages.insert(struct_name, fields_def);
 
         self.path.push(8);
         for (idx, oneof) in message.oneof_decl.iter().enumerate() {
@@ -323,11 +316,9 @@ impl<'a> CodeGenerator<'a> {
         // self.code_buf.push_str(&format!("        {type_name} {{ {all_fields} }}\n"));
         // self.code_buf.push_str("    }\n");
         // self.code_buf.push_str("}\n");
-
-        self.config_buf.push_str("]\n");
     }
 
-    fn append_field(&mut self, fq_message_name: &str, field: FieldDescriptorProto) {
+    fn append_field(&mut self, fq_message_name: &str, field: FieldDescriptorProto) -> cairo_proto_serde::configuration::Field {
         let type_ = field.r#type();
         let repeated = field.label == Some(Label::Repeated as i32);
         let deprecated = self.deprecated(&field);
@@ -386,11 +377,11 @@ impl<'a> CodeGenerator<'a> {
         self.code_buf.push_str(",\n");
 
         if repeated {
-            self.config_buf.push_str(&format!("{{\"name\": \"{field_name}\", \"type\": \"array\", \"value\": \"{ty}\"}}"));
+            Field { name: field_name, ty: FieldType::Array(Box::new(ty.into())) }
         } else if optional {
-            self.config_buf.push_str(&format!("{{\"name\": \"{field_name}\", \"type\": \"option\", \"value\": \"{ty}\"}}"));
+            Field { name: field_name, ty: FieldType::Option(Box::new(ty.into())) }
         } else {
-            self.config_buf.push_str(&format!("{{\"name\": \"{field_name}\", \"type\": \"{ty}\"}}"));
+            Field { name: field_name, ty: ty.into() }
         }
     }
 
@@ -401,6 +392,8 @@ impl<'a> CodeGenerator<'a> {
         key: &FieldDescriptorProto,
         value: &FieldDescriptorProto,
     ) {
+        todo!("cairo maps are not serializable");
+
         let key_ty = self.resolve_type(key, fq_message_name);
         let value_ty = self.resolve_type(value, fq_message_name);
 
@@ -417,7 +410,7 @@ impl<'a> CodeGenerator<'a> {
             "{field_name}: Felt252Dict<{value_ty}>,\n"
         ));
 
-        self.config_buf.push_str(&format!("{{\"name\": \"{field_name}\", \"type\": \"dictionary\", \"key\": \"{key_ty}\", \"value\": \"{value_ty}\", \"map\": true}}"));
+        //self.config_buf.push_str(&format!("{{\"name\": \"{field_name}\", \"type\": \"dictionary\", \"key\": \"{key_ty}\", \"value\": \"{value_ty}\", \"map\": true}}"));
     }
 
     fn location(&self) -> Option<&Location> {
@@ -494,7 +487,8 @@ impl<'a> CodeGenerator<'a> {
         // Generate a trait for the service.
         self.code_buf.push_str("#[generate_trait]\n");
         self.code_buf.push_str(&format!("impl {} of {}Trait {{\n", &service.name, &service.name));
-        self.config_buf.push_str(&format!("\"{}\": {{", service.name));
+
+        let mut methods = HashMap::<String, MethodDeclaration>::new();
 
         // Generate the service methods.
         for method in service.methods {
@@ -513,14 +507,13 @@ impl<'a> CodeGenerator<'a> {
 method.name));
 
             self.code_buf.push_str("    }\n");
-            self.config_buf.push_str(
-                &format!("\"{}\" : {{ \"input\": \"{}\", \"output\": \"{}\" }}, ", method.name, method.input_type, method.output_type)
-            );
+            methods.insert(method.name, MethodDeclaration { input: FieldType::Message(method.input_type), output: FieldType::Message(method.output_type) });
         }
+
+        self.serde_config.services.insert(service.name, cairo_proto_serde::configuration::Service { methods });
 
         // Close out the trait.
         self.code_buf.push_str("}\n");
-        self.config_buf.push_str("}");
     }
 
     fn push_indent(&mut self) {
@@ -664,13 +657,10 @@ method.name));
             .map_or(false, FieldOptions::deprecated)
     }
 
-    fn append_footer(&mut self) {
-        self.config_buf.push_str("} }");
-    }
+    fn append_footer(&mut self) {}
 
     fn append_header(&mut self) {
         self.code_buf.push_str("use starknet::testing::cheatcode;\n");
-        self.config_buf.push_str("{ \"messages\": {");
     }
 }
 

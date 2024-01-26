@@ -21,6 +21,7 @@ use std::io::{Error, ErrorKind, Write};
 use std::ops::RangeToInclusive;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use cairo_proto_serde::configuration::Configuration;
 
 mod ast;
 mod code_generator;
@@ -320,11 +321,13 @@ impl Config {
             let code_output_path = target.join(file_name);
             let config_output_path = target.join(&format!("{file_name}.json"));
 
+            let config_json = serde_json::to_string(&content.1).unwrap();
+
             let unchanged_code = fs::read(&code_output_path)
                 .map(|previous_content| previous_content == content.0.as_bytes())
                 .unwrap_or(false);
             let unchanged_config = fs::read(&config_output_path)
-                .map(|previous_content| previous_content == content.0.as_bytes())
+                .map(|previous_content| previous_content == config_json.as_bytes())
                 .unwrap_or(false);
 
             if unchanged_code && unchanged_config {
@@ -332,7 +335,7 @@ impl Config {
             } else {
                 trace!("writing: {:?}", file_name);
                 fs::write(code_output_path, &content.0)?;
-                fs::write(config_output_path, &content.1)?;
+                fs::write(config_output_path, &config_json)?;
             }
         }
 
@@ -348,7 +351,7 @@ impl Config {
     pub fn generate(
         &mut self,
         requests: Vec<(Module, FileDescriptorProto)>,
-    ) -> std::io::Result<HashMap<Module, (String, String)>> {
+    ) -> std::io::Result<HashMap<Module, (String, Configuration)>> {
         let mut modules = HashMap::new();
         let mut packages = HashMap::new();
 
@@ -364,7 +367,7 @@ impl Config {
             }
             let (code_buf, config_buf) = modules
                 .entry(request_module.clone())
-                .or_insert_with(|| (String::new(), String::new()));
+                .or_insert_with(|| (String::new(), Configuration::default()));
             CodeGenerator::generate(self, &message_graph, &extern_paths, request_fd, code_buf, config_buf);
             if code_buf.is_empty() {
                 // Did not generate any code, remove from list to avoid inclusion in include file or output file list
@@ -378,7 +381,7 @@ impl Config {
     }
 
     #[cfg(feature = "format")]
-    fn fmt_modules(&mut self, modules: &mut HashMap<Module, (String, String)>) {
+    fn fmt_modules(&mut self, modules: &mut HashMap<Module, (String, Configuration)>) {
         for buf in modules.values_mut() {
             let file = syn::parse_file(buf).unwrap();
             let formatted = prettyplease::unparse(&file);
@@ -387,7 +390,7 @@ impl Config {
     }
 
     #[cfg(not(feature = "format"))]
-    fn fmt_modules(&mut self, _: &mut HashMap<Module, (String, String)>) {}
+    fn fmt_modules(&mut self, _: &mut HashMap<Module, (String, Configuration)>) {}
 }
 
 
