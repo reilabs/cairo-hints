@@ -885,6 +885,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cairo-proto-serde"
+version = "0.1.0"
+dependencies = [
+ "cairo-felt",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "cairo-vm"
 version = "0.8.4-rc.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

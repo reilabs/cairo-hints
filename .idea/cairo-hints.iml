@@ -8,6 +8,7 @@
       <sourceFolder url="file://$MODULE_DIR$/scarb-hints-new/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/scarb-hints-run/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/scarb-hints-test/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cairo-proto-serde/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

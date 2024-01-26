@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "cairo-proto-serde",
     "cairo-proto-build",
     "cairo-oracle-hint-processor",
     "scarb-hints-new",
