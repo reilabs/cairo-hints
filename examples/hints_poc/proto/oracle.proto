@@ -10,7 +10,7 @@ message Request {
     uint64 n = 1;
     optional Inner x = 3;
     repeated int32 y = 4;
-    map<string, Inner> map = 5;
+    // map<string, Inner> map = 5;
 }
 
 message Response {

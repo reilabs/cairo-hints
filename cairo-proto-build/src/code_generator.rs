@@ -196,7 +196,7 @@ impl<'a> CodeGenerator<'a> {
         let struct_name = to_upper_camel(&message_name);
 
         self.push_indent();
-        self.code_buf.push_str("#[derive(Serde, Drop)]\n");
+        self.code_buf.push_str("#[derive(Drop, Serde)]\n");
         self.push_indent();
         self.code_buf.push_str("struct ");
         self.code_buf.push_str(&struct_name);
@@ -285,43 +285,44 @@ impl<'a> CodeGenerator<'a> {
             self.pop_mod();
         }
 
-        let type_name = to_upper_camel(&message_name);
-        self.code_buf.push_str(&format!("impl Sendable{type_name} of Sendable<{type_name}> {{\n"));
-        self.code_buf.push_str(&format!("    fn send(self: @{type_name}) {{\n"));
-        self.code_buf.push_str("        cheatcode::<'oracle_path_push'>(array!['struct'].span());\n");
-        for (field, idx) in fields.clone() {
-            let name = to_snake(field.name());
-            self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_push'>(array!['{name}'].span());\n"));
-            self.code_buf.push_str(&format!("        self.{name}.send();\n"));
-            self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_pop'>(array!['{name}'].span());\n"));
-        }
-        self.code_buf.push_str("        cheatcode::<'oracle_path_pop'>(array!['struct'].span());\n");
-
-        self.code_buf.push_str("    }\n");
-        self.code_buf.push_str(&format!("    fn recv() -> {type_name} {{\n"));
-
-        self.code_buf.push_str("        cheatcode::<'oracle_path_push'>(array!['struct'].span());\n");
-        for (field, idx) in fields.clone() {
-            let name = to_snake(field.name());
-            let repeated = field.label == Some(Label::Repeated as i32);
-            let optional = self.optional(&field);    
-            let mut ty = self.resolve_type(&field, &fq_message_name);
-            if repeated {
-                ty = format!("Array<{ty}>");
-            } else if optional {
-                ty = format!("Option<{ty}>");
-            }
-
-            self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_push'>(array!['{name}'].span());\n"));
-            self.code_buf.push_str(&format!("        let {name} = Sendable::<{ty}>::recv();\n"));
-            self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_pop'>(array!['{name}'].span());\n"));
-        }
-        self.code_buf.push_str("        cheatcode::<'oracle_path_pop'>(array!['struct'].span());\n");
-
-        let all_fields = fields.iter().map(|f| to_snake(f.0.name())).join(", ");
-        self.code_buf.push_str(&format!("        {type_name} {{ {all_fields} }}\n"));
-        self.code_buf.push_str("    }\n");
-        self.code_buf.push_str("}\n");
+        // Sendable no longer needed
+        // let type_name = to_upper_camel(&message_name);
+        // self.code_buf.push_str(&format!("impl Sendable{type_name} of Sendable<{type_name}> {{\n"));
+        // self.code_buf.push_str(&format!("    fn send(self: @{type_name}) {{\n"));
+        // self.code_buf.push_str("        cheatcode::<'oracle_path_push'>(array!['struct'].span());\n");
+        // for (field, idx) in fields.clone() {
+        //     let name = to_snake(field.name());
+        //     self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_push'>(array!['{name}'].span());\n"));
+        //     self.code_buf.push_str(&format!("        self.{name}.send();\n"));
+        //     self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_pop'>(array!['{name}'].span());\n"));
+        // }
+        // self.code_buf.push_str("        cheatcode::<'oracle_path_pop'>(array!['struct'].span());\n");
+        //
+        // self.code_buf.push_str("    }\n");
+        // self.code_buf.push_str(&format!("    fn recv() -> {type_name} {{\n"));
+        //
+        // self.code_buf.push_str("        cheatcode::<'oracle_path_push'>(array!['struct'].span());\n");
+        // for (field, idx) in fields.clone() {
+        //     let name = to_snake(field.name());
+        //     let repeated = field.label == Some(Label::Repeated as i32);
+        //     let optional = self.optional(&field);
+        //     let mut ty = self.resolve_type(&field, &fq_message_name);
+        //     if repeated {
+        //         ty = format!("Array<{ty}>");
+        //     } else if optional {
+        //         ty = format!("Option<{ty}>");
+        //     }
+        //
+        //     self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_push'>(array!['{name}'].span());\n"));
+        //     self.code_buf.push_str(&format!("        let {name} = Sendable::<{ty}>::recv();\n"));
+        //     self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_pop'>(array!['{name}'].span());\n"));
+        // }
+        // self.code_buf.push_str("        cheatcode::<'oracle_path_pop'>(array!['struct'].span());\n");
+        //
+        // let all_fields = fields.iter().map(|f| to_snake(f.0.name())).join(", ");
+        // self.code_buf.push_str(&format!("        {type_name} {{ {all_fields} }}\n"));
+        // self.code_buf.push_str("    }\n");
+        // self.code_buf.push_str("}\n");
 
         self.config_buf.push_str("]\n");
     }
@@ -504,11 +505,12 @@ impl<'a> CodeGenerator<'a> {
 
             self.code_buf.push_str(&format!(
                 r"
-                arg.send();
-                cheatcode::<'oracle_ask'>(array!['{}'].span());
-                Sendable::<{}>::recv()
+        let mut serialized = ArrayTrait::new();
+        ('{}', arg).serialize(ref serialized);
+        let mut result = cheatcode::<'oracle_ask'>(serialized.span());
+        Serde::deserialize(ref result).unwrap()
 ",
-method.name, method.output_type));
+method.name));
 
             self.code_buf.push_str("    }\n");
             self.config_buf.push_str(
@@ -667,105 +669,8 @@ method.name, method.output_type));
     }
 
     fn append_header(&mut self) {
+        self.code_buf.push_str("use starknet::testing::cheatcode;\n");
         self.config_buf.push_str("{ \"messages\": {");
-        self.code_buf.push_str(
-r"use starknet::testing::cheatcode;
-
-trait Sendable<T> {
-    fn send(self: @T);
-    fn recv() -> T;
-}
-
-// TODO: missing implementation for builtin types
-impl Sendableu64 of Sendable<u64> {
-    fn send(self: @u64) {
-        let val: felt252 = (*self).into();
-        cheatcode::<'oracle_value_push'>(array!['u64', val].span());
-    }
-    fn recv() -> u64 {
-        let mut bytes = cheatcode::<'oracle_value_pop'>(array!['u64'].span()); // could enforce type here!
-        Serde::<u64>::deserialize(ref bytes).unwrap()
-    }
-}
-
-impl Sendableu32 of Sendable<u32> {
-    fn send(self: @u32) {
-        let val: felt252 = (*self).into();
-        cheatcode::<'oracle_value_push'>(array!['u32', val].span());
-    }
-    fn recv() -> u32 {
-        let mut bytes = cheatcode::<'oracle_value_pop'>(array!['u32'].span()); // could enforce type here!
-        Serde::<u32>::deserialize(ref bytes).unwrap()
-    }
-}
-
-impl Sendablei32 of Sendable<i32> {
-    fn send(self: @i32) {
-        let val: felt252 = (*self).into();
-        cheatcode::<'oracle_value_push'>(array!['i32', val].span());
-    }
-    fn recv() -> i32 {
-        let mut bytes = cheatcode::<'oracle_value_pop'>(array!['i32'].span()); // could enforce type here!
-        Serde::<i32>::deserialize(ref bytes).unwrap()
-    }
-}
-
-impl optionimpl<T, +Sendable<T>> of Sendable<Option<T>> {
-    fn send(self: @Option<T>) {
-        cheatcode::<'oracle_path_push'>(array!['struct'].span());
-
-        match self {
-            Option::Some(v) => {
-                cheatcode::<'oracle_key_push'>(array!['presence'].span());
-                Sendable::<u64>::send(@1); // present
-                cheatcode::<'oracle_key_pop'>(array!['presence'].span());
-
-                cheatcode::<'oracle_key_push'>(array!['value'].span());
-                Sendable::<T>::send(v); // present
-                cheatcode::<'oracle_key_pop'>(array!['value'].span());
-            },
-            Option::None => {
-                cheatcode::<'oracle_key_push'>(array!['presence'].span());
-                Sendable::<u64>::send(@0); // not present
-                cheatcode::<'oracle_key_pop'>(array!['presence'].span());
-            }
-        }
-
-        cheatcode::<'oracle_path_pop'>(array!['struct'].span());
-    }
-    fn recv() -> Option<T> {
-        Option::None
-    }
-}
-
-impl ArraySendable<T, +Sendable<T>> of Sendable<Array<T>> {
-    fn send(self: @Array<T>) {
-        cheatcode::<'oracle_path_push'>(array!['array'].span());
-        let mut i: usize = 0;
-        loop {
-            if i >= self.len() {
-                break;
-            }
-            self.at(i).send();
-        };
-        cheatcode::<'oracle_path_pop'>(array!['array'].span());
-    }
-
-    fn recv() -> Array<T> {
-        array![]
-    }
-}
-
-impl ByteArraySendable of Sendable<ByteArray> {
-    fn send(self: @ByteArray) {
-    }
-
-    fn recv() -> ByteArray {
-        Default::default()
-    }
-}
-
-");
     }
 }
 
