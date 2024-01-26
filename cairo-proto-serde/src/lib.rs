@@ -1,19 +1,28 @@
 use cairo_felt::Felt252;
 use serde_json::{json, Map, Value};
-use crate::configuration::{Configuration, FieldType};
+use crate::configuration::{Configuration, FieldType, PrimitiveType};
 
 pub mod configuration;
 
-// TODO: cover all types
-fn serialize_primitive(ty: &str, value: &Value) -> Vec<Felt252> {
-    let x = value.as_number().unwrap().as_u64().unwrap();
-    vec![Felt252::from(x)]
+fn serialize_primitive(ty: &PrimitiveType, value: &Value) -> Vec<Felt252> {
+    let number = value.as_number().unwrap();
+    let element = match ty {
+        PrimitiveType::U64 => Felt252::from(number.as_u64().unwrap()),
+        PrimitiveType::U32 => Felt252::from(u32::try_from(number.as_u64().unwrap()).unwrap()),
+        PrimitiveType::I32 => Felt252::from(i32::try_from(number.as_i64().unwrap()).unwrap()),
+    };
+    vec![element]
 }
 
-fn deserialize_primitive(ty: &str, value: &mut &[Felt252]) -> Value {
-    let x: u64 = value[0].to_bigint().try_into().unwrap();
+fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
+    let num = value[0].to_bigint();
     *value = &value[1..];
-    json!(x)
+
+    match ty {
+        PrimitiveType::U64 => json!(u64::try_from(num).unwrap()),
+        PrimitiveType::U32 => json!(u32::try_from(num).unwrap()),
+        PrimitiveType::I32 => json!(i32::try_from(num).unwrap()),
+    }
 }
 
 fn serialize_cairo_serde(config: &Configuration, ty: &FieldType, value: &Value) -> Vec<Felt252> {
@@ -30,15 +39,15 @@ fn serialize_cairo_serde(config: &Configuration, ty: &FieldType, value: &Value) 
         }
         FieldType::Option(inner_ty) => {
             if value.is_null() {
-                result.append(&mut serialize_primitive("u64".into(), &json!(1)));
+                result.append(&mut serialize_primitive(&PrimitiveType::U64, &json!(1)));
             } else {
-                result.append(&mut serialize_primitive("u64".into(), &json!(0)));
+                result.append(&mut serialize_primitive(&PrimitiveType::U64, &json!(0)));
                 result.append(&mut serialize_cairo_serde(config, &inner_ty, value));
             }
         }
         FieldType::Array(value_ty) => {
             let value = value.as_array().expect("must be an array");
-            result.append(&mut serialize_primitive("u64".into(), &json!(value.len())));
+            result.append(&mut serialize_primitive(&PrimitiveType::U64, &json!(value.len())));
             for element in value {
                 result.append(&mut serialize_cairo_serde(config, &value_ty, element));
             }
@@ -60,7 +69,7 @@ fn deserialize_cairo_serde(config: &Configuration, ty: &FieldType, value: &mut &
             Value::Object(result)
         }
         FieldType::Option(inner_ty) => {
-            let idx = deserialize_primitive("u64", value);
+            let idx = deserialize_primitive(&PrimitiveType::U64, value);
             if idx == 0 {
                 deserialize_cairo_serde(config, &inner_ty, value)
             } else {
@@ -68,7 +77,7 @@ fn deserialize_cairo_serde(config: &Configuration, ty: &FieldType, value: &mut &
             }
         }
         FieldType::Array(value_ty) => {
-            let len = deserialize_primitive("u64", value).as_number().unwrap().as_u64().unwrap() as usize;
+            let len = deserialize_primitive(&PrimitiveType::U64, value).as_number().unwrap().as_u64().unwrap() as usize;
             let mut result = Vec::new();
             for _i in 0..len {
                 result.push(deserialize_cairo_serde(config, &value_ty, value));
@@ -83,7 +92,7 @@ mod tests {
     use std::collections::HashMap;
     use cairo_felt::Felt252;
     use serde_json::{json, Value};
-    use crate::configuration::{Configuration, Field, FieldType, MethodDeclaration, Service};
+    use crate::configuration::{Configuration, Field, FieldType, MethodDeclaration, PrimitiveType, Service};
     use crate::{deserialize_cairo_serde, serialize_cairo_serde};
 
     #[test]
@@ -112,22 +121,30 @@ mod tests {
         assert_eq!(deserialized, expected_json);
     }
 
+    #[test]
+    fn it_saves_configuration() {
+        let configuration = test_configuration();
+        let json_string = serde_json::to_string(&configuration).unwrap();
+        let new_configuration = serde_json::from_str::<Configuration>(&json_string).unwrap();
+        println!("JSON {json_string:?} -> {configuration:?}");
+    }
+
 
     fn test_configuration() -> Configuration {
         let mut messages = HashMap::new();
         messages.insert(
             String::from("Inner"), vec![
-                Field { name: "inner".into(), ty: FieldType::Primitive("u32".into()) },
+                Field { name: "inner".into(), ty: FieldType::Primitive(PrimitiveType::U32) },
             ]);
         messages.insert(
             String::from("Request"), vec![
-                Field { name: "n".into(), ty: FieldType::Primitive("u64".into()) },
+                Field { name: "n".into(), ty: FieldType::Primitive(PrimitiveType::U64) },
                 Field { name: "x".into(), ty: FieldType::Option(Box::new(FieldType::Message("Inner".into()))) },
-                Field { name: "y".into(), ty: FieldType::Array(Box::new(FieldType::Primitive("i64".into()))) },
+                Field { name: "y".into(), ty: FieldType::Array(Box::new(FieldType::Primitive(PrimitiveType::I32))) },
             ]);
         messages.insert(
             String::from("Response"), vec![
-                Field { name: "n".into(), ty: FieldType::Primitive("u64".into()) },
+                Field { name: "n".into(), ty: FieldType::Primitive(PrimitiveType::U64) },
             ]);
 
         let mut methods = HashMap::new();

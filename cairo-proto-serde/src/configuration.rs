@@ -7,9 +7,20 @@ pub struct Configuration {
     pub services: HashMap<String, Service>,
 }
 
+// primitive types supported by both Protocol Buffers and Cairo
+// TODO: currently it only covers types in the example project
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PrimitiveType {
+    U64,
+    U32,
+    I32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum FieldType {
-    Primitive(String),
+    Primitive(PrimitiveType),
     Message(String),
     Option(Box<FieldType>),
     Array(Box<FieldType>),
