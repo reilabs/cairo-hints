@@ -1,5 +1,8 @@
 use std::env;
 use std::fs;
+use std::fs::File;
+use std::io::BufReader;
+use std::path::PathBuf;
 
 use anyhow::{bail, ensure, Context, Result};
 use cairo_lang_runner::Arg;
@@ -27,6 +30,7 @@ use scarb_metadata::{Metadata, MetadataCommand, ScarbCommand};
 use scarb_ui::args::PackagesFilter;
 use scarb_ui::components::Status;
 use scarb_ui::{Message, OutputFormat, Ui, Verbosity};
+use cairo_proto_serde::configuration::Configuration;
 
 mod deserialization;
 
@@ -57,7 +61,9 @@ struct Args {
     /// Oracle server URL.
     #[arg(long)]
     oracle_server: Option<String>,
-    
+
+    #[arg(long)]
+    service_config: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -132,6 +138,7 @@ fn main() -> Result<()> {
             available_gas.value(),
             StarknetState::default(),
             &args.oracle_server,
+            &args.service_config,
         )
         .context("failed to run the function")?;
 
@@ -153,6 +160,7 @@ pub fn run_with_oracle_hint_processor(
     available_gas: Option<usize>,
     starknet_state: StarknetState,
     oracle_server: &Option<String>,
+    service_config: &Option<PathBuf>,
 ) -> Result<RunResultStarknet, RunnerError> {
     let initial_gas = runner.get_initial_available_gas(func, available_gas)?;
     let (entry_code, builtins) = runner.create_entry_code(func, args, initial_gas)?;
@@ -166,7 +174,16 @@ pub fn run_with_oracle_hint_processor(
         string_to_hint,
         run_resources: RunResources::default(),
     };
-    let mut hint_processor = RpcHintProcessor::new(cairo_hint_processor, oracle_server);
+
+    let service_config = match service_config {
+        Some(path) => {
+            let file = File::open(path).unwrap();
+            let reader = BufReader::new(file);
+            serde_json::from_reader(reader).unwrap()
+        }
+        None => Configuration::default()
+    };
+    let mut hint_processor = RpcHintProcessor::new(cairo_hint_processor, oracle_server, &service_config);
 
     runner.run_function(func, &mut hint_processor, hints_dict, instructions, builtins).map(|v| {
         RunResultStarknet {

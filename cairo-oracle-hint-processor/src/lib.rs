@@ -12,6 +12,8 @@ use cairo_vm::{hint_processor::hint_processor_definition::HintProcessorLogic, fe
 use cairo_vm::vm::runners::cairo_runner::ResourceTracker;
 use cairo_vm::{vm::{errors::{hint_errors::HintError, memory_errors::MemoryError}, vm_core::VirtualMachine}, types::{exec_scope::ExecutionScopes, relocatable::{Relocatable, MaybeRelocatable}}};
 use cairo_vm::hint_processor::hint_processor_definition::HintReference;
+use cairo_proto_serde::configuration::Configuration;
+use cairo_proto_serde::{deserialize_cairo_serde, serialize_cairo_serde};
 use hint_processor_utils::{extract_buffer, get_ptr, cell_ref_to_relocatable};
 
 #[derive(Debug, PartialEq)]
@@ -33,11 +35,12 @@ pub struct RpcHintProcessor<'a> {
     state: OracleState,
     inner_processor: CairoHintProcessor<'a>,
     server: Option<String>,
+    configuration: &'a Configuration
 }
 
 impl<'a> RpcHintProcessor<'a> {
-    pub fn new(inner_processor: CairoHintProcessor<'a>, server: &Option<String>) -> Self {
-        Self { state: OracleState::Sending(Value::Null), path: Default::default(), inner_processor, server: server.clone() }
+    pub fn new(inner_processor: CairoHintProcessor<'a>, server: &Option<String>, configuration: &'a Configuration) -> Self {
+        Self { state: OracleState::Sending(Value::Null), path: Default::default(), inner_processor, server: server.clone(), configuration }
     }
 
     fn to_string(&self, felt: &Felt252) -> String {
@@ -169,113 +172,32 @@ impl<'a> RpcHintProcessor<'a> {
 
         let mut res_segment = MemBuffer::new_segment(vm);
         let res_segment_start = res_segment.ptr;
-        match selector {
-            "oracle_path_push" => {
-                let kind = self.to_string(&inputs[0]);
-                match kind.as_str() {
-                    "struct" => self.path.push(PathElement::Struct),
-                    "array" => self.path.push(PathElement::Array),
-                    _ => panic!("unknown path type '{kind:?}'")
-                }
-            }
-            "oracle_path_pop" => {
-                let kind = self.to_string(&inputs[0]);
-                let kind = match kind.as_str() {
-                    "struct" => PathElement::Struct,
-                    "array" => PathElement::Array,
-                    _ => panic!("unknown path type")
-                };
-                let last = self.path.pop().unwrap();
-                assert_eq!(last, kind);
-            }
-            "oracle_key_push" => {
-                let name = self.to_string(&inputs[0]);
-                self.path.push(PathElement::Key(name));
-            }
-            "oracle_key_pop" => {
-                let kind = PathElement::Key(self.to_string(&inputs[0]));
-                let last = self.path.pop().unwrap();
-                assert_eq!(last, kind);
-            }
-            "oracle_value_push" => {
-                let ty = self.to_string(&inputs[0]);
-                let value = &inputs[1];
-                match ty.as_str() {
-                    "u64" => {
-                        println!("pushing value {}_u64 at path {:?}", value.to_u64().unwrap(), self.path);
-                        self.set_value(Value::from(value.to_u64().unwrap()));
-                    }
-                    "u32" => {
-                        println!("pushing value {}_u32 at path {:?}", value.to_u32().unwrap(), self.path);
-                        self.set_value(Value::from(value.to_u32().unwrap()));
-                    }
-                    "i32" => {
-                        println!("pushing value {}_i32 at path {:?}", value.to_i32().unwrap(), self.path);
-                        self.set_value(Value::from(value.to_i32().unwrap()));
-                    }
-                    _ => panic!("unknown value type {ty:?}")
-                }
-            }
-            "oracle_value_pop" => {
-                let ty = self.to_string(&inputs[0]);
-                let value = self.get_value();
-                println!("popping value {value:?} of type {ty}");
-                match value {
-                    Value::Null => todo!(),
-                    Value::Bool(_) => todo!(),
-                    Value::Number(num) => {
-                        match ty.as_str() {
-                            "u64" => res_segment.write(num.as_u64().unwrap() as usize)?,
-                            _ => panic!("unknown value pop type"),
-                        }
-                    }
-                    Value::String(_) => todo!(),
-                    Value::Array(_) => todo!(),
-                    Value::Object(_) => todo!(),
-                }
-            }
-            "oracle_ask" => {
-                println!("asking oracle {:?}", self.state);
-                
-                let OracleState::Sending(state) = &self.state else {
-                    panic!("not in sending mode");
-                };
 
-                let client = reqwest::blocking::Client::new();
-                let resp: Value = client.post(self.server.as_ref().unwrap())
-                    .json(state)
-                    .send()
-                    .unwrap()
-                    .json::<Value>()
-                    .unwrap();
-                let output = resp;
-                let result = output["result"].clone();
+        let Some(configuration) = self.configuration.services.iter().find_map(|(_, methods)| {
+            methods.methods.get(selector)
+        }) else {
+            return Err(HintError::CustomHint(Box::from(format!(
+                "Unknown cheatcode selector: {selector}"
+            ))));
+        };
 
-                println!("Output: {output:?}");
+        let data = deserialize_cairo_serde(self.configuration, &configuration.input, &mut inputs.as_ref());
+        println!("let the oracle decide... Inputs: {data:?}");
 
-                self.state = OracleState::Receiving(result);
-            }
-            "oracle" => {
-                println!("local variables: {:?}", exec_scopes);
+        let client = reqwest::blocking::Client::new();
+        let resp = client.post(self.server.as_ref().unwrap())
+            .json(&data)
+            .send()
+            .unwrap()
+            .json::<Value>()
+            .unwrap();
 
-                let mut map = HashMap::new();
-                map.insert("n", inputs[0].to_bigint().to_u64().unwrap());
-                println!("let the oracle decide... Inputs: {map:?}");
+        let output = &resp["result"];
+        let data = serialize_cairo_serde(self.configuration, &configuration.output, output);
+        println!("Output: {output}");
+        res_segment.write_data(data.iter())?;
 
 
-                let client = reqwest::blocking::Client::new();
-                let resp = client.post(self.server.as_ref().unwrap())
-                    .json(&map)
-                    .send()
-                    .unwrap()
-                    .json::<HashMap<String, usize>>()
-                    .unwrap();
-
-                let output = resp["result"];
-                println!("Output: {output}");
-                res_segment.write(output)?;
-
-                
                 // let contract_logs = self.starknet_state.logs.get_mut(&as_single_input(inputs)?);
                 // if let Some((keys, data)) =
                 //     contract_logs.and_then(|contract_logs| contract_logs.events.pop_front())
@@ -285,12 +207,7 @@ impl<'a> RpcHintProcessor<'a> {
                 //     res_segment.write(data.len())?;
                 //     res_segment.write_data(data.iter())?;
                 // }
-            }
-            _ => Err(HintError::CustomHint(Box::from(format!(
-                "Unknown cheatcode selector: {selector}"
-            ))))?,
-        }
-        println!("path after cheatcode: {:?}", self.path);
+
 
         let res_segment_end = res_segment.ptr;
         insert_value_to_cellref!(vm, output_start, res_segment_start)?;

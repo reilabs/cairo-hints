@@ -25,7 +25,7 @@ fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
     }
 }
 
-fn serialize_cairo_serde(config: &Configuration, ty: &FieldType, value: &Value) -> Vec<Felt252> {
+pub fn serialize_cairo_serde(config: &Configuration, ty: &FieldType, value: &Value) -> Vec<Felt252> {
     let mut result = Vec::new();
 
     match ty {
@@ -57,7 +57,7 @@ fn serialize_cairo_serde(config: &Configuration, ty: &FieldType, value: &Value) 
     result
 }
 
-fn deserialize_cairo_serde(config: &Configuration, ty: &FieldType, value: &mut &[Felt252]) -> Value {
+pub fn deserialize_cairo_serde(config: &Configuration, ty: &FieldType, value: &mut &[Felt252]) -> Value {
     match ty {
         FieldType::Primitive(ty) => deserialize_primitive(ty, value),
         FieldType::Message(message_ty) => {

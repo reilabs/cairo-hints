@@ -17,8 +17,8 @@ struct Response {
 impl SqrtOracle of SqrtOracleTrait {
     fn sqrt(arg: Request) -> Response {
         let mut serialized = ArrayTrait::new();
-        ('sqrt', arg).serialize(ref serialized);
-        let mut result = cheatcode::<'oracle_ask'>(serialized.span());
+        arg.serialize(ref serialized);
+        let mut result = cheatcode::<'sqrt'>(serialized.span());
         Serde::deserialize(ref result).unwrap()
     }
 }

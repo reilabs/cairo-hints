@@ -500,8 +500,8 @@ impl<'a> CodeGenerator<'a> {
             self.code_buf.push_str(&format!(
                 r"
         let mut serialized = ArrayTrait::new();
-        ('{}', arg).serialize(ref serialized);
-        let mut result = cheatcode::<'oracle_ask'>(serialized.span());
+        arg.serialize(ref serialized);
+        let mut result = cheatcode::<'{}'>(serialized.span());
         Serde::deserialize(ref result).unwrap()
 ",
 method.name));
