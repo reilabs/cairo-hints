@@ -1,0 +1,27 @@
+[package]
+name = "cairo-lang-hints-test-runner"
+version.workspace = true
+edition.workspace = true
+description = "Cairo tests runner. Used to run tests written in Cairo."
+
+[dependencies]
+anyhow = "1.0.79"
+cairo-felt = "0.8.7"
+cairo-lang-compiler = { version = "2.4.4" }
+cairo-lang-filesystem = { version = "2.4.4" }
+cairo-lang-runner = { version = "2.4.4" }
+cairo-lang-sierra = { version = "2.4.4" }
+cairo-lang-sierra-to-casm = { version = "2.4.4" }
+cairo-lang-starknet = { version = "2.4.4" }
+cairo-lang-test-plugin = { version = "2.4.4" }
+cairo-lang-utils = { version = "2.4.4" }
+cairo-vm = "0.8.4-rc.0"
+cairo-oracle-hint-processor = { path = "../cairo-oracle-hint-processor" }
+cairo-proto-serde = { path = "../cairo-proto-serde" }
+colored = "2.1.0"
+itertools = "0.12.0"
+num-traits = "0.2.17"
+rayon = "1.8.1"
+
+[dev-dependencies]
+serde_json = "1.0.113"

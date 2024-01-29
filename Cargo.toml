@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "cairo-lang-hints-test-runner",
     "cairo-proto-serde",
     "cairo-proto-build",
     "cairo-oracle-hint-processor",
@@ -12,3 +13,7 @@ members = [
 exclude = [
     "examples/hints_poc/rust"
 ]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"

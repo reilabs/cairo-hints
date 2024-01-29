@@ -12,7 +12,7 @@ cairo-lang-runner = "2.4.4"
 cairo-lang-sierra = "2.4.4"
 cairo-lang-sierra-to-casm = "2.4.4"
 cairo-lang-test-plugin = "2.4.4"
-cairo-lang-test-runner = { path = "../../cairo/crates/cairo-lang-test-runner" }
+cairo-lang-hints-test-runner = { path = "../cairo-lang-hints-test-runner" }
 cairo-vm = "0.8.4-rc.0"
 camino = "1.1.6"
 clap = "4.4.18"

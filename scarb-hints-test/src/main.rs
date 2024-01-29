@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use cairo_lang_test_plugin::TestCompilation;
-use cairo_lang_test_runner::{CompiledTestRunner, TestRunConfig};
+use cairo_lang_hints_test_runner::{CompiledTestRunner, TestRunConfig};
 use clap::Parser;
 
 use scarb_metadata::{Metadata, MetadataCommand, PackageMetadata, ScarbCommand, TargetMetadata};
