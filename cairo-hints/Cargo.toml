@@ -43,4 +43,3 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 cairo-lang-hints-test-runner = { workspace = true }
 cairo-lang-test-plugin = { workspace = true }
-bincode = "2.0.0-rc.3"
