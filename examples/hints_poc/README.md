@@ -6,7 +6,7 @@ It calculates sqrt using an RPC server implemented in Rust.
 
 1. Follow [installation guide from the root folder](https://github.com/reilabs/cairo-hints/tree/main?tab=readme-ov-file#cairo-1-hints).
 2. `cd cairo`
-3. Run `scarb hints-gen-oracle path-to-this-folder` (i.e. `scarb hints-gen-oracle ..`)
+3. Run `scarb hints-build path-to-this-folder` (i.e. `scarb hints-build ..`)
 4. In a new shell tab
     * `cd rust; cargo run`
 5. Run `scarb hints-run --oracle-server http://0.0.0.0:3000 --service-config src/oracle.cairo.json`
