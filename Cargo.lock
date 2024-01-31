@@ -374,6 +374,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "cairo-hints"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "cairo-felt",
+ "cairo-lang-hints-test-runner",
+ "cairo-lang-runner",
+ "cairo-lang-sierra",
+ "cairo-lang-sierra-to-casm",
+ "cairo-lang-test-plugin",
+ "cairo-oracle-hint-processor",
+ "cairo-proto-build",
+ "cairo-proto-serde",
+ "cairo-vm",
+ "camino",
+ "clap",
+ "env_logger",
+ "indoc",
+ "itertools 0.12.0",
+ "num-bigint",
+ "scarb-metadata",
+ "scarb-ui",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "cairo-lang-casm"
 version = "2.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2592,68 +2620,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "scarb-hints-gen-oracle"
-version = "0.1.0"
-dependencies = [
- "cairo-proto-build",
- "env_logger",
-]
-
-[[package]]
-name = "scarb-hints-new"
-version = "0.1.0"
-
-[[package]]
-name = "scarb-hints-run"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cairo-felt",
- "cairo-lang-runner",
- "cairo-lang-sierra",
- "cairo-lang-sierra-to-casm",
- "cairo-oracle-hint-processor",
- "cairo-proto-serde",
- "cairo-vm",
- "camino",
- "clap",
- "indoc",
- "itertools 0.12.0",
- "num-bigint",
- "scarb-metadata",
- "scarb-ui",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "scarb-hints-test"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cairo-felt",
- "cairo-lang-hints-test-runner",
- "cairo-lang-runner",
- "cairo-lang-sierra",
- "cairo-lang-sierra-to-casm",
- "cairo-lang-test-plugin",
- "cairo-oracle-hint-processor",
- "cairo-proto-serde",
- "cairo-vm",
- "camino",
- "clap",
- "indoc",
- "itertools 0.12.0",
- "num-bigint",
- "scarb-metadata",
- "scarb-ui",
- "serde",
- "serde_json",
- "thiserror",
 ]
 
 [[package]]

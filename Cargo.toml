@@ -5,10 +5,7 @@ members = [
     "cairo-proto-serde",
     "cairo-proto-build",
     "cairo-oracle-hint-processor",
-    "scarb-hints-new",
-    "scarb-hints-gen-oracle",
-    "scarb-hints-run",
-    "scarb-hints-test",
+    "cairo-hints",
 ]
 exclude = [
     "examples/hints_poc/rust"
