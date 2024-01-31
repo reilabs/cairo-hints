@@ -9,5 +9,5 @@ It calculates sqrt using an RPC server implemented in Rust.
 3. Run `scarb hints-gen-oracle path-to-this-folder` (i.e. `scarb hints-gen-oracle ..`)
 4. In a new shell tab
     * `cd rust; cargo run`
-5. Run `scarb hints-run --oracle-server http://0.0.0.0:3000 --service-config src/oracle.cairo.json`
-6. Integration tests: `scarb hints-test --oracle-server http://0.0.0.0:3000 --service-config src/oracle.cairo.json`
+5. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --service-config src/oracle.cairo.json`
+6. Integration tests: `scarb hints-test --oracle-server http://127.0.0.1:3000 --service-config src/oracle.cairo.json`

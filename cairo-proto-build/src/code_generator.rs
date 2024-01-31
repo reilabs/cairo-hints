@@ -3,17 +3,16 @@ use std::collections::{HashMap, HashSet};
 use std::iter;
 use std::ops::Add;
 
+use cairo_proto_serde::configuration::{Configuration, Field, FieldType, MethodDeclaration};
 use itertools::{Either, Itertools};
 use log::debug;
 use multimap::MultiMap;
 use prost_types::field_descriptor_proto::{Label, Type};
 use prost_types::source_code_info::Location;
 use prost_types::{
-    DescriptorProto, EnumValueDescriptorProto, FieldDescriptorProto,
-    FieldOptions, FileDescriptorProto, ServiceDescriptorProto,
-    SourceCodeInfo,
+    DescriptorProto, EnumValueDescriptorProto, FieldDescriptorProto, FieldOptions,
+    FileDescriptorProto, ServiceDescriptorProto, SourceCodeInfo,
 };
-use cairo_proto_serde::configuration::{Configuration, Field, FieldType, MethodDeclaration};
 
 use crate::ast::{Comments, Method, Service};
 use crate::extern_paths::ExternPaths;
@@ -56,6 +55,8 @@ impl<'a> CodeGenerator<'a> {
         code_buf: &mut String,
         serde_config: &mut Configuration,
     ) {
+        println!("{:#?}", file);
+
         let source_info = file.source_code_info.map(|mut s| {
             s.location.retain(|loc| {
                 let len = loc.path.len();
@@ -214,7 +215,7 @@ impl<'a> CodeGenerator<'a> {
                 None => {
                     let field_def = self.append_field(&fq_message_name, field);
                     fields_def.push(field_def);
-                },
+                }
             }
             self.path.pop();
         }
@@ -318,7 +319,11 @@ impl<'a> CodeGenerator<'a> {
         // self.code_buf.push_str("}\n");
     }
 
-    fn append_field(&mut self, fq_message_name: &str, field: FieldDescriptorProto) -> cairo_proto_serde::configuration::Field {
+    fn append_field(
+        &mut self,
+        fq_message_name: &str,
+        field: FieldDescriptorProto,
+    ) -> cairo_proto_serde::configuration::Field {
         let type_ = field.r#type();
         let repeated = field.label == Some(Label::Repeated as i32);
         let deprecated = self.deprecated(&field);
@@ -377,11 +382,20 @@ impl<'a> CodeGenerator<'a> {
         self.code_buf.push_str(",\n");
 
         if repeated {
-            Field { name: field_name, ty: FieldType::Array(Box::new(ty.into())) }
+            Field {
+                name: field_name,
+                ty: FieldType::Array(Box::new(ty.into())),
+            }
         } else if optional {
-            Field { name: field_name, ty: FieldType::Option(Box::new(ty.into())) }
+            Field {
+                name: field_name,
+                ty: FieldType::Option(Box::new(ty.into())),
+            }
         } else {
-            Field { name: field_name, ty: ty.into() }
+            Field {
+                name: field_name,
+                ty: ty.into(),
+            }
         }
     }
 
@@ -406,9 +420,8 @@ impl<'a> CodeGenerator<'a> {
 
         let field_name = to_snake(field.name());
         self.push_indent();
-        self.code_buf.push_str(&format!(
-            "{field_name}: Felt252Dict<{value_ty}>,\n"
-        ));
+        self.code_buf
+            .push_str(&format!("{field_name}: Felt252Dict<{value_ty}>,\n"));
 
         //self.config_buf.push_str(&format!("{{\"name\": \"{field_name}\", \"type\": \"dictionary\", \"key\": \"{key_ty}\", \"value\": \"{value_ty}\", \"map\": true}}"));
     }
@@ -421,7 +434,6 @@ impl<'a> CodeGenerator<'a> {
             .unwrap();
         Some(&source_info.location[idx])
     }
-
 
     fn append_service(&mut self, service: ServiceDescriptorProto) {
         let name = service.name().to_owned();
@@ -486,7 +498,10 @@ impl<'a> CodeGenerator<'a> {
     fn append_service_def(&mut self, service: Service) {
         // Generate a trait for the service.
         self.code_buf.push_str("#[generate_trait]\n");
-        self.code_buf.push_str(&format!("impl {} of {}Trait {{\n", &service.name, &service.name));
+        self.code_buf.push_str(&format!(
+            "impl {} of {}Trait {{\n",
+            &service.name, &service.name
+        ));
 
         let mut methods = HashMap::<String, MethodDeclaration>::new();
 
@@ -504,13 +519,23 @@ impl<'a> CodeGenerator<'a> {
         let mut result = cheatcode::<'{}'>(serialized.span());
         Serde::deserialize(ref result).unwrap()
 ",
-method.name));
+                method.name
+            ));
 
             self.code_buf.push_str("    }\n");
-            methods.insert(method.name, MethodDeclaration { input: FieldType::Message(method.input_type), output: FieldType::Message(method.output_type) });
+            methods.insert(
+                method.name,
+                MethodDeclaration {
+                    input: FieldType::Message(method.input_type),
+                    output: FieldType::Message(method.output_type),
+                },
+            );
         }
 
-        self.serde_config.services.insert(service.name, cairo_proto_serde::configuration::Service { methods });
+        self.serde_config.services.insert(
+            service.name,
+            cairo_proto_serde::configuration::Service { methods },
+        );
 
         // Close out the trait.
         self.code_buf.push_str("}\n");
@@ -522,7 +547,8 @@ method.name));
 
     fn push_mod(&mut self, module: &str) {
         self.push_indent();
-        self.code_buf.push_str("/// Nested message and enum types in `");
+        self.code_buf
+            .push_str("/// Nested message and enum types in `");
         self.code_buf.push_str(module);
         self.code_buf.push_str("`.\n");
 
@@ -547,8 +573,8 @@ method.name));
 
     fn resolve_type(&self, field: &FieldDescriptorProto, fq_message_name: &str) -> String {
         match field.r#type() {
-            Type::Float => String::from("f32"),
-            Type::Double => String::from("f64"),
+            Type::Float => panic!("Float type not supported"), //String::from("f32"),
+            Type::Double => panic!("Double type not supported"), //String::from("f64"),
             Type::Uint32 | Type::Fixed32 => String::from("u32"),
             Type::Uint64 | Type::Fixed64 => String::from("u64"),
             Type::Int32 | Type::Sfixed32 | Type::Sint32 | Type::Enum => String::from("i32"),
@@ -598,41 +624,41 @@ method.name));
             .join("::")
     }
 
-    fn field_type_tag(&self, field: &FieldDescriptorProto) -> Cow<'static, str> {
-        match field.r#type() {
-            Type::Float => Cow::Borrowed("float"),
-            Type::Double => Cow::Borrowed("double"),
-            Type::Int32 => Cow::Borrowed("int32"),
-            Type::Int64 => Cow::Borrowed("int64"),
-            Type::Uint32 => Cow::Borrowed("uint32"),
-            Type::Uint64 => Cow::Borrowed("uint64"),
-            Type::Sint32 => Cow::Borrowed("sint32"),
-            Type::Sint64 => Cow::Borrowed("sint64"),
-            Type::Fixed32 => Cow::Borrowed("fixed32"),
-            Type::Fixed64 => Cow::Borrowed("fixed64"),
-            Type::Sfixed32 => Cow::Borrowed("sfixed32"),
-            Type::Sfixed64 => Cow::Borrowed("sfixed64"),
-            Type::Bool => Cow::Borrowed("bool"),
-            Type::String => Cow::Borrowed("string"),
-            Type::Bytes => Cow::Borrowed("bytes"),
-            Type::Group => Cow::Borrowed("group"),
-            Type::Message => Cow::Borrowed("message"),
-            Type::Enum => Cow::Owned(format!(
-                "enumeration={:?}",
-                self.resolve_ident(field.type_name())
-            )),
-        }
-    }
+    // fn field_type_tag(&self, field: &FieldDescriptorProto) -> Cow<'static, str> {
+    //     match field.r#type() {
+    //         Type::Float => Cow::Borrowed("float"),
+    //         Type::Double => Cow::Borrowed("double"),
+    //         Type::Int32 => Cow::Borrowed("int32"),
+    //         Type::Int64 => Cow::Borrowed("int64"),
+    //         Type::Uint32 => Cow::Borrowed("uint32"),
+    //         Type::Uint64 => Cow::Borrowed("uint64"),
+    //         Type::Sint32 => Cow::Borrowed("sint32"),
+    //         Type::Sint64 => Cow::Borrowed("sint64"),
+    //         Type::Fixed32 => Cow::Borrowed("fixed32"),
+    //         Type::Fixed64 => Cow::Borrowed("fixed64"),
+    //         Type::Sfixed32 => Cow::Borrowed("sfixed32"),
+    //         Type::Sfixed64 => Cow::Borrowed("sfixed64"),
+    //         Type::Bool => Cow::Borrowed("bool"),
+    //         Type::String => Cow::Borrowed("string"),
+    //         Type::Bytes => Cow::Borrowed("bytes"),
+    //         Type::Group => Cow::Borrowed("group"),
+    //         Type::Message => Cow::Borrowed("message"),
+    //         Type::Enum => Cow::Owned(format!(
+    //             "enumeration={:?}",
+    //             self.resolve_ident(field.type_name())
+    //         )),
+    //     }
+    // }
 
-    fn map_value_type_tag(&self, field: &FieldDescriptorProto) -> Cow<'static, str> {
-        match field.r#type() {
-            Type::Enum => Cow::Owned(format!(
-                "enumeration({})",
-                self.resolve_ident(field.type_name())
-            )),
-            _ => self.field_type_tag(field),
-        }
-    }
+    // fn map_value_type_tag(&self, field: &FieldDescriptorProto) -> Cow<'static, str> {
+    //     match field.r#type() {
+    //         Type::Enum => Cow::Owned(format!(
+    //             "enumeration({})",
+    //             self.resolve_ident(field.type_name())
+    //         )),
+    //         _ => self.field_type_tag(field),
+    //     }
+    // }
 
     fn optional(&self, field: &FieldDescriptorProto) -> bool {
         if field.proto3_optional.unwrap_or(false) {
@@ -660,136 +686,137 @@ method.name));
     fn append_footer(&mut self) {}
 
     fn append_header(&mut self) {
-        self.code_buf.push_str("use starknet::testing::cheatcode;\n");
+        self.code_buf
+            .push_str("use starknet::testing::cheatcode;\n");
     }
 }
 
-/// Returns `true` if the repeated field type can be packed.
-fn can_pack(field: &FieldDescriptorProto) -> bool {
-    matches!(
-        field.r#type(),
-        Type::Float
-            | Type::Double
-            | Type::Int32
-            | Type::Int64
-            | Type::Uint32
-            | Type::Uint64
-            | Type::Sint32
-            | Type::Sint64
-            | Type::Fixed32
-            | Type::Fixed64
-            | Type::Sfixed32
-            | Type::Sfixed64
-            | Type::Bool
-            | Type::Enum
-    )
-}
+// /// Returns `true` if the repeated field type can be packed.
+// fn can_pack(field: &FieldDescriptorProto) -> bool {
+//     matches!(
+//         field.r#type(),
+//         Type::Float
+//             | Type::Double
+//             | Type::Int32
+//             | Type::Int64
+//             | Type::Uint32
+//             | Type::Uint64
+//             | Type::Sint32
+//             | Type::Sint64
+//             | Type::Fixed32
+//             | Type::Fixed64
+//             | Type::Sfixed32
+//             | Type::Sfixed64
+//             | Type::Bool
+//             | Type::Enum
+//     )
+// }
 
-/// Based on [`google::protobuf::UnescapeCEscapeString`][1]
-/// [1]: https://github.com/google/protobuf/blob/3.3.x/src/google/protobuf/stubs/strutil.cc#L312-L322
-fn unescape_c_escape_string(s: &str) -> Vec<u8> {
-    let src = s.as_bytes();
-    let len = src.len();
-    let mut dst = Vec::new();
+// /// Based on [`google::protobuf::UnescapeCEscapeString`][1]
+// /// [1]: https://github.com/google/protobuf/blob/3.3.x/src/google/protobuf/stubs/strutil.cc#L312-L322
+// fn unescape_c_escape_string(s: &str) -> Vec<u8> {
+//     let src = s.as_bytes();
+//     let len = src.len();
+//     let mut dst = Vec::new();
 
-    let mut p = 0;
+//     let mut p = 0;
 
-    while p < len {
-        if src[p] != b'\\' {
-            dst.push(src[p]);
-            p += 1;
-        } else {
-            p += 1;
-            if p == len {
-                panic!(
-                    "invalid c-escaped default binary value ({}): ends with '\'",
-                    s
-                )
-            }
-            match src[p] {
-                b'a' => {
-                    dst.push(0x07);
-                    p += 1;
-                }
-                b'b' => {
-                    dst.push(0x08);
-                    p += 1;
-                }
-                b'f' => {
-                    dst.push(0x0C);
-                    p += 1;
-                }
-                b'n' => {
-                    dst.push(0x0A);
-                    p += 1;
-                }
-                b'r' => {
-                    dst.push(0x0D);
-                    p += 1;
-                }
-                b't' => {
-                    dst.push(0x09);
-                    p += 1;
-                }
-                b'v' => {
-                    dst.push(0x0B);
-                    p += 1;
-                }
-                b'\\' => {
-                    dst.push(0x5C);
-                    p += 1;
-                }
-                b'?' => {
-                    dst.push(0x3F);
-                    p += 1;
-                }
-                b'\'' => {
-                    dst.push(0x27);
-                    p += 1;
-                }
-                b'"' => {
-                    dst.push(0x22);
-                    p += 1;
-                }
-                b'0'..=b'7' => {
-                    debug!("another octal: {}, offset: {}", s, &s[p..]);
-                    let mut octal = 0;
-                    for _ in 0..3 {
-                        if p < len && src[p] >= b'0' && src[p] <= b'7' {
-                            debug!("\toctal: {}", octal);
-                            octal = octal * 8 + (src[p] - b'0');
-                            p += 1;
-                        } else {
-                            break;
-                        }
-                    }
-                    dst.push(octal);
-                }
-                b'x' | b'X' => {
-                    if p + 3 > len {
-                        panic!(
-                            "invalid c-escaped default binary value ({}): incomplete hex value",
-                            s
-                        )
-                    }
-                    match u8::from_str_radix(&s[p + 1..p + 3], 16) {
-                        Ok(b) => dst.push(b),
-                        _ => panic!(
-                            "invalid c-escaped default binary value ({}): invalid hex value",
-                            &s[p..p + 2]
-                        ),
-                    }
-                    p += 3;
-                }
-                _ => panic!(
-                    "invalid c-escaped default binary value ({}): invalid escape",
-                    s
-                ),
-            }
-        }
-    }
-    dst
-}
+//     while p < len {
+//         if src[p] != b'\\' {
+//             dst.push(src[p]);
+//             p += 1;
+//         } else {
+//             p += 1;
+//             if p == len {
+//                 panic!(
+//                     "invalid c-escaped default binary value ({}): ends with '\'",
+//                     s
+//                 )
+//             }
+//             match src[p] {
+//                 b'a' => {
+//                     dst.push(0x07);
+//                     p += 1;
+//                 }
+//                 b'b' => {
+//                     dst.push(0x08);
+//                     p += 1;
+//                 }
+//                 b'f' => {
+//                     dst.push(0x0C);
+//                     p += 1;
+//                 }
+//                 b'n' => {
+//                     dst.push(0x0A);
+//                     p += 1;
+//                 }
+//                 b'r' => {
+//                     dst.push(0x0D);
+//                     p += 1;
+//                 }
+//                 b't' => {
+//                     dst.push(0x09);
+//                     p += 1;
+//                 }
+//                 b'v' => {
+//                     dst.push(0x0B);
+//                     p += 1;
+//                 }
+//                 b'\\' => {
+//                     dst.push(0x5C);
+//                     p += 1;
+//                 }
+//                 b'?' => {
+//                     dst.push(0x3F);
+//                     p += 1;
+//                 }
+//                 b'\'' => {
+//                     dst.push(0x27);
+//                     p += 1;
+//                 }
+//                 b'"' => {
+//                     dst.push(0x22);
+//                     p += 1;
+//                 }
+//                 b'0'..=b'7' => {
+//                     debug!("another octal: {}, offset: {}", s, &s[p..]);
+//                     let mut octal = 0;
+//                     for _ in 0..3 {
+//                         if p < len && src[p] >= b'0' && src[p] <= b'7' {
+//                             debug!("\toctal: {}", octal);
+//                             octal = octal * 8 + (src[p] - b'0');
+//                             p += 1;
+//                         } else {
+//                             break;
+//                         }
+//                     }
+//                     dst.push(octal);
+//                 }
+//                 b'x' | b'X' => {
+//                     if p + 3 > len {
+//                         panic!(
+//                             "invalid c-escaped default binary value ({}): incomplete hex value",
+//                             s
+//                         )
+//                     }
+//                     match u8::from_str_radix(&s[p + 1..p + 3], 16) {
+//                         Ok(b) => dst.push(b),
+//                         _ => panic!(
+//                             "invalid c-escaped default binary value ({}): invalid hex value",
+//                             &s[p..p + 2]
+//                         ),
+//                     }
+//                     p += 3;
+//                 }
+//                 _ => panic!(
+//                     "invalid c-escaped default binary value ({}): invalid escape",
+//                     s
+//                 ),
+//             }
+//         }
+//     }
+//     dst
+// }
 
 /// Strip an enum's type name from the prefix of an enum value.
 ///

@@ -6,7 +6,7 @@ It uses protocol buffers to define messages shared between Cairo and RPC server,
 
 ## Installation
 
-1. Make sure you have `protoc` installed.
+1. Make sure you have `protoc` and `scarb` installed.
 2. Clone this repo and run:
     * `cargo install --path scarb-hints-new --locked`
     * `cargo install --path scarb-hints-gen-oracle --locked`
