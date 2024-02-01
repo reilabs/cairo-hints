@@ -3,7 +3,7 @@ mod oracle;
 use oracle::{RequestUInt32, SqrtOracle};
 
 fn main() -> bool {
-    let x = 1;
+    let x = 10;
 
     let request = RequestUInt32 { n: x };
     let result = SqrtOracle::sqrt(request);

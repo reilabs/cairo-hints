@@ -1,16 +1,18 @@
 use crate::configuration::{Configuration, FieldType, PrimitiveType};
 use cairo_felt::Felt252;
+use num_traits::identities::One;
+use num_traits::identities::Zero;
 use serde_json::{json, Map, Value};
 
 pub mod configuration;
 
 fn serialize_primitive(ty: &PrimitiveType, value: &Value) -> Vec<Felt252> {
-    let number = value.as_number().unwrap();
     let element = match ty {
-        PrimitiveType::U64 => Felt252::from(number.as_u64().unwrap()),
-        PrimitiveType::U32 => Felt252::from(u32::try_from(number.as_u64().unwrap()).unwrap()),
-        PrimitiveType::I32 => Felt252::from(i32::try_from(number.as_i64().unwrap()).unwrap()),
-        PrimitiveType::I64 => Felt252::from(i64::try_from(number.as_i64().unwrap()).unwrap()),
+        PrimitiveType::U64 => Felt252::from(value.as_u64().unwrap()),
+        PrimitiveType::U32 => Felt252::from(value.as_u64().unwrap()),
+        PrimitiveType::I32 => Felt252::from(value.as_i64().unwrap()),
+        PrimitiveType::I64 => Felt252::from(value.as_i64().unwrap()),
+        PrimitiveType::BOOL => Felt252::from(value.as_bool().unwrap()),
     };
     vec![element]
 }
@@ -24,6 +26,15 @@ fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
         PrimitiveType::U32 => json!(u32::try_from(num).unwrap()),
         PrimitiveType::I32 => json!(i32::try_from(num).unwrap()),
         PrimitiveType::I64 => json!(i64::try_from(num).unwrap()),
+        PrimitiveType::BOOL => {
+            if num.is_one() {
+                json!(true)
+            } else if num.is_zero() {
+                json!(false)
+            } else {
+                panic!("Value can't be converted to boolean")
+            }
+        }
     }
 }
 

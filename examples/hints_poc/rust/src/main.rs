@@ -5,7 +5,7 @@ use tracing::debug;
 
 #[derive(Debug, Deserialize)]
 struct RequestUInt32 {
-    n: i64,
+    n: u32,
 }
 
 #[derive(Debug, Serialize)]
@@ -15,7 +15,7 @@ struct JsonResult {
 
 #[derive(Debug, Serialize)]
 struct ResponseUInt32 {
-    n: i64,
+    n: u32,
 }
 
 async fn root(extract::Json(payload): extract::Json<RequestUInt32>) -> Json<JsonResult> {

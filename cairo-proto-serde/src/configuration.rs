@@ -16,6 +16,7 @@ pub enum PrimitiveType {
     U32,
     I32,
     I64,
+    BOOL,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -52,6 +53,7 @@ impl From<String> for FieldType {
             "u32" => FieldType::Primitive(PrimitiveType::U32),
             "i32" => FieldType::Primitive(PrimitiveType::I32),
             "i64" => FieldType::Primitive(PrimitiveType::I64),
+            "bool" => FieldType::Primitive(PrimitiveType::BOOL),
             _ => FieldType::Message(value),
         }
     }

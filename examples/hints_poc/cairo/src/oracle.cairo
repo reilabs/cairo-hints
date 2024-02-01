@@ -1,11 +1,11 @@
 use starknet::testing::cheatcode;
 #[derive(Drop, Serde)]
 struct RequestUInt32 {
-    n: i64,
+    n: u32,
 }
 #[derive(Drop, Serde)]
 struct ResponseUInt32 {
-    n: i64,
+    n: u32,
 }
 #[generate_trait]
 impl SqrtOracle of SqrtOracleTrait {

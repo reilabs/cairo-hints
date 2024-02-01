@@ -894,6 +894,7 @@ name = "cairo-proto-serde"
 version = "0.1.0"
 dependencies = [
  "cairo-felt",
+ "num-traits 0.2.17",
  "serde",
  "serde_json",
 ]
