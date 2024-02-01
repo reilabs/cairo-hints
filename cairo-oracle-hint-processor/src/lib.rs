@@ -3,18 +3,33 @@ mod hint_processor_utils;
 use core::any::Any;
 use std::{collections::HashMap, io::Read};
 
-use cairo_lang_casm::{hints::{Hint, StarknetHint}, operand::{ResOperand, CellRef}};
-use cairo_lang_utils::bigint::BigIntAsHex;
-use num_traits::ToPrimitive;
-use serde_json::{Value, Map, json};
+use cairo_lang_casm::{
+    hints::{Hint, StarknetHint},
+    operand::{CellRef, ResOperand},
+};
 use cairo_lang_runner::{CairoHintProcessor, StarknetState};
-use cairo_vm::{hint_processor::hint_processor_definition::HintProcessorLogic, felt::Felt252, vm::errors::vm_errors::VirtualMachineError};
-use cairo_vm::vm::runners::cairo_runner::ResourceTracker;
-use cairo_vm::{vm::{errors::{hint_errors::HintError, memory_errors::MemoryError}, vm_core::VirtualMachine}, types::{exec_scope::ExecutionScopes, relocatable::{Relocatable, MaybeRelocatable}}};
-use cairo_vm::hint_processor::hint_processor_definition::HintReference;
+use cairo_lang_utils::bigint::BigIntAsHex;
 use cairo_proto_serde::configuration::Configuration;
 use cairo_proto_serde::{deserialize_cairo_serde, serialize_cairo_serde};
-use hint_processor_utils::{extract_buffer, get_ptr, cell_ref_to_relocatable};
+use cairo_vm::hint_processor::hint_processor_definition::HintReference;
+use cairo_vm::vm::runners::cairo_runner::ResourceTracker;
+use cairo_vm::{
+    felt::Felt252, hint_processor::hint_processor_definition::HintProcessorLogic,
+    vm::errors::vm_errors::VirtualMachineError,
+};
+use cairo_vm::{
+    types::{
+        exec_scope::ExecutionScopes,
+        relocatable::{MaybeRelocatable, Relocatable},
+    },
+    vm::{
+        errors::{hint_errors::HintError, memory_errors::MemoryError},
+        vm_core::VirtualMachine,
+    },
+};
+use hint_processor_utils::{cell_ref_to_relocatable, extract_buffer, get_ptr};
+use num_traits::ToPrimitive;
+use serde_json::{json, Map, Value};
 
 #[derive(Debug, PartialEq)]
 enum PathElement {
@@ -35,120 +50,130 @@ pub struct RpcHintProcessor<'a> {
     state: OracleState,
     inner_processor: CairoHintProcessor<'a>,
     server: Option<String>,
-    configuration: &'a Configuration
+    configuration: &'a Configuration,
 }
 
 impl<'a> RpcHintProcessor<'a> {
-    pub fn new(inner_processor: CairoHintProcessor<'a>, server: &Option<String>, configuration: &'a Configuration) -> Self {
-        Self { state: OracleState::Sending(Value::Null), path: Default::default(), inner_processor, server: server.clone(), configuration }
-    }
-
-    fn to_string(&self, felt: &Felt252) -> String {
-        let by = felt.to_bigint().to_bytes_be().1;
-        String::from_utf8(by).unwrap()
-    }
-
-    fn set_key(val_ref: &mut Map<String, Value>, remaining_path: &[PathElement], value: Value) {
-        println!("set_key {val_ref:?} {remaining_path:?} {value:?}");
-
-        let Some(PathElement::Key(key)) = remaining_path.first() else {
-            return;
-        };
-        
-        let remaining_path = &remaining_path[1..];
-        if remaining_path.len() == 0 {
-            val_ref.insert(key.clone(), value);
-        } else {
-            match val_ref.get_mut(key) {
-                Some(val_ref) => {
-                    Self::set(val_ref, remaining_path, value);
-                }
-                None => {
-                    val_ref.insert(key.clone(), Value::Null);
-                    let val_ref = val_ref.get_mut(key).unwrap();
-                    Self::set(val_ref, remaining_path, value);
-                }
-            }
+    pub fn new(
+        inner_processor: CairoHintProcessor<'a>,
+        server: &Option<String>,
+        configuration: &'a Configuration,
+    ) -> Self {
+        Self {
+            state: OracleState::Sending(Value::Null),
+            path: Default::default(),
+            inner_processor,
+            server: server.clone(),
+            configuration,
         }
     }
 
-    fn get_key(val_ref: &Map<String, Value>, remaining_path: &[PathElement]) -> Value {
-        println!("get_key {val_ref:?} {remaining_path:?}");
+    // fn to_string(&self, felt: &Felt252) -> String {
+    //     let by = felt.to_bigint().to_bytes_be().1;
+    //     String::from_utf8(by).unwrap()
+    // }
 
-        let Some(PathElement::Key(key)) = remaining_path.first() else {
-            return Value::Null;
-        };
-        
-        let remaining_path = &remaining_path[1..];
-        if remaining_path.len() == 0 {
-            val_ref.get(key).unwrap().clone()
-        } else {
-            Self::get(val_ref.get(key).unwrap(), remaining_path)
-        }
-    }
+    // fn set_key(val_ref: &mut Map<String, Value>, remaining_path: &[PathElement], value: Value) {
+    //     println!("set_key {val_ref:?} {remaining_path:?} {value:?}");
 
+    //     let Some(PathElement::Key(key)) = remaining_path.first() else {
+    //         return;
+    //     };
 
-    fn set(val_ref: &mut Value, remaining_path: &[PathElement], value: Value) {
-        println!("set {val_ref:?} {remaining_path:?} {value:?}");
+    //     let remaining_path = &remaining_path[1..];
+    //     if remaining_path.len() == 0 {
+    //         val_ref.insert(key.clone(), value);
+    //     } else {
+    //         match val_ref.get_mut(key) {
+    //             Some(val_ref) => {
+    //                 Self::set(val_ref, remaining_path, value);
+    //             }
+    //             None => {
+    //                 val_ref.insert(key.clone(), Value::Null);
+    //                 let val_ref = val_ref.get_mut(key).unwrap();
+    //                 Self::set(val_ref, remaining_path, value);
+    //             }
+    //         }
+    //     }
+    // }
 
-        let Some(step) = remaining_path.first() else {
-            return;
-        };
+    // fn get_key(val_ref: &Map<String, Value>, remaining_path: &[PathElement]) -> Value {
+    //     println!("get_key {val_ref:?} {remaining_path:?}");
 
-        match step {
-            PathElement::Struct => {
-                if matches!(val_ref, Value::Null) {
-                    *val_ref = Value::Object(Default::default());
-                }
-                if let Value::Object(inner) = val_ref {
-                    Self::set_key(inner, &remaining_path[1..], value);
-                } else {
-                    panic!("incompatible type already set");
-                }
-            }
-            PathElement::Array => todo!(),
-            PathElement::Key(_) => todo!(),
-        }
-    }
+    //     let Some(PathElement::Key(key)) = remaining_path.first() else {
+    //         return Value::Null;
+    //     };
 
-    fn get(val_ref: &Value, remaining_path: &[PathElement]) -> Value {
-        println!("get {val_ref:?} {remaining_path:?}");
+    //     let remaining_path = &remaining_path[1..];
+    //     if remaining_path.len() == 0 {
+    //         val_ref.get(key).unwrap().clone()
+    //     } else {
+    //         Self::get(val_ref.get(key).unwrap(), remaining_path)
+    //     }
+    // }
 
-        let Some(step) = remaining_path.first() else {
-            return Value::Null;
-        };
+    // fn set(val_ref: &mut Value, remaining_path: &[PathElement], value: Value) {
+    //     println!("set {val_ref:?} {remaining_path:?} {value:?}");
 
-        match step {
-            PathElement::Struct => {
-                if let Value::Object(inner) = val_ref {
-                    Self::get_key(inner, &remaining_path[1..])
-                } else {
-                    panic!("incompatible type already set");
-                }
-            }
-            PathElement::Array => todo!(),
-            PathElement::Key(_) => todo!(),
-        }
-    }
+    //     let Some(step) = remaining_path.first() else {
+    //         return;
+    //     };
 
-    fn set_value(&mut self, value: Value) {
-        match &mut self.state {
-            OracleState::Sending(state) => {
-                Self::set(state, &self.path, value);
-            }
-            _ => { panic!("cannot set value when not sending"); }
-        }
-    }
+    //     match step {
+    //         PathElement::Struct => {
+    //             if matches!(val_ref, Value::Null) {
+    //                 *val_ref = Value::Object(Default::default());
+    //             }
+    //             if let Value::Object(inner) = val_ref {
+    //                 Self::set_key(inner, &remaining_path[1..], value);
+    //             } else {
+    //                 panic!("incompatible type already set");
+    //             }
+    //         }
+    //         PathElement::Array => todo!(),
+    //         PathElement::Key(_) => todo!(),
+    //     }
+    // }
 
-    fn get_value(&self) -> Value {
-        match &self.state {
-            OracleState::Receiving(state) => {
-                Self::get(state, &self.path)
-            }
-            _ => { panic!("cannot get value when not receiving"); }
-        }
+    // fn get(val_ref: &Value, remaining_path: &[PathElement]) -> Value {
+    //     println!("get {val_ref:?} {remaining_path:?}");
 
-    }
+    //     let Some(step) = remaining_path.first() else {
+    //         return Value::Null;
+    //     };
+
+    //     match step {
+    //         PathElement::Struct => {
+    //             if let Value::Object(inner) = val_ref {
+    //                 Self::get_key(inner, &remaining_path[1..])
+    //             } else {
+    //                 panic!("incompatible type already set");
+    //             }
+    //         }
+    //         PathElement::Array => todo!(),
+    //         PathElement::Key(_) => todo!(),
+    //     }
+    // }
+
+    // fn set_value(&mut self, value: Value) {
+    //     match &mut self.state {
+    //         OracleState::Sending(state) => {
+    //             Self::set(state, &self.path, value);
+    //         }
+    //         _ => {
+    //             panic!("cannot set value when not sending");
+    //         }
+    //     }
+    // }
+
+    // fn get_value(&self) -> Value {
+    //     match &self.state {
+    //         OracleState::Receiving(state) => Self::get(state, &self.path),
+    //         _ => {
+    //             panic!("cannot get value when not receiving");
+    //         }
+    //     }
+    // }
 
     /// Executes a cheatcode.
     fn execute_cheatcode(
@@ -181,11 +206,16 @@ impl<'a> RpcHintProcessor<'a> {
             ))));
         };
 
-        let data = deserialize_cairo_serde(self.configuration, &configuration.input, &mut inputs.as_ref());
+        let data = deserialize_cairo_serde(
+            self.configuration,
+            &configuration.input,
+            &mut inputs.as_ref(),
+        );
         println!("let the oracle decide... Inputs: {data:?}");
 
         let client = reqwest::blocking::Client::new();
-        let resp = client.post(self.server.as_ref().unwrap())
+        let resp = client
+            .post(self.server.as_ref().unwrap())
             .json(&data)
             .send()
             .unwrap()
@@ -197,17 +227,15 @@ impl<'a> RpcHintProcessor<'a> {
         println!("Output: {output}");
         res_segment.write_data(data.iter())?;
 
-
-                // let contract_logs = self.starknet_state.logs.get_mut(&as_single_input(inputs)?);
-                // if let Some((keys, data)) =
-                //     contract_logs.and_then(|contract_logs| contract_logs.events.pop_front())
-                // {
-                //     res_segment.write(keys.len())?;
-                //     res_segment.write_data(keys.iter())?;
-                //     res_segment.write(data.len())?;
-                //     res_segment.write_data(data.iter())?;
-                // }
-
+        // let contract_logs = self.starknet_state.logs.get_mut(&as_single_input(inputs)?);
+        // if let Some((keys, data)) =
+        //     contract_logs.and_then(|contract_logs| contract_logs.events.pop_front())
+        // {
+        //     res_segment.write(keys.len())?;
+        //     res_segment.write_data(keys.iter())?;
+        //     res_segment.write(data.len())?;
+        //     res_segment.write_data(data.iter())?;
+        // }
 
         let res_segment_end = res_segment.ptr;
         insert_value_to_cellref!(vm, output_start, res_segment_start)?;
@@ -234,9 +262,10 @@ impl<'a> HintProcessorLogic for RpcHintProcessor<'a> {
         //List of all references (key corresponds to element of the previous dictionary)
         references: &[HintReference],
     ) -> Result<Box<dyn Any>, VirtualMachineError> {
-        self.inner_processor.compile_hint(hint_code, ap_tracking_data, reference_ids, references)
+        self.inner_processor
+            .compile_hint(hint_code, ap_tracking_data, reference_ids, references)
     }
-        
+
     fn execute_hint(
         &mut self,
         vm: &mut cairo_vm::vm::vm_core::VirtualMachine,
@@ -262,12 +291,12 @@ impl<'a> HintProcessorLogic for RpcHintProcessor<'a> {
                     vm,
                     exec_scopes,
                 )?;
-            },
+            }
             _ => {
-                self.inner_processor.execute_hint(vm, exec_scopes, hint_data, constants)?;
+                self.inner_processor
+                    .execute_hint(vm, exec_scopes, hint_data, constants)?;
             }
         }
-            
         Ok(())
     }
 }
@@ -323,7 +352,6 @@ pub fn vm_get_range(
     }
     Ok(values)
 }
-
 
 /// Wrapper trait for a VM owner.
 pub trait VMWrapper {

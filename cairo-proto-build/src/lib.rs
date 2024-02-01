@@ -1,4 +1,7 @@
+use bytes::Buf;
+use cairo_proto_serde::configuration::Configuration;
 use code_generator::CodeGenerator;
+use core::fmt::Debug;
 use extern_paths::ExternPaths;
 use ident::to_snake;
 use log::debug;
@@ -10,8 +13,6 @@ use prost_types::FileDescriptorProto;
 use prost_types::FileDescriptorSet;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use core::fmt::Debug;
-use bytes::Buf;
 use std::default;
 use std::env;
 use std::ffi::{OsStr, OsString};
@@ -21,7 +22,6 @@ use std::io::{Error, ErrorKind, Write};
 use std::ops::RangeToInclusive;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use cairo_proto_serde::configuration::Configuration;
 
 mod ast;
 mod code_generator;
@@ -158,7 +158,7 @@ impl Config {
     pub fn new() -> Config {
         Config::default()
     }
-    
+
     /// Configures the output directory where generated Rust files will be written.
     ///
     /// If unset, defaults to the `OUT_DIR` environment variable. `OUT_DIR` is set by Cargo when
@@ -342,7 +342,7 @@ impl Config {
         Ok(())
     }
 
-        /// Processes a set of modules and file descriptors, returning a map of modules to generated
+    /// Processes a set of modules and file descriptors, returning a map of modules to generated
     /// code contents.
     ///
     /// This is generally used when control over the output should not be managed by Prost,
@@ -368,7 +368,14 @@ impl Config {
             let (code_buf, config_buf) = modules
                 .entry(request_module.clone())
                 .or_insert_with(|| (String::new(), Configuration::default()));
-            CodeGenerator::generate(self, &message_graph, &extern_paths, request_fd, code_buf, config_buf);
+            CodeGenerator::generate(
+                self,
+                &message_graph,
+                &extern_paths,
+                request_fd,
+                code_buf,
+                config_buf,
+            );
             if code_buf.is_empty() {
                 // Did not generate any code, remove from list to avoid inclusion in include file or output file list
                 modules.remove(&request_module);
@@ -392,7 +399,6 @@ impl Config {
     #[cfg(not(feature = "format"))]
     fn fmt_modules(&mut self, _: &mut HashMap<Module, (String, Configuration)>) {}
 }
-
 
 impl default::Default for Config {
     fn default() -> Config {

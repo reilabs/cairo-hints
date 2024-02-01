@@ -1,11 +1,11 @@
 use std::ops::Neg;
 
+use cairo_lang_casm::operand::{CellRef, DerefOrImmediate, Operation, Register, ResOperand};
 use cairo_vm::felt::Felt252;
 use cairo_vm::types::{errors::math_errors::MathError, relocatable::Relocatable};
 use cairo_vm::utils::CAIRO_PRIME;
 use cairo_vm::vm::errors::{hint_errors::HintError, vm_errors::VirtualMachineError};
 use cairo_vm::vm::vm_core::VirtualMachine;
-use cairo_lang_casm::operand::{CellRef, DerefOrImmediate, Operation, Register, ResOperand};
 use num_bigint::{BigInt, Sign, ToBigInt};
 use num_integer::Integer;
 
@@ -54,30 +54,30 @@ pub(crate) fn extract_buffer(buffer: &ResOperand) -> Result<(&CellRef, Felt252),
     Ok((cell, base_offset))
 }
 
-/// Fetches the value of `res_operand` from the vm.
-pub(crate) fn get_val(
-    vm: &VirtualMachine,
-    res_operand: &ResOperand,
-) -> Result<Felt252, VirtualMachineError> {
-    match res_operand {
-        ResOperand::Deref(cell) => get_cell_val(vm, cell),
-        ResOperand::DoubleDeref(cell, offset) => {
-            get_double_deref_val(vm, cell, &Felt252::from(*offset as i32))
-        }
-        ResOperand::Immediate(x) => Ok(bigint_to_felt(&x.value)?),
-        ResOperand::BinOp(op) => {
-            let a = get_cell_val(vm, &op.a)?;
-            let b = match &op.b {
-                DerefOrImmediate::Deref(cell) => get_cell_val(vm, cell)?,
-                DerefOrImmediate::Immediate(x) => bigint_to_felt(&x.value)?,
-            };
-            match op.op {
-                Operation::Add => Ok(a + b),
-                Operation::Mul => Ok(a * b),
-            }
-        }
-    }
-}
+// /// Fetches the value of `res_operand` from the vm.
+// pub(crate) fn get_val(
+//     vm: &VirtualMachine,
+//     res_operand: &ResOperand,
+// ) -> Result<Felt252, VirtualMachineError> {
+//     match res_operand {
+//         ResOperand::Deref(cell) => get_cell_val(vm, cell),
+//         ResOperand::DoubleDeref(cell, offset) => {
+//             get_double_deref_val(vm, cell, &Felt252::from(*offset as i32))
+//         }
+//         ResOperand::Immediate(x) => Ok(bigint_to_felt(&x.value)?),
+//         ResOperand::BinOp(op) => {
+//             let a = get_cell_val(vm, &op.a)?;
+//             let b = match &op.b {
+//                 DerefOrImmediate::Deref(cell) => get_cell_val(vm, cell)?,
+//                 DerefOrImmediate::Immediate(x) => bigint_to_felt(&x.value)?,
+//             };
+//             match op.op {
+//                 Operation::Add => Ok(a + b),
+//                 Operation::Mul => Ok(a * b),
+//             }
+//         }
+//     }
+// }
 
 pub(crate) fn cell_ref_to_relocatable(
     cell_ref: &CellRef,
@@ -90,12 +90,15 @@ pub(crate) fn cell_ref_to_relocatable(
     base + (cell_ref.offset as i32)
 }
 
-pub(crate) fn get_cell_val(
-    vm: &VirtualMachine,
-    cell: &CellRef,
-) -> Result<Felt252, VirtualMachineError> {
-    Ok(vm.get_integer(cell_ref_to_relocatable(cell, vm)?)?.as_ref().clone())
-}
+// pub(crate) fn get_cell_val(
+//     vm: &VirtualMachine,
+//     cell: &CellRef,
+// ) -> Result<Felt252, VirtualMachineError> {
+//     Ok(vm
+//         .get_integer(cell_ref_to_relocatable(cell, vm)?)?
+//         .as_ref()
+//         .clone())
+// }
 
 pub(crate) fn get_ptr(
     vm: &VirtualMachine,
@@ -114,39 +117,40 @@ pub(crate) fn as_relocatable(
     get_ptr(vm, base, &offset).map_err(HintError::from)
 }
 
-pub(crate) fn get_double_deref_val(
-    vm: &VirtualMachine,
-    cell: &CellRef,
-    offset: &Felt252,
-) -> Result<Felt252, VirtualMachineError> {
-    Ok(vm.get_integer(get_ptr(vm, cell, offset)?)?.as_ref().clone())
-}
+// pub(crate) fn get_double_deref_val(
+//     vm: &VirtualMachine,
+//     cell: &CellRef,
+//     offset: &Felt252,
+// ) -> Result<Felt252, VirtualMachineError> {
+//     Ok(vm.get_integer(get_ptr(vm, cell, offset)?)?.as_ref().clone())
+// }
 
-/// Fetches the value of `res_operand` from the vm.
-pub(crate) fn res_operand_get_val(
-    vm: &VirtualMachine,
-    res_operand: &ResOperand,
-) -> Result<Felt252, VirtualMachineError> {
-    match res_operand {
-        ResOperand::Deref(cell) => get_cell_val(vm, cell),
-        ResOperand::DoubleDeref(cell, offset) => {
-            get_double_deref_val(vm, cell, &Felt252::from(*offset as i32))
-        }
-        ResOperand::Immediate(x) => Ok(bigint_to_felt(&x.value)?),
-        ResOperand::BinOp(op) => {
-            let a = get_cell_val(vm, &op.a)?;
-            let b = match &op.b {
-                DerefOrImmediate::Deref(cell) => get_cell_val(vm, cell)?,
-                DerefOrImmediate::Immediate(x) => bigint_to_felt(&x.value)?,
-            };
-            match op.op {
-                Operation::Add => Ok(a + b),
-                Operation::Mul => Ok(a * b),
-            }
-        }
-    }
-}
+// /// Fetches the value of `res_operand` from the vm.
+// pub(crate) fn res_operand_get_val(
+//     vm: &VirtualMachine,
+//     res_operand: &ResOperand,
+// ) -> Result<Felt252, VirtualMachineError> {
+//     match res_operand {
+//         ResOperand::Deref(cell) => get_cell_val(vm, cell),
+//         ResOperand::DoubleDeref(cell, offset) => {
+//             get_double_deref_val(vm, cell, &Felt252::from(*offset as i32))
+//         }
+//         ResOperand::Immediate(x) => Ok(bigint_to_felt(&x.value)?),
+//         ResOperand::BinOp(op) => {
+//             let a = get_cell_val(vm, &op.a)?;
+//             let b = match &op.b {
+//                 DerefOrImmediate::Deref(cell) => get_cell_val(vm, cell)?,
+//                 DerefOrImmediate::Immediate(x) => bigint_to_felt(&x.value)?,
+//             };
+//             match op.op {
+//                 Operation::Add => Ok(a + b),
+//                 Operation::Mul => Ok(a * b),
+//             }
+//         }
+//     }
+// }
 
+#[cfg(test)]
 pub(crate) fn as_cairo_short_string(value: &Felt252) -> Option<String> {
     let mut as_string = String::default();
     let mut is_end = false;

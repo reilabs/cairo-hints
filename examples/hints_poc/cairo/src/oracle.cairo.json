@@ -1,1 +1,1 @@
-{"messages":{"RequestUInt32":[{"name":"n","ty":{"primitive":"u64"}}],"ResponseUInt32":[{"name":"n","ty":{"primitive":"u64"}}]},"services":{"SqrtOracle":{"sqrt":{"input":{"message":"RequestUInt32"},"output":{"message":"ResponseUInt32"}}}}}
+{"messages":{"RequestUInt32":[{"name":"n","ty":{"primitive":"i64"}}],"ResponseUInt32":[{"name":"n","ty":{"primitive":"i64"}}]},"services":{"SqrtOracle":{"sqrt":{"input":{"message":"RequestUInt32"},"output":{"message":"ResponseUInt32"}}}}}

@@ -3,11 +3,11 @@ syntax = "proto3";
 package oracle;
 
 message RequestUInt32 {
-    uint64 n = 1;
+    sint64 n = 1;
 }
 
 message ResponseUInt32 {
-    uint64 n = 1;
+    sint64 n = 1;
 }
 
 service SqrtOracle {

@@ -1,16 +1,16 @@
-use std::{env, fs};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::{env, fs};
 
 use anyhow::{Context, Result};
-use cairo_lang_test_plugin::TestCompilation;
 use cairo_lang_hints_test_runner::{CompiledTestRunner, TestRunConfig};
+use cairo_lang_test_plugin::TestCompilation;
 use clap::Parser;
 
+use cairo_proto_serde::configuration::Configuration;
 use scarb_metadata::{Metadata, MetadataCommand, PackageMetadata, ScarbCommand, TargetMetadata};
 use scarb_ui::args::PackagesFilter;
-use cairo_proto_serde::configuration::Configuration;
 
 /// Execute all unit tests of a local package.
 #[derive(Parser, Clone, Debug)]
@@ -68,7 +68,7 @@ fn main() -> Result<()> {
             let reader = BufReader::new(file);
             serde_json::from_reader(reader).unwrap()
         }
-        None => Configuration::default()
+        None => Configuration::default(),
     };
 
     for package in matched {
