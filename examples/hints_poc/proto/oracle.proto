@@ -2,21 +2,14 @@ syntax = "proto3";
 
 package oracle;
 
-message Inner {
-    uint32 inner = 1;
-}
-
-message Request {
+message RequestUInt32 {
     uint64 n = 1;
-    optional Inner x = 3;
-    repeated int32 y = 4;
-    // map<string, Inner> map = 5;
 }
 
-message Response {
+message ResponseUInt32 {
     uint64 n = 1;
 }
 
 service SqrtOracle {
-    rpc Sqrt(Request) returns (Response);
+    rpc Sqrt(RequestUInt32) returns (ResponseUInt32);
 }

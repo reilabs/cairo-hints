@@ -1,0 +1,24 @@
+warn: the version of cairo-test does not match the version of scarb.cairo-test: `0.1.0`, scarb: `2.5.1`
+   Compiling test(hints_poc_unittest) hints_poc v0.1.0 (C:\Users\Giuseppe\source\repos\cairo-hints\examples\hints_poc\cairo\Scarb.toml)
+    Finished release target(s) in 2 seconds
+testing hints_poc ...
+Filtered test cases
+running 1 tests
+requires gas counter true, available gas Some(4294967295)
+run_with_oracle_hint_processor!!!
+Map
+End map Panic(
+    [
+        155801121783046687566683549401418067831,
+    ],
+)
+result Panic(
+    [
+        155801121783046687566683549401418067831,
+    ],
+)
+test hints_poc::tests::sqrt_test ... fail (gas usage est.: 218060)
+failures:
+   hints_poc::tests::sqrt_test - Panicked with 0x7536345f6d756c204f766572666c6f77 ('u64_mul Overflow').
+
+error: process did not exit successfully: exit code: 1

@@ -1,26 +1,26 @@
 mod oracle;
 
-use oracle::{Request, Inner, SqrtOracle};
+use oracle::{RequestUInt32, SqrtOracle};
 
 fn main() -> bool {
-    let num = 1764;
+    let x = 9223372036854775807;
 
-    let request = Request { n: num, x: Option::Some(Inner { inner: 5 }), y: array![] };
+    let request = RequestUInt32 { n: x*x };
     let result = SqrtOracle::sqrt(request);
 
-    result.n * result.n == num
-}   
+    result.n == x
+}
 
 #[cfg(test)]
 mod tests {
-    use super::{Request, Inner, SqrtOracle};
+    use super::{RequestUInt32, SqrtOracle};
 
     #[test]
     fn sqrt_test() {
-        let x = 42;
-        let request = Request { n: x * x, x: Option::Some(Inner { inner: 5 }), y: array![] };
+        let x: u64= 9223372036854775807;
+        let request = RequestUInt32 { n: x * x };
         let result = SqrtOracle::sqrt(request);
-
+        println!("Result {}", x);
         assert!(result.n == x);
     }
 }

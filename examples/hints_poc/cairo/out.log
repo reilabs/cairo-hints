@@ -1,0 +1,24 @@
+warn: the version of cairo-test does not match the version of scarb.cairo-test: `0.1.0`, scarb: `2.5.1`
+   Compiling test(hints_poc_unittest) hints_poc v0.1.0 (C:\Users\Giuseppe\source\repos\cairo-hints\examples\hints_poc\cairo\Scarb.toml)
+    Finished release target(s) in 2 seconds
+testing hints_poc ...
+Filtered test cases
+running 1 tests
+requires gas counter true, available gas Some(4294967295)
+run_with_oracle_hint_processor!!!
+BigIntAsHex {
+    value: 1936814708,
+}
+let the oracle decide... Inputs: Object {"n": Number(100)}
+Output: {"n":10}
+Result 10
+Map
+End map Success(
+    [],
+)
+result Success(
+    [],
+)
+test hints_poc::tests::sqrt_test ... ok (gas usage est.: 259590)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 filtered out;
+
