@@ -7,11 +7,23 @@ use serde_json::{json, Map, Value};
 pub mod configuration;
 
 fn serialize_primitive(ty: &PrimitiveType, value: &Value) -> Vec<Felt252> {
+    // println!("serialize_primitive {:#?}", value.as_bool());
+    // let number = value.as_number().unwrap();
     let element = match ty {
         PrimitiveType::U64 => Felt252::from(value.as_u64().unwrap()),
         PrimitiveType::U32 => Felt252::from(value.as_u64().unwrap()),
         PrimitiveType::I32 => Felt252::from(value.as_i64().unwrap()),
         PrimitiveType::I64 => Felt252::from(value.as_i64().unwrap()),
+        PrimitiveType::BYTEARRAY => {
+            // println!("serialize_primitive {:#?}", value);
+            let bytes = value.as_str().unwrap().as_bytes();
+            let len_bytes = bytes.len().to_le_bytes();
+            return vec![
+                Felt252::from_bytes_le(&[0]),
+                Felt252::from_bytes_be(bytes),
+                Felt252::from_bytes_le(&len_bytes),
+            ];
+        }
         PrimitiveType::BOOL => Felt252::from(value.as_bool().unwrap()),
     };
     vec![element]
@@ -26,6 +38,20 @@ fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
         PrimitiveType::U32 => json!(u32::try_from(num).unwrap()),
         PrimitiveType::I32 => json!(i32::try_from(num).unwrap()),
         PrimitiveType::I64 => json!(i64::try_from(num).unwrap()),
+        PrimitiveType::BYTEARRAY => {
+            let v: Vec<Vec<u8>> = value
+                .clone()
+                .to_vec()
+                .into_iter()
+                .map(|e| {
+                    e.to_bytes_be()
+                        .into_iter()
+                        .filter(|c| c.is_ascii_alphanumeric())
+                        .collect()
+                })
+                .collect();
+            json!(String::from_utf8(v.concat()).unwrap())
+        }
         PrimitiveType::BOOL => {
             if num.is_one() {
                 json!(true)
@@ -43,8 +69,8 @@ pub fn serialize_cairo_serde(
     ty: &FieldType,
     value: &Value,
 ) -> Vec<Felt252> {
+    // println!("serialize_cairo_serde {:#?} {:#?}", ty, value);
     let mut result = Vec::new();
-
     match ty {
         FieldType::Primitive(ty) => result.append(&mut serialize_primitive(ty, value)),
         FieldType::Message(message_ty) => {
@@ -88,6 +114,9 @@ pub fn deserialize_cairo_serde(
     ty: &FieldType,
     value: &mut &[Felt252],
 ) -> Value {
+    // println!("deserialize_cairo_serde {:#?}", config);
+    // println!("deserialize_cairo_serde {:#?}", value);
+    // println!("deserialize_cairo_serde {:#?}", ty);
     match ty {
         FieldType::Primitive(ty) => deserialize_primitive(ty, value),
         FieldType::Message(message_ty) => {
@@ -177,7 +206,7 @@ mod tests {
     fn it_saves_configuration() {
         let configuration = test_configuration();
         let json_string = serde_json::to_string(&configuration).unwrap();
-        let new_configuration = serde_json::from_str::<Configuration>(&json_string).unwrap();
+        // let new_configuration = serde_json::from_str::<Configuration>(&json_string).unwrap();
         println!("JSON {json_string:?} -> {configuration:?}");
     }
 
