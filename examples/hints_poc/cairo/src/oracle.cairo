@@ -1,15 +1,23 @@
 use starknet::testing::cheatcode;
 #[derive(Drop, Serde)]
-struct RequestUInt32 {
-    n: u32,
+struct Request {
+    color: bool,
+    size: Size,
 }
 #[derive(Drop, Serde)]
-struct ResponseUInt32 {
-    n: u32,
+struct Response {
+    color: bool,
+    size: Size,
+}
+#[derive(Drop, Serde, PartialEq)]
+enum Size {
+    Small,
+    Medium,
+    Large,
 }
 #[generate_trait]
 impl SqrtOracle of SqrtOracleTrait {
-    fn sqrt(arg: RequestUInt32) -> ResponseUInt32 {
+    fn sqrt(arg: Request) -> Response {
         let mut serialized = ArrayTrait::new();
         arg.serialize(ref serialized);
         let mut result = cheatcode::<'sqrt'>(serialized.span());

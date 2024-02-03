@@ -1,28 +1,42 @@
 use axum::{extract, routing::post, Json, Router};
 use serde::{Deserialize, Serialize};
+use serde_repr::*;
 use tower_http::trace::TraceLayer;
 use tracing::debug;
 
+#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[repr(i32)]
+enum Size {
+    Small,
+    Medium,
+    Large,
+}
+
 #[derive(Debug, Deserialize)]
-struct RequestUInt32 {
-    n: u32,
+struct Request {
+    color: bool,
+    size: Size,
 }
 
 #[derive(Debug, Serialize)]
 struct JsonResult {
-    result: ResponseUInt32,
+    result: Response,
 }
 
 #[derive(Debug, Serialize)]
-struct ResponseUInt32 {
-    n: u32,
+struct Response {
+    color: bool,
+    size: Size,
 }
 
-async fn root(extract::Json(payload): extract::Json<RequestUInt32>) -> Json<JsonResult> {
+async fn root(extract::Json(payload): extract::Json<Request>) -> Json<JsonResult> {
     debug!("received payload {payload:?}");
-    let n = payload.n; //(payload.n as f64).sqrt() as u64;
+    let n = payload; //(payload.n as f64).sqrt() as u64;
     Json(JsonResult {
-        result: ResponseUInt32 { n },
+        result: Response {
+            color: n.color,
+            size: n.size,
+        },
     })
 }
 

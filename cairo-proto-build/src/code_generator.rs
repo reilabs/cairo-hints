@@ -3,15 +3,18 @@ use std::collections::{HashMap, HashSet};
 use std::iter;
 use std::ops::Add;
 
-use cairo_proto_serde::configuration::{Configuration, Field, FieldType, MethodDeclaration};
+use cairo_proto_serde::configuration::{
+    Configuration, Field, FieldType, Mapping, MethodDeclaration,
+};
+use heck::ToTitleCase;
 use itertools::{Either, Itertools};
 use log::debug;
 use multimap::MultiMap;
 use prost_types::field_descriptor_proto::{Label, Type};
 use prost_types::source_code_info::Location;
 use prost_types::{
-    DescriptorProto, EnumValueDescriptorProto, FieldDescriptorProto, FieldOptions,
-    FileDescriptorProto, ServiceDescriptorProto, SourceCodeInfo,
+    DescriptorProto, EnumDescriptorProto, EnumValueDescriptorProto, FieldDescriptorProto,
+    FieldOptions, FileDescriptorProto, ServiceDescriptorProto, SourceCodeInfo,
 };
 
 use crate::ast::{Comments, Method, Service};
@@ -105,7 +108,9 @@ impl<'a> CodeGenerator<'a> {
 
         code_gen.path.push(5);
         for (idx, desc) in file.enum_type.into_iter().enumerate() {
-            panic!("enums are not supported");
+            code_gen.path.push(idx as i32);
+            code_gen.append_enum(desc);
+            code_gen.path.pop();
         }
         code_gen.path.pop();
 
@@ -119,6 +124,176 @@ impl<'a> CodeGenerator<'a> {
         code_gen.append_footer();
 
         code_gen.path.pop();
+    }
+
+    fn append_enum(&mut self, desc: EnumDescriptorProto) {
+        debug!("  enum: {:?}", desc.name());
+
+        let proto_enum_name = desc.name();
+        let enum_name = to_upper_camel(proto_enum_name);
+
+        let enum_values = &desc.value;
+        let fq_proto_enum_name = format!(
+            "{}{}{}{}.{}",
+            if self.package.is_empty() && self.type_path.is_empty() {
+                ""
+            } else {
+                "."
+            },
+            self.package.trim_matches('.'),
+            if self.type_path.is_empty() { "" } else { "." },
+            self.type_path.join("."),
+            proto_enum_name,
+        );
+
+        if self
+            .extern_paths
+            .resolve_ident(&fq_proto_enum_name)
+            .is_some()
+        {
+            return;
+        }
+
+        // self.append_doc(&fq_proto_enum_name, None);
+        // self.append_type_attributes(&fq_proto_enum_name);
+        // self.append_enum_attributes(&fq_proto_enum_name);
+        self.push_indent();
+        // let dbg = if self.should_skip_debug(&fq_proto_enum_name) {
+        //     ""
+        // } else {
+        //     "Debug, "
+        // };
+        // self.code_buf.push_str(&format!(
+        //     "#[derive(Clone, Copy, {}PartialEq, Eq, Hash, PartialOrd, Ord, {}::Enumeration)]\n",
+        //     dbg,
+        //     self.config.prost_path.as_deref().unwrap_or("::prost"),
+        // ));
+        self.code_buf
+            .push_str("#[derive(Drop, Serde, PartialEq)]\n");
+        self.push_indent();
+        // self.code_buf.push_str("#[repr(i32)]\n");
+        // self.push_indent();
+        self.code_buf.push_str("enum ");
+        self.code_buf.push_str(&enum_name);
+        self.code_buf.push_str(" {\n");
+
+        // self.config.strip_enum_prefix = true
+        let variant_mappings = build_enum_value_mappings(&enum_name, true, enum_values);
+
+        self.depth += 1;
+        self.path.push(2);
+        let mut mappings_def = Vec::new();
+        for variant in variant_mappings.iter() {
+            let m = Mapping {
+                name: variant.proto_name.to_string().to_title_case(),
+                nb: variant.proto_number,
+            };
+            mappings_def.push(m);
+            self.path.push(variant.path_idx as i32);
+
+            // self.append_doc(&fq_proto_enum_name, Some(variant.proto_name));
+            // self.append_field_attributes(&fq_proto_enum_name, variant.proto_name);
+            self.push_indent();
+            self.code_buf.push_str(&variant.generated_variant_name);
+            // self.code_buf.push_str(" = ");
+            // self.code_buf.push_str(&variant.proto_number.to_string());
+            self.code_buf.push_str(",\n");
+
+            self.path.pop();
+        }
+
+        self.path.pop();
+        self.serde_config.enums.insert(enum_name, mappings_def);
+
+        self.depth -= 1;
+
+        self.push_indent();
+        self.code_buf.push_str("}\n");
+
+        // self.push_indent();
+        // self.code_buf.push_str("impl ");
+        // self.code_buf.push_str(&enum_name);
+        // self.code_buf.push_str(" {\n");
+        // self.depth += 1;
+        // self.path.push(2);
+
+        // self.push_indent();
+        // self.code_buf.push_str(
+        //     "/// String value of the enum field names used in the ProtoBuf definition.\n",
+        // );
+        // self.push_indent();
+        // self.code_buf.push_str("///\n");
+        // self.push_indent();
+        // self.code_buf.push_str(
+        //     "/// The values are not transformed in any way and thus are considered stable\n",
+        // );
+        // self.push_indent();
+        // self.code_buf.push_str(
+        //     "/// (if the ProtoBuf definition does not change) and safe for programmatic use.\n",
+        // );
+        // self.push_indent();
+        // self.code_buf
+        //     .push_str("pub fn as_str_name(&self) -> &'static str {\n");
+        // self.depth += 1;
+
+        // self.push_indent();
+        // self.code_buf.push_str("match self {\n");
+        // self.depth += 1;
+
+        // for variant in variant_mappings.iter() {
+        //     self.push_indent();
+        //     self.code_buf.push_str(&enum_name);
+        //     self.code_buf.push_str("::");
+        //     self.code_buf.push_str(&variant.generated_variant_name);
+        //     self.code_buf.push_str(" => \"");
+        //     self.code_buf.push_str(variant.proto_name);
+        //     self.code_buf.push_str("\",\n");
+        // }
+
+        // self.depth -= 1;
+        // self.push_indent();
+        // self.code_buf.push_str("}\n"); // End of match
+
+        // self.depth -= 1;
+        // self.push_indent();
+        // self.code_buf.push_str("}\n"); // End of as_str_name()
+
+        // self.push_indent();
+        // self.code_buf
+        //     .push_str("/// Creates an enum from field names used in the ProtoBuf definition.\n");
+
+        // self.push_indent();
+        // self.code_buf
+        //     .push_str("pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {\n");
+        // self.depth += 1;
+
+        // self.push_indent();
+        // self.code_buf.push_str("match value {\n");
+        // self.depth += 1;
+
+        // for variant in variant_mappings.iter() {
+        //     self.push_indent();
+        //     self.code_buf.push('\"');
+        //     self.code_buf.push_str(variant.proto_name);
+        //     self.code_buf.push_str("\" => Some(Self::");
+        //     self.code_buf.push_str(&variant.generated_variant_name);
+        //     self.code_buf.push_str("),\n");
+        // }
+        // self.push_indent();
+        // self.code_buf.push_str("_ => None,\n");
+
+        // self.depth -= 1;
+        // self.push_indent();
+        // self.code_buf.push_str("}\n"); // End of match
+
+        // self.depth -= 1;
+        // self.push_indent();
+        // self.code_buf.push_str("}\n"); // End of from_str_name()
+
+        // self.path.pop();
+        // self.depth -= 1;
+        // self.push_indent();
+        // self.code_buf.push_str("}\n"); // End of impl
     }
 
     fn append_message(&mut self, message: DescriptorProto) {
@@ -254,12 +429,10 @@ impl<'a> CodeGenerator<'a> {
             self.path.pop();
 
             self.path.push(4);
-            for (idx, nested_enum) in message.enum_type.into_iter().enumerate() {
-                panic!("enums are not supported");
-
-                // self.path.push(idx as i32);
-                // self.append_enum(nested_enum);
-                // self.path.pop();
+            for (idx, desc) in message.enum_type.into_iter().enumerate() {
+                self.path.push(idx as i32);
+                self.append_enum(desc);
+                self.path.pop();
             }
             self.path.pop();
 
@@ -353,6 +526,27 @@ impl<'a> CodeGenerator<'a> {
             self.code_buf.push_str("#[deprecated]\n");
         }
 
+        if let Some(ref default) = field.default_value {
+            self.code_buf.push_str("\", default=\"");
+            if type_ == Type::Enum {
+                let mut enum_value = to_upper_camel(default);
+                // Field types are fully qualified, so we extract
+                // the last segment and strip it from the left
+                // side of the default value.
+                let enum_type = field
+                    .type_name
+                    .as_ref()
+                    .and_then(|ty| ty.split('.').last())
+                    .unwrap();
+
+                enum_value = strip_enum_prefix(&to_upper_camel(enum_type), &enum_value);
+                self.code_buf.push_str(&enum_value);
+            } else {
+                self.code_buf
+                    .push_str(&default.escape_default().to_string());
+            }
+        }
+
         let field_name = to_snake(field.name());
 
         self.push_indent();
@@ -390,6 +584,11 @@ impl<'a> CodeGenerator<'a> {
             Field {
                 name: field_name,
                 ty: FieldType::Option(Box::new(ty.into())),
+            }
+        } else if type_ == Type::Enum {
+            Field {
+                name: field_name,
+                ty: FieldType::Enum(ty),
             }
         } else {
             Field {
@@ -572,17 +771,18 @@ impl<'a> CodeGenerator<'a> {
     }
 
     fn resolve_type(&self, field: &FieldDescriptorProto, fq_message_name: &str) -> String {
+        // println!("{:#?} {:#?}", field, fq_message_name);
         match field.r#type() {
             Type::Float => panic!("Float type not supported"),
             Type::Double => panic!("Double type not supported"),
             Type::Uint32 | Type::Fixed32 => String::from("u32"),
             Type::Uint64 | Type::Fixed64 => String::from("u64"),
-            Type::Int32 | Type::Sfixed32 | Type::Sint32 | Type::Enum => String::from("i32"),
+            Type::Int32 | Type::Sfixed32 | Type::Sint32 => String::from("i32"),
             Type::Int64 | Type::Sfixed64 | Type::Sint64 => String::from("i64"),
             Type::Bool => String::from("bool"),
             Type::String => String::from("ByteArray"),
             Type::Bytes => String::from("ByteArray"),
-            Type::Group | Type::Message => self.resolve_ident(field.type_name()),
+            Type::Group | Type::Message | Type::Enum => self.resolve_ident(field.type_name()),
         }
     }
 

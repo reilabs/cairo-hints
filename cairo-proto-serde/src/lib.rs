@@ -2,6 +2,7 @@ use crate::configuration::{Configuration, FieldType, PrimitiveType};
 use cairo_felt::Felt252;
 use num_traits::identities::One;
 use num_traits::identities::Zero;
+use num_traits::ToPrimitive;
 use serde_json::{json, Map, Value};
 
 pub mod configuration;
@@ -69,7 +70,9 @@ pub fn serialize_cairo_serde(
     ty: &FieldType,
     value: &Value,
 ) -> Vec<Felt252> {
-    // println!("serialize_cairo_serde {:#?} {:#?}", ty, value);
+    // println!("serialize_cairo_serde {:#?}", ty);
+    // println!("serialize_cairo_serde {:#?}", value);
+    // println!("---------------------------------------");
     let mut result = Vec::new();
     match ty {
         FieldType::Primitive(ty) => result.append(&mut serialize_primitive(ty, value)),
@@ -86,6 +89,7 @@ pub fn serialize_cairo_serde(
                 ));
             }
         }
+        FieldType::Enum(_) => result.append(&mut serialize_primitive(&PrimitiveType::I32, value)),
         FieldType::Option(inner_ty) => {
             if value.is_null() {
                 result.append(&mut serialize_primitive(&PrimitiveType::U64, &json!(1)));
@@ -117,6 +121,7 @@ pub fn deserialize_cairo_serde(
     // println!("deserialize_cairo_serde {:#?}", config);
     // println!("deserialize_cairo_serde {:#?}", value);
     // println!("deserialize_cairo_serde {:#?}", ty);
+    // println!("---------------------------------------");
     match ty {
         FieldType::Primitive(ty) => deserialize_primitive(ty, value),
         FieldType::Message(message_ty) => {
@@ -131,6 +136,7 @@ pub fn deserialize_cairo_serde(
             }
             Value::Object(result)
         }
+        FieldType::Enum(_) => deserialize_primitive(&PrimitiveType::I32, value),
         FieldType::Option(inner_ty) => {
             let idx = deserialize_primitive(&PrimitiveType::U64, value);
             if idx == 0 {
@@ -257,6 +263,11 @@ mod tests {
         let mut services = HashMap::new();
         services.insert(String::from("SqrtOracle"), Service { methods });
 
-        Configuration { messages, services }
+        let enums = HashMap::new();
+        Configuration {
+            enums,
+            messages,
+            services,
+        }
     }
 }

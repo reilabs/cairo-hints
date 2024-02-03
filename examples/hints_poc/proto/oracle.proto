@@ -2,14 +2,22 @@ syntax = "proto3";
 
 package oracle;
 
-message RequestUInt32 {
-    uint32 n = 1;
+enum Size {
+    SMALL = 0;
+    MEDIUM = 1;
+    LARGE = 2;
 }
 
-message ResponseUInt32 {
-    uint32 n = 1;
+message Request {
+    bool color = 1;
+    Size size = 2;
+}
+
+message Response {
+    bool color = 1;
+    Size size = 2;
 }
 
 service SqrtOracle {
-    rpc Sqrt(RequestUInt32) returns (ResponseUInt32);
+    rpc Sqrt(Request) returns (Response);
 }

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Configuration {
+    pub enums: HashMap<String, Vec<Mapping>>,
     pub messages: HashMap<String, Vec<Field>>,
     pub services: HashMap<String, Service>,
 }
@@ -25,6 +26,7 @@ pub enum PrimitiveType {
 pub enum FieldType {
     Primitive(PrimitiveType),
     Message(String),
+    Enum(String),
     Option(Box<FieldType>),
     Array(Box<FieldType>),
 }
@@ -33,6 +35,12 @@ pub enum FieldType {
 pub struct Field {
     pub name: String,
     pub ty: FieldType,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Mapping {
+    pub name: String,
+    pub nb: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -56,7 +64,6 @@ impl From<String> for FieldType {
             "i64" => FieldType::Primitive(PrimitiveType::I64),
             "bool" => FieldType::Primitive(PrimitiveType::BOOL),
             "ByteArray" => FieldType::Primitive(PrimitiveType::BYTEARRAY),
-            // "ByteArray" => FieldType::Array(Box::new(FieldType::Primitive(PrimitiveType::BYTE))),
             _ => FieldType::Message(value),
         }
     }
