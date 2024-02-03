@@ -120,7 +120,8 @@ pub fn deserialize_cairo_serde(
     match ty {
         FieldType::Primitive(ty) => deserialize_primitive(ty, value),
         FieldType::Message(message_ty) => {
-            let message_config = &config.messages[message_ty];
+            let message_key = message_ty.split("::").last().unwrap();
+            let message_config = &config.messages[message_key];
             let mut result = Map::new();
             for field in message_config {
                 result.insert(
