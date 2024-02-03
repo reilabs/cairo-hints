@@ -1,0 +1,45 @@
+[package]
+name = "cairo-hints"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "scarb-hints-build"
+path = "scarb-hints-build/main.rs"
+
+[[bin]]
+name = "scarb-hints-new"
+path = "scarb-hints-new/main.rs"
+
+[[bin]]
+name = "scarb-hints-run"
+path = "scarb-hints-run/main.rs"
+
+[[bin]]
+name = "scarb-hints-test"
+path = "scarb-hints-test/main.rs"
+
+[dependencies]
+cairo-proto-build = { workspace = true }
+env_logger = { workspace = true }
+anyhow = { workspace = true }
+cairo-felt = { workspace = true }
+cairo-lang-compiler = { workspace = true }
+cairo-lang-runner = { workspace = true }
+cairo-lang-sierra = { workspace = true }
+cairo-lang-sierra-to-casm = { workspace = true }
+cairo-oracle-hint-processor = { workspace = true }
+cairo-proto-serde = { workspace = true }
+cairo-vm = { workspace = true }
+camino = { workspace = true }
+clap = { workspace = true }
+indoc = { workspace = true }
+itertools = { workspace = true }
+num-bigint = { workspace = true }
+scarb-metadata = { workspace = true }
+scarb-ui = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+cairo-lang-hints-test-runner = { workspace = true }
+cairo-lang-test-plugin = { workspace = true }

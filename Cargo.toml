@@ -5,10 +5,7 @@ members = [
     "cairo-proto-serde",
     "cairo-proto-build",
     "cairo-oracle-hint-processor",
-    "scarb-hints-new",
-    "scarb-hints-gen-oracle",
-    "scarb-hints-run",
-    "scarb-hints-test",
+    "cairo-hints",
 ]
 exclude = [
     "examples/hints_poc/rust"
@@ -17,3 +14,47 @@ exclude = [
 [workspace.package]
 version = "0.0.1"
 edition = "2021"
+
+[workspace.dependencies]
+anyhow = "1.0.79"
+bytes = "1.5.0"
+cairo-felt = "0.8.7"
+cairo-lang-casm = "2.4.4"
+cairo-lang-compiler = { version = "2.4.4" }
+cairo-lang-filesystem = { version = "2.4.4" }
+cairo-lang-runner = { version = "2.4.4" }
+cairo-lang-sierra = { version = "2.4.4" }
+cairo-lang-sierra-to-casm = { version = "2.4.4" }
+cairo-lang-starknet = { version = "2.4.4" }
+cairo-lang-hints-test-runner = { path = "./cairo-lang-hints-test-runner" }
+cairo-lang-test-plugin = { version = "2.4.4" }
+cairo-lang-utils = { version = "2.4.4" }
+cairo-oracle-hint-processor = { path = "./cairo-oracle-hint-processor" }
+cairo-proto-build = { path = "./cairo-proto-build", default-features = false }
+cairo-proto-serde = { path = "./cairo-proto-serde" }
+cairo-vm = "0.8.4-rc.0"
+camino = "1.1.6"
+clap = "4.4.18"
+colored = "2.1.0"
+env_logger = "0.10.1"
+heck = "0.4.1"
+indoc = "2.0.4"
+itertools = "0.12.0"
+log = "0.4.20"
+multimap = "0.10.0"
+num-bigint = "0.4.4"
+num-integer = "0.1.45"
+num-traits = "0.2.17"
+petgraph = "0.6.4"
+prost = "0.12.3"
+prost-types = "0.12.3"
+rayon = "1.8.1"
+reqwest = { version = "0.11.23", features = ["blocking", "json"] }
+scarb-metadata = "1.10.0"
+scarb-ui = "0.1.2"
+serde = { version = "1.0.195", features = ["derive"] }
+serde_json = "1.0.111"
+starknet-types-core = "0.0.7"
+tempfile = "3.9.0"
+thiserror = "1.0.56"
+which = "6.0.0"

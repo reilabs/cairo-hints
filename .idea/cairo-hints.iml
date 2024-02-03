@@ -2,14 +2,10 @@
 <module type="EMPTY_MODULE" version="4">
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/cairo-lang-hints-test-runner/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cairo-oracle-hint-processor/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cairo-proto-build/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/scarb-hints-gen-oracle/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/scarb-hints-new/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/scarb-hints-run/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/scarb-hints-test/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cairo-proto-serde/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/cairo-lang-hints-test-runner/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
