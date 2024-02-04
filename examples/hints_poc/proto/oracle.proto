@@ -9,13 +9,11 @@ enum Size {
 }
 
 message Request {
-    bool color = 1;
-    Size size = 2;
+    string color = 1;
 }
 
 message Response {
-    bool color = 1;
-    Size size = 2;
+    string color = 1;
 }
 
 service SqrtOracle {

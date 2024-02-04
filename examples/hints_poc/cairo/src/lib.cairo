@@ -17,12 +17,10 @@ mod tests {
 
     #[test]
     fn sqrt_test() {
-        let s = Size::Large;
-        let c = false;
-        let r = Request { color: c, size: s };
+        let c = "Hello World~~~~";
+        let r = Request { color: c.clone() };
         let result = SqrtOracle::sqrt(r);
 
-        assert!(result.color == false);
-        assert!(result.size == Size::Large);
+        assert!(result.color == c.clone());
     }
 }

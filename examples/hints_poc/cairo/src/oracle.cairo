@@ -1,13 +1,11 @@
 use starknet::testing::cheatcode;
 #[derive(Drop, Serde)]
 struct Request {
-    color: bool,
-    size: Size,
+    color: ByteArray,
 }
 #[derive(Drop, Serde)]
 struct Response {
-    color: bool,
-    size: Size,
+    color: ByteArray,
 }
 #[derive(Drop, Serde, PartialEq)]
 enum Size {
