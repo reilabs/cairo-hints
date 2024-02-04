@@ -17,13 +17,23 @@ fn serialize_primitive(ty: &PrimitiveType, value: &Value) -> Vec<Felt252> {
         PrimitiveType::I64 => Felt252::from(value.as_i64().unwrap()),
         PrimitiveType::BYTEARRAY => {
             // println!("serialize_primitive {:#?}", value);
+            let mut p = Vec::new();
             let bytes = value.as_str().unwrap().as_bytes();
-            let len_bytes = bytes.len().to_le_bytes();
-            return vec![
-                Felt252::from_bytes_le(&[0]),
-                Felt252::from_bytes_be(bytes),
-                Felt252::from_bytes_le(&len_bytes),
-            ];
+
+            let total_length = bytes.len().to_u32().unwrap() / 31;
+            p.push(Felt252::from(total_length));
+
+            bytes
+                .chunks(31)
+                .for_each(|v| p.push(Felt252::from_bytes_be(v)));
+
+            let last_row_length = bytes.len().to_u32().unwrap() % 31;
+            if last_row_length == 0 {
+                p.push(Felt252::from(0));
+            }
+            p.push(Felt252::from(last_row_length));
+            // println!("serialize_primitive {:#?}", p);
+            return p;
         }
         PrimitiveType::BOOL => Felt252::from(value.as_bool().unwrap()),
     };
@@ -31,6 +41,7 @@ fn serialize_primitive(ty: &PrimitiveType, value: &Value) -> Vec<Felt252> {
 }
 
 fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
+    // println!("deserialize_primitive {:#?}", value);
     let num = value[0].to_bigint();
     *value = &value[1..];
 
@@ -41,15 +52,12 @@ fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
         PrimitiveType::I64 => json!(i64::try_from(num).unwrap()),
         PrimitiveType::BYTEARRAY => {
             let v: Vec<Vec<u8>> = value
-                .clone()
                 .to_vec()
+                .split_last()
+                .unwrap()
+                .1
                 .into_iter()
-                .map(|e| {
-                    e.to_bytes_be()
-                        .into_iter()
-                        .filter(|c| c.is_ascii_alphanumeric())
-                        .collect()
-                })
+                .map(|e| e.to_bytes_be())
                 .collect();
             json!(String::from_utf8(v.concat()).unwrap())
         }
