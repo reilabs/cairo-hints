@@ -152,8 +152,6 @@ pub struct Config {
     boxed: PathMap<()>,
     out_dir: Option<PathBuf>,
     default_package_filename: String,
-    header_once: Once,
-    footer_once: Once,
 }
 
 impl Config {
@@ -368,10 +366,12 @@ impl Config {
             if !request_fd.service.is_empty() {
                 packages.insert(request_module.clone(), request_fd.package().to_string());
             }
-            let (code_buf, config_buf) = modules
-                .entry(request_module.clone())
-                .or_insert_with(|| (String::new(), Configuration::default()));
-            self.append_header(code_buf);
+            let (code_buf, config_buf) =
+                modules.entry(request_module.clone()).or_insert_with(|| {
+                    let mut init_buf = String::new();
+                    Config::append_header(&mut init_buf);
+                    (init_buf, Configuration::default())
+                });
             CodeGenerator::generate(
                 self,
                 &message_graph,
@@ -380,6 +380,9 @@ impl Config {
                 code_buf,
                 config_buf,
             );
+            // if !config_buf.services.is_empty() {
+            //     self.append_header(code_buf);
+            // }
             if code_buf.is_empty() {
                 // Did not generate any code, remove from list to avoid inclusion in include file or output file list
                 modules.remove(&request_module);
@@ -394,11 +397,8 @@ impl Config {
     // Not used yet. If used, it requires checking the last iteration in the for loop.
     // fn append_footer(&mut self, code_buf: &mut String) {}
 
-    fn append_header(&mut self, code_buf: &mut String) {
-        self.header_once.call_once(|| {
-            // one-time setup
-            code_buf.push_str("use starknet::testing::cheatcode;\n");
-        });
+    fn append_header(code_buf: &mut String) {
+        code_buf.push_str("use starknet::testing::cheatcode;\n");
     }
 
     #[cfg(feature = "format")]
@@ -420,8 +420,6 @@ impl default::Default for Config {
             boxed: PathMap::default(),
             out_dir: None,
             default_package_filename: String::from("oracle"),
-            header_once: Once::new(),
-            footer_once: Once::new(),
         }
     }
 }
