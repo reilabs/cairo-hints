@@ -95,7 +95,7 @@ impl<'a> CodeGenerator<'a> {
             code_gen.package
         );
 
-        code_gen.append_header();
+        // code_gen.append_header();
 
         let message_count = file.message_type.len();
         code_gen.path.push(4);
@@ -121,7 +121,7 @@ impl<'a> CodeGenerator<'a> {
             code_gen.path.pop();
         }
 
-        code_gen.append_footer();
+        // code_gen.append_footer();
 
         code_gen.path.pop();
     }
@@ -881,13 +881,6 @@ impl<'a> CodeGenerator<'a> {
             .options
             .as_ref()
             .map_or(false, FieldOptions::deprecated)
-    }
-
-    fn append_footer(&mut self) {}
-
-    fn append_header(&mut self) {
-        self.code_buf
-            .push_str("use starknet::testing::cheatcode;\n");
     }
 }
 

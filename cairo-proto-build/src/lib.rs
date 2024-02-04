@@ -22,6 +22,7 @@ use std::io::{Error, ErrorKind, Write};
 use std::ops::RangeToInclusive;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Once;
 
 mod ast;
 mod code_generator;
@@ -151,6 +152,8 @@ pub struct Config {
     boxed: PathMap<()>,
     out_dir: Option<PathBuf>,
     default_package_filename: String,
+    header_once: Once,
+    footer_once: Once,
 }
 
 impl Config {
@@ -368,6 +371,7 @@ impl Config {
             let (code_buf, config_buf) = modules
                 .entry(request_module.clone())
                 .or_insert_with(|| (String::new(), Configuration::default()));
+            self.append_header(code_buf);
             CodeGenerator::generate(
                 self,
                 &message_graph,
@@ -385,6 +389,16 @@ impl Config {
         self.fmt_modules(&mut modules);
 
         Ok(modules)
+    }
+
+    // Not used yet. If used, it requires checking the last iteration in the for loop.
+    // fn append_footer(&mut self, code_buf: &mut String) {}
+
+    fn append_header(&mut self, code_buf: &mut String) {
+        self.header_once.call_once(|| {
+            // one-time setup
+            code_buf.push_str("use starknet::testing::cheatcode;\n");
+        });
     }
 
     #[cfg(feature = "format")]
@@ -406,6 +420,8 @@ impl default::Default for Config {
             boxed: PathMap::default(),
             out_dir: None,
             default_package_filename: String::from("oracle"),
+            header_once: Once::new(),
+            footer_once: Once::new(),
         }
     }
 }
