@@ -14,7 +14,7 @@ enum Size {
 
 #[derive(Debug, Deserialize)]
 struct Request {
-    color: String,
+    color: Size,
 }
 
 #[derive(Debug, Serialize)]
@@ -24,16 +24,14 @@ struct JsonResult {
 
 #[derive(Debug, Serialize)]
 struct Response {
-    color: String,
+    color: Size,
 }
 
 async fn root(extract::Json(payload): extract::Json<Request>) -> Json<JsonResult> {
     debug!("received payload {payload:?}");
     let n = payload; //(payload.n as f64).sqrt() as u64;
     Json(JsonResult {
-        result: Response {
-            color: n.color.to_string(),
-        },
+        result: Response { color: n.color },
     })
 }
 

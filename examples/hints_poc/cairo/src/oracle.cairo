@@ -1,17 +1,11 @@
 use starknet::testing::cheatcode;
 #[derive(Drop, Serde)]
 struct Request {
-    color: ByteArray,
+    color: super::shirts::Size,
 }
 #[derive(Drop, Serde)]
 struct Response {
-    color: ByteArray,
-}
-#[derive(Drop, Serde, PartialEq)]
-enum Size {
-    Small,
-    Medium,
-    Large,
+    color: super::shirts::Size,
 }
 #[generate_trait]
 impl SqrtOracle of SqrtOracleTrait {

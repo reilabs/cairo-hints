@@ -1,6 +1,7 @@
 mod oracle;
+mod shirts;
 
-use oracle::{Request, Size, SqrtOracle};
+use shirts::{Request, Size, SqrtOracle};
 
 fn main() -> bool {
     true
@@ -9,7 +10,7 @@ fn main() -> bool {
     //let result = SqrtOracle::sqrt(r);
 
     //result.n == x
-}   
+}
 
 #[cfg(test)]
 mod tests {
@@ -17,10 +18,9 @@ mod tests {
 
     #[test]
     fn sqrt_test() {
-        let c = "Hello World~~~~";
-        let r = Request { color: c.clone() };
+        let r = Request { color: Size::Large };
         let result = SqrtOracle::sqrt(r);
 
-        assert!(result.color == c.clone());
+        assert!(result.color == Size::Large);
     }
 }

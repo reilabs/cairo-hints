@@ -2,18 +2,14 @@ syntax = "proto3";
 
 package oracle;
 
-enum Size {
-    SMALL = 0;
-    MEDIUM = 1;
-    LARGE = 2;
-}
+import "field.proto";
 
 message Request {
-    string color = 1;
+    shirts.Size color = 1;
 }
 
 message Response {
-    string color = 1;
+    shirts.Size color = 1;
 }
 
 service SqrtOracle {

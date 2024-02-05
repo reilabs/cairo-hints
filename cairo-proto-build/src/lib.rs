@@ -178,20 +178,6 @@ impl Config {
     /// This method is like the `prost_build::compile_protos` function, with the added ability to
     /// specify non-default code generation options. See that function for more information about
     /// the arguments and generated outputs.
-    ///
-    /// The `protos` and `includes` arguments are ignored if `skip_protoc_run` is specified.
-    ///
-    /// # Example `build.rs`
-    ///
-    /// ```rust,no_run
-    /// # use std::io::Result;
-    /// fn main() -> Result<()> {
-    ///   let mut prost_build = prost_build::Config::new();
-    ///   prost_build.btree_map(&["."]);
-    ///   prost_build.compile_protos(&["src/frontend.proto", "src/backend.proto"], &["src"])?;
-    ///   Ok(())
-    /// }
-    /// ```
     pub fn compile_protos(
         &mut self,
         protos: &[impl AsRef<Path>],
@@ -237,6 +223,7 @@ impl Config {
 
         debug!("Running: {:?}", cmd);
 
+        println!("compile_protos {:#?}", cmd);
         let output = cmd.output().map_err(|error| {
             Error::new(
                 error.kind(),
@@ -267,7 +254,7 @@ impl Config {
             )
         })?;
 
-        self.compile_fds(file_descriptor_set)
+        self.compile_fds(protos, file_descriptor_set)
     }
 
     /// Compile a [`FileDescriptorSet`] into Rust files during a Cargo build with
@@ -279,16 +266,21 @@ impl Config {
     /// # Example `build.rs`
     ///
     /// ```rust,no_run
+    /// # use cairo_proto_build::Config;
     /// # use prost_types::FileDescriptorSet;
     /// # fn fds() -> FileDescriptorSet { todo!() }
     /// fn main() -> std::io::Result<()> {
     ///   let file_descriptor_set = fds();
     ///
-    ///   prost_build::Config::new()
+    ///   Config::new()
     ///     .compile_fds(file_descriptor_set)
     /// }
     /// ```
-    pub fn compile_fds(&mut self, fds: FileDescriptorSet) -> std::io::Result<()> {
+    pub fn compile_fds(
+        &mut self,
+        protos: &[impl AsRef<Path>],
+        fds: FileDescriptorSet,
+    ) -> std::io::Result<()> {
         let target: PathBuf = self.out_dir.clone().ok_or_else(|| {
             Error::new(ErrorKind::Other, "out_dir configuration option is not set")
         })?;
@@ -314,11 +306,14 @@ impl Config {
             })
             .collect::<HashMap<Module, String>>();
 
+        println!("compile_fds {:#?}", requests);
         let modules = self.generate(requests)?;
         for (module, content) in &modules {
             let file_name = file_names
                 .get(module)
                 .expect("every module should have a filename");
+            println!("compile_fds {:#?} {:#?}", file_name, module);
+            // Extract only the json matching the protos
             let code_output_path = target.join(file_name);
             let config_output_path = target.join(&format!("{file_name}.json"));
 
@@ -361,6 +356,8 @@ impl Config {
         let extern_paths = ExternPaths::new(&[], true)
             .map_err(|error| Error::new(ErrorKind::InvalidInput, error))?;
 
+        // println!("generate {:#?}", requests);
+
         for (request_module, request_fd) in requests {
             // Only record packages that have services
             if !request_fd.service.is_empty() {
@@ -380,9 +377,6 @@ impl Config {
                 code_buf,
                 config_buf,
             );
-            // if !config_buf.services.is_empty() {
-            //     self.append_header(code_buf);
-            // }
             if code_buf.is_empty() {
                 // Did not generate any code, remove from list to avoid inclusion in include file or output file list
                 modules.remove(&request_module);
