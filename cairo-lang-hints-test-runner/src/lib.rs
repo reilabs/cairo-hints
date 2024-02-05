@@ -10,12 +10,17 @@ use cairo_lang_compiler::project::setup_project;
 use cairo_lang_filesystem::cfg::{Cfg, CfgSet};
 use cairo_lang_filesystem::ids::CrateId;
 use cairo_lang_runner::casm_run::format_next_item;
-use cairo_lang_runner::{build_hints_dict, Arg, CairoHintProcessor, RunResultStarknet, RunResultValue, RunnerError, SierraCasmRunner, StarknetState, RunResult};
+use cairo_lang_runner::{
+    build_hints_dict, Arg, CairoHintProcessor, RunResultStarknet, RunResultValue, RunnerError,
+    SierraCasmRunner, StarknetState,
+};
 use cairo_lang_sierra::extensions::gas::CostTokenType;
 use cairo_lang_sierra::ids::FunctionId;
 use cairo_lang_sierra::program::{Function, Program};
 use cairo_lang_sierra_to_casm::compiler::CairoProgram;
-use cairo_lang_sierra_to_casm::metadata::{calc_metadata, calc_metadata_ap_change_only, MetadataComputationConfig, MetadataError};
+use cairo_lang_sierra_to_casm::metadata::{
+    calc_metadata, calc_metadata_ap_change_only, MetadataComputationConfig, MetadataError,
+};
 use cairo_lang_starknet::contract::ContractInfo;
 use cairo_lang_starknet::starknet_plugin_suite;
 use cairo_lang_test_plugin::test_config::{PanicExpectation, TestExpectation};
@@ -26,7 +31,6 @@ use cairo_lang_utils::casts::IntoOrPanic;
 use cairo_lang_utils::ordered_hash_map::OrderedHashMap;
 use cairo_oracle_hint_processor::RpcHintProcessor;
 use cairo_proto_serde::configuration::Configuration;
-use cairo_vm::hint_processor::hint_processor_definition::HintProcessor;
 use cairo_vm::vm::runners::cairo_runner::RunResources;
 use colored::Colorize;
 use itertools::{chain, Itertools};
@@ -58,7 +62,11 @@ impl TestRunner {
     }
 
     /// Runs the tests and process the results for a summary.
-    pub fn run(&self, oracle_server: &Option<String>, configuration: &Configuration) -> Result<Option<TestsSummary>> {
+    pub fn run(
+        &self,
+        oracle_server: &Option<String>,
+        configuration: &Configuration,
+    ) -> Result<Option<TestsSummary>> {
         let runner = CompiledTestRunner::new(self.compiler.build()?, self.config.clone());
         runner.run(oracle_server, configuration)
     }
@@ -81,15 +89,23 @@ impl CompiledTestRunner {
     }
 
     /// Execute preconfigured test execution.
-    pub fn run(self, oracle_server: &Option<String>, configuration: &Configuration) -> Result<Option<TestsSummary>> {
+    pub fn run(
+        self,
+        oracle_server: &Option<String>,
+        configuration: &Configuration,
+    ) -> Result<Option<TestsSummary>> {
         let (compiled, filtered_out) = filter_test_cases(
             self.compiled,
             self.config.include_ignored,
             self.config.ignored,
             self.config.filter,
         );
-
-        let TestsSummary { passed, failed, ignored, failed_run_results } = run_tests(
+        let TestsSummary {
+            passed,
+            failed,
+            ignored,
+            failed_run_results,
+        } = run_tests(
             compiled.named_tests,
             compiled.sierra_program,
             compiled.function_set_costs,
@@ -138,8 +154,11 @@ fn format_for_panic(mut felts: IntoIter<Felt252>) -> String {
     while let Some(item) = format_next_item(&mut felts) {
         items.push(item.quote_if_string());
     }
-    let panic_values_string =
-        if let [item] = &items[..] { item.clone() } else { format!("({})", items.join(", ")) };
+    let panic_values_string = if let [item] = &items[..] {
+        item.clone()
+    } else {
+        format!("({})", items.join(", "))
+    };
     format!("Panicked with {panic_values_string}.")
 }
 
@@ -181,7 +200,10 @@ impl TestCompiler {
 
         let main_crate_ids = setup_project(db, Path::new(&path))?;
 
-        if DiagnosticsReporter::stderr().with_extra_crates(&main_crate_ids).check(db) {
+        if DiagnosticsReporter::stderr()
+            .with_extra_crates(&main_crate_ids)
+            .check(db)
+        {
             bail!("failed to compile: {}", path.display());
         }
 
@@ -220,7 +242,8 @@ pub fn filter_test_cases(
     filter: String,
 ) -> (TestCompilation, usize) {
     let total_tests_count = compiled.named_tests.len();
-    let named_tests = compiled.named_tests
+    let named_tests = compiled
+        .named_tests
         .into_iter()
         .map(|(func, mut test)| {
             // Un-ignoring all the tests in `include-ignored` mode.
@@ -234,7 +257,10 @@ pub fn filter_test_cases(
         .filter(|(_, test)| !ignored || test.ignored)
         .collect_vec();
     let filtered_out = total_tests_count - named_tests.len();
-    let tests = TestCompilation { named_tests, ..compiled };
+    let tests = TestCompilation {
+        named_tests,
+        ..compiled
+    };
     (tests, filtered_out)
 }
 
@@ -289,64 +315,74 @@ pub fn run_tests(
     }));
     named_tests
         .into_par_iter()
-        .map(|(name, test)| -> anyhow::Result<(String, Option<TestResult>)> {
-            if test.ignored {
-                return Ok((name, None));
-            }
-            let func = runner.find_function(name.as_str())?;
+        .map(
+            |(name, test)| -> anyhow::Result<(String, Option<TestResult>)> {
+                if test.ignored {
+                    return Ok((name, None));
+                }
+                let func = runner.find_function(name.as_str())?;
 
-            println!("requires gas counter {:?}, available gas {:?}", sierra_program.requires_gas_counter(), test.available_gas);
+                println!(
+                    "requires gas counter {:?}, available gas {:?}",
+                    sierra_program.requires_gas_counter(),
+                    test.available_gas
+                );
 
-            // // TODO: this shouldn't be needed. we should call into cairo-lang-runner
-            let metadata = create_metadata(&sierra_program, metadata_config.clone())?;
-            let casm_program = cairo_lang_sierra_to_casm::compiler::compile(
-                &sierra_program,
-                &metadata,
-                metadata_config.is_some(),
-            )?;
+                // // TODO: this shouldn't be needed. we should call into cairo-lang-runner
+                let metadata = create_metadata(&sierra_program, metadata_config.clone())?;
+                let casm_program = cairo_lang_sierra_to_casm::compiler::compile(
+                    &sierra_program,
+                    &metadata,
+                    metadata_config.is_some(),
+                )?;
 
-            let result = run_with_oracle_hint_processor(
-                &runner,
-                &casm_program,
-                func,
-                &[],
-                test.available_gas,
-                StarknetState::default(),
-                oracle_server,
-                configuration,
-            )
-            .context("failed to run the function")?;
+                let result = run_with_oracle_hint_processor(
+                    &runner,
+                    &casm_program,
+                    func,
+                    &[],
+                    test.available_gas,
+                    StarknetState::default(),
+                    oracle_server,
+                    configuration,
+                )
+                .context("failed to run the function")?;
 
-            Ok((
-                name,
-                Some(TestResult {
-                    status: match &result.value {
-                        RunResultValue::Success(_) => match test.expectation {
-                            TestExpectation::Success => TestStatus::Success,
-                            TestExpectation::Panics(_) => TestStatus::Fail(result.value),
-                        },
-                        RunResultValue::Panic(value) => match test.expectation {
-                            TestExpectation::Success => TestStatus::Fail(result.value),
-                            TestExpectation::Panics(panic_expectation) => match panic_expectation {
-                                PanicExpectation::Exact(expected) if value != &expected => {
-                                    TestStatus::Fail(result.value)
+                Ok((
+                    name,
+                    Some(TestResult {
+                        status: match &result.value {
+                            RunResultValue::Success(_) => match test.expectation {
+                                TestExpectation::Success => TestStatus::Success,
+                                TestExpectation::Panics(_) => TestStatus::Fail(result.value),
+                            },
+                            RunResultValue::Panic(value) => match test.expectation {
+                                TestExpectation::Success => TestStatus::Fail(result.value),
+                                TestExpectation::Panics(panic_expectation) => {
+                                    match panic_expectation {
+                                        PanicExpectation::Exact(expected) if value != &expected => {
+                                            TestStatus::Fail(result.value)
+                                        }
+                                        _ => TestStatus::Success,
+                                    }
                                 }
-                                _ => TestStatus::Success,
                             },
                         },
-                    },
-                    gas_usage: test
-                        .available_gas
-                        .zip(result.gas_counter)
-                        .map(|(before, after)| {
-                            before.into_or_panic::<i64>() - after.to_bigint().to_i64().unwrap()
-                        })
-                        .or_else(|| {
-                            runner.initial_required_gas(func).map(|gas| gas.into_or_panic::<i64>())
-                        }),
-                }),
-            ))
-        })
+                        gas_usage: test
+                            .available_gas
+                            .zip(result.gas_counter)
+                            .map(|(before, after)| {
+                                before.into_or_panic::<i64>() - after.to_bigint().to_i64().unwrap()
+                            })
+                            .or_else(|| {
+                                runner
+                                    .initial_required_gas(func)
+                                    .map(|gas| gas.into_or_panic::<i64>())
+                            }),
+                    }),
+                ))
+            },
+        )
         .for_each(|r| {
             let mut wrapped_summary = wrapped_summary.lock().unwrap();
             if wrapped_summary.is_err() {
@@ -361,10 +397,14 @@ pub fn run_tests(
             };
             let summary = wrapped_summary.as_mut().unwrap();
             let (res_type, status_str, gas_usage) = match status {
-                Some(TestResult { status: TestStatus::Success, gas_usage }) => {
-                    (&mut summary.passed, "ok".bright_green(), gas_usage)
-                }
-                Some(TestResult { status: TestStatus::Fail(run_result), gas_usage }) => {
+                Some(TestResult {
+                    status: TestStatus::Success,
+                    gas_usage,
+                }) => (&mut summary.passed, "ok".bright_green(), gas_usage),
+                Some(TestResult {
+                    status: TestStatus::Fail(run_result),
+                    gas_usage,
+                }) => {
                     summary.failed_run_results.push(run_result);
                     (&mut summary.failed, "fail".bright_red(), gas_usage)
                 }
@@ -390,13 +430,15 @@ pub fn run_with_oracle_hint_processor(
     starknet_state: StarknetState,
     oracle_server: &Option<String>,
     configuration: &Configuration,
-
 ) -> Result<RunResultStarknet, RunnerError> {
     let initial_gas = runner.get_initial_available_gas(func, available_gas)?;
     let (entry_code, builtins) = runner.create_entry_code(func, args, initial_gas)?;
     let footer = runner.create_code_footer();
-    let instructions =
-        chain!(entry_code.iter(), casm_program.instructions.iter(), footer.iter());
+    let instructions = chain!(
+        entry_code.iter(),
+        casm_program.instructions.iter(),
+        footer.iter()
+    );
     let (hints_dict, string_to_hint) = build_hints_dict(instructions.clone());
     let cairo_hint_processor = CairoHintProcessor {
         runner: Some(runner),
@@ -404,16 +446,22 @@ pub fn run_with_oracle_hint_processor(
         string_to_hint,
         run_resources: RunResources::default(),
     };
-    let mut hint_processor = RpcHintProcessor::new(cairo_hint_processor, oracle_server, configuration);
-
-    runner.run_function(func, &mut hint_processor, hints_dict, instructions, builtins).map(|v| {
-        RunResultStarknet {
+    let mut hint_processor =
+        RpcHintProcessor::new(cairo_hint_processor, oracle_server, configuration);
+    runner
+        .run_function(
+            func,
+            &mut hint_processor,
+            hints_dict,
+            instructions,
+            builtins,
+        )
+        .map(|v| RunResultStarknet {
             gas_counter: v.gas_counter,
             memory: v.memory,
             value: v.value,
             starknet_state: hint_processor.starknet_state(),
-        }
-    })
+        })
 }
 
 /// Creates the metadata required for a Sierra program lowering to casm.

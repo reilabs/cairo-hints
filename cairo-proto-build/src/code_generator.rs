@@ -1,19 +1,19 @@
-use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::iter;
-use std::ops::Add;
 
+use cairo_proto_serde::configuration::{
+    Configuration, Field, FieldType, Mapping, MethodDeclaration,
+};
+use heck::ToTitleCase;
 use itertools::{Either, Itertools};
 use log::debug;
 use multimap::MultiMap;
 use prost_types::field_descriptor_proto::{Label, Type};
 use prost_types::source_code_info::Location;
 use prost_types::{
-    DescriptorProto, EnumValueDescriptorProto, FieldDescriptorProto,
-    FieldOptions, FileDescriptorProto, ServiceDescriptorProto,
-    SourceCodeInfo,
+    DescriptorProto, EnumDescriptorProto, EnumValueDescriptorProto, FieldDescriptorProto,
+    FieldOptions, FileDescriptorProto, ServiceDescriptorProto, SourceCodeInfo,
 };
-use cairo_proto_serde::configuration::{Configuration, Field, FieldType, MethodDeclaration};
 
 use crate::ast::{Comments, Method, Service};
 use crate::extern_paths::ExternPaths;
@@ -56,6 +56,8 @@ impl<'a> CodeGenerator<'a> {
         code_buf: &mut String,
         serde_config: &mut Configuration,
     ) {
+        // println!("{:#?}", file);
+
         let source_info = file.source_code_info.map(|mut s| {
             s.location.retain(|loc| {
                 let len = loc.path.len();
@@ -93,7 +95,6 @@ impl<'a> CodeGenerator<'a> {
 
         code_gen.append_header();
 
-        let message_count = file.message_type.len();
         code_gen.path.push(4);
         for (idx, message) in file.message_type.into_iter().enumerate() {
             code_gen.path.push(idx as i32);
@@ -104,7 +105,9 @@ impl<'a> CodeGenerator<'a> {
 
         code_gen.path.push(5);
         for (idx, desc) in file.enum_type.into_iter().enumerate() {
-            panic!("enums are not supported");
+            code_gen.path.push(idx as i32);
+            code_gen.append_enum(desc);
+            code_gen.path.pop();
         }
         code_gen.path.pop();
 
@@ -118,6 +121,71 @@ impl<'a> CodeGenerator<'a> {
         code_gen.append_footer();
 
         code_gen.path.pop();
+    }
+
+    fn append_enum(&mut self, desc: EnumDescriptorProto) {
+        debug!("  enum: {:?}", desc.name());
+
+        let proto_enum_name = desc.name();
+        let enum_name = to_upper_camel(proto_enum_name);
+
+        let enum_values = &desc.value;
+        let fq_proto_enum_name = format!(
+            "{}{}{}{}.{}",
+            if self.package.is_empty() && self.type_path.is_empty() {
+                ""
+            } else {
+                "."
+            },
+            self.package.trim_matches('.'),
+            if self.type_path.is_empty() { "" } else { "." },
+            self.type_path.join("."),
+            proto_enum_name,
+        );
+
+        if self
+            .extern_paths
+            .resolve_ident(&fq_proto_enum_name)
+            .is_some()
+        {
+            return;
+        }
+
+        self.push_indent();
+        self.code_buf
+            .push_str("#[derive(Drop, Serde, PartialEq)]\n");
+        self.push_indent();
+        self.code_buf.push_str("enum ");
+        self.code_buf.push_str(&enum_name);
+        self.code_buf.push_str(" {\n");
+
+        let variant_mappings = build_enum_value_mappings(&enum_name, true, enum_values);
+
+        self.depth += 1;
+        self.path.push(2);
+        let mut mappings_def = Vec::new();
+        for variant in variant_mappings.iter() {
+            let m = Mapping {
+                name: variant.proto_name.to_string().to_title_case(),
+                nb: variant.proto_number,
+            };
+            mappings_def.push(m);
+            self.path.push(variant.path_idx as i32);
+
+            self.push_indent();
+            self.code_buf.push_str(&variant.generated_variant_name);
+            self.code_buf.push_str(",\n");
+
+            self.path.pop();
+        }
+
+        self.path.pop();
+        self.serde_config.enums.insert(enum_name, mappings_def);
+
+        self.depth -= 1;
+
+        self.push_indent();
+        self.code_buf.push_str("}\n");
     }
 
     fn append_message(&mut self, message: DescriptorProto) {
@@ -214,7 +282,7 @@ impl<'a> CodeGenerator<'a> {
                 None => {
                     let field_def = self.append_field(&fq_message_name, field);
                     fields_def.push(field_def);
-                },
+                }
             }
             self.path.pop();
         }
@@ -231,10 +299,6 @@ impl<'a> CodeGenerator<'a> {
             };
 
             panic!("oneof fields are not supported");
-
-            // self.path.push(idx);
-            // self.append_oneof_field(&message_name, &fq_message_name, oneof, fields);
-            // self.path.pop();
         }
         self.path.pop();
 
@@ -253,12 +317,10 @@ impl<'a> CodeGenerator<'a> {
             self.path.pop();
 
             self.path.push(4);
-            for (idx, nested_enum) in message.enum_type.into_iter().enumerate() {
-                panic!("enums are not supported");
-
-                // self.path.push(idx as i32);
-                // self.append_enum(nested_enum);
-                // self.path.pop();
+            for (idx, desc) in message.enum_type.into_iter().enumerate() {
+                self.path.push(idx as i32);
+                self.append_enum(desc);
+                self.path.pop();
             }
             self.path.pop();
 
@@ -271,54 +333,17 @@ impl<'a> CodeGenerator<'a> {
                 };
 
                 panic!("oneof messages are not supported");
-
-                // self.append_oneof(&fq_message_name, oneof, idx, fields);
             }
 
             self.pop_mod();
         }
-
-        // Sendable no longer needed
-        // let type_name = to_upper_camel(&message_name);
-        // self.code_buf.push_str(&format!("impl Sendable{type_name} of Sendable<{type_name}> {{\n"));
-        // self.code_buf.push_str(&format!("    fn send(self: @{type_name}) {{\n"));
-        // self.code_buf.push_str("        cheatcode::<'oracle_path_push'>(array!['struct'].span());\n");
-        // for (field, idx) in fields.clone() {
-        //     let name = to_snake(field.name());
-        //     self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_push'>(array!['{name}'].span());\n"));
-        //     self.code_buf.push_str(&format!("        self.{name}.send();\n"));
-        //     self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_pop'>(array!['{name}'].span());\n"));
-        // }
-        // self.code_buf.push_str("        cheatcode::<'oracle_path_pop'>(array!['struct'].span());\n");
-        //
-        // self.code_buf.push_str("    }\n");
-        // self.code_buf.push_str(&format!("    fn recv() -> {type_name} {{\n"));
-        //
-        // self.code_buf.push_str("        cheatcode::<'oracle_path_push'>(array!['struct'].span());\n");
-        // for (field, idx) in fields.clone() {
-        //     let name = to_snake(field.name());
-        //     let repeated = field.label == Some(Label::Repeated as i32);
-        //     let optional = self.optional(&field);
-        //     let mut ty = self.resolve_type(&field, &fq_message_name);
-        //     if repeated {
-        //         ty = format!("Array<{ty}>");
-        //     } else if optional {
-        //         ty = format!("Option<{ty}>");
-        //     }
-        //
-        //     self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_push'>(array!['{name}'].span());\n"));
-        //     self.code_buf.push_str(&format!("        let {name} = Sendable::<{ty}>::recv();\n"));
-        //     self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_pop'>(array!['{name}'].span());\n"));
-        // }
-        // self.code_buf.push_str("        cheatcode::<'oracle_path_pop'>(array!['struct'].span());\n");
-        //
-        // let all_fields = fields.iter().map(|f| to_snake(f.0.name())).join(", ");
-        // self.code_buf.push_str(&format!("        {type_name} {{ {all_fields} }}\n"));
-        // self.code_buf.push_str("    }\n");
-        // self.code_buf.push_str("}\n");
     }
 
-    fn append_field(&mut self, fq_message_name: &str, field: FieldDescriptorProto) -> cairo_proto_serde::configuration::Field {
+    fn append_field(
+        &mut self,
+        fq_message_name: &str,
+        field: FieldDescriptorProto,
+    ) -> cairo_proto_serde::configuration::Field {
         let type_ = field.r#type();
         let repeated = field.label == Some(Label::Repeated as i32);
         let deprecated = self.deprecated(&field);
@@ -346,6 +371,27 @@ impl<'a> CodeGenerator<'a> {
         if deprecated {
             self.push_indent();
             self.code_buf.push_str("#[deprecated]\n");
+        }
+
+        if let Some(ref default) = field.default_value {
+            self.code_buf.push_str("\", default=\"");
+            if type_ == Type::Enum {
+                let mut enum_value = to_upper_camel(default);
+                // Field types are fully qualified, so we extract
+                // the last segment and strip it from the left
+                // side of the default value.
+                let enum_type = field
+                    .type_name
+                    .as_ref()
+                    .and_then(|ty| ty.split('.').last())
+                    .unwrap();
+
+                enum_value = strip_enum_prefix(&to_upper_camel(enum_type), &enum_value);
+                self.code_buf.push_str(&enum_value);
+            } else {
+                self.code_buf
+                    .push_str(&default.escape_default().to_string());
+            }
         }
 
         let field_name = to_snake(field.name());
@@ -377,11 +423,25 @@ impl<'a> CodeGenerator<'a> {
         self.code_buf.push_str(",\n");
 
         if repeated {
-            Field { name: field_name, ty: FieldType::Array(Box::new(ty.into())) }
+            Field {
+                name: field_name,
+                ty: FieldType::Array(Box::new(ty.into())),
+            }
         } else if optional {
-            Field { name: field_name, ty: FieldType::Option(Box::new(ty.into())) }
+            Field {
+                name: field_name,
+                ty: FieldType::Option(Box::new(ty.into())),
+            }
+        } else if type_ == Type::Enum {
+            Field {
+                name: field_name,
+                ty: FieldType::Enum(ty),
+            }
         } else {
-            Field { name: field_name, ty: ty.into() }
+            Field {
+                name: field_name,
+                ty: ty.into(),
+            }
         }
     }
 
@@ -406,9 +466,8 @@ impl<'a> CodeGenerator<'a> {
 
         let field_name = to_snake(field.name());
         self.push_indent();
-        self.code_buf.push_str(&format!(
-            "{field_name}: Felt252Dict<{value_ty}>,\n"
-        ));
+        self.code_buf
+            .push_str(&format!("{field_name}: Felt252Dict<{value_ty}>,\n"));
 
         //self.config_buf.push_str(&format!("{{\"name\": \"{field_name}\", \"type\": \"dictionary\", \"key\": \"{key_ty}\", \"value\": \"{value_ty}\", \"map\": true}}"));
     }
@@ -421,7 +480,6 @@ impl<'a> CodeGenerator<'a> {
             .unwrap();
         Some(&source_info.location[idx])
     }
-
 
     fn append_service(&mut self, service: ServiceDescriptorProto) {
         let name = service.name().to_owned();
@@ -486,7 +544,10 @@ impl<'a> CodeGenerator<'a> {
     fn append_service_def(&mut self, service: Service) {
         // Generate a trait for the service.
         self.code_buf.push_str("#[generate_trait]\n");
-        self.code_buf.push_str(&format!("impl {} of {}Trait {{\n", &service.name, &service.name));
+        self.code_buf.push_str(&format!(
+            "impl {} of {}Trait {{\n",
+            &service.name, &service.name
+        ));
 
         let mut methods = HashMap::<String, MethodDeclaration>::new();
 
@@ -504,13 +565,23 @@ impl<'a> CodeGenerator<'a> {
         let mut result = cheatcode::<'{}'>(serialized.span());
         Serde::deserialize(ref result).unwrap()
 ",
-method.name));
+                method.name
+            ));
 
             self.code_buf.push_str("    }\n");
-            methods.insert(method.name, MethodDeclaration { input: FieldType::Message(method.input_type), output: FieldType::Message(method.output_type) });
+            methods.insert(
+                method.name,
+                MethodDeclaration {
+                    input: FieldType::Message(method.input_type),
+                    output: FieldType::Message(method.output_type),
+                },
+            );
         }
 
-        self.serde_config.services.insert(service.name, cairo_proto_serde::configuration::Service { methods });
+        self.serde_config.services.insert(
+            service.name,
+            cairo_proto_serde::configuration::Service { methods },
+        );
 
         // Close out the trait.
         self.code_buf.push_str("}\n");
@@ -522,7 +593,8 @@ method.name));
 
     fn push_mod(&mut self, module: &str) {
         self.push_indent();
-        self.code_buf.push_str("/// Nested message and enum types in `");
+        self.code_buf
+            .push_str("/// Nested message and enum types in `");
         self.code_buf.push_str(module);
         self.code_buf.push_str("`.\n");
 
@@ -546,17 +618,18 @@ method.name));
     }
 
     fn resolve_type(&self, field: &FieldDescriptorProto, fq_message_name: &str) -> String {
+        // println!("{:#?} {:#?}", field, fq_message_name);
         match field.r#type() {
-            Type::Float => String::from("f32"),
-            Type::Double => String::from("f64"),
+            Type::Float => panic!("Float type not supported"),
+            Type::Double => panic!("Double type not supported"),
             Type::Uint32 | Type::Fixed32 => String::from("u32"),
             Type::Uint64 | Type::Fixed64 => String::from("u64"),
-            Type::Int32 | Type::Sfixed32 | Type::Sint32 | Type::Enum => String::from("i32"),
+            Type::Int32 | Type::Sfixed32 | Type::Sint32 => String::from("i32"),
             Type::Int64 | Type::Sfixed64 | Type::Sint64 => String::from("i64"),
             Type::Bool => String::from("bool"),
             Type::String => String::from("ByteArray"),
             Type::Bytes => String::from("ByteArray"),
-            Type::Group | Type::Message => self.resolve_ident(field.type_name()),
+            Type::Group | Type::Message | Type::Enum => self.resolve_ident(field.type_name()),
         }
     }
 
@@ -598,42 +671,6 @@ method.name));
             .join("::")
     }
 
-    fn field_type_tag(&self, field: &FieldDescriptorProto) -> Cow<'static, str> {
-        match field.r#type() {
-            Type::Float => Cow::Borrowed("float"),
-            Type::Double => Cow::Borrowed("double"),
-            Type::Int32 => Cow::Borrowed("int32"),
-            Type::Int64 => Cow::Borrowed("int64"),
-            Type::Uint32 => Cow::Borrowed("uint32"),
-            Type::Uint64 => Cow::Borrowed("uint64"),
-            Type::Sint32 => Cow::Borrowed("sint32"),
-            Type::Sint64 => Cow::Borrowed("sint64"),
-            Type::Fixed32 => Cow::Borrowed("fixed32"),
-            Type::Fixed64 => Cow::Borrowed("fixed64"),
-            Type::Sfixed32 => Cow::Borrowed("sfixed32"),
-            Type::Sfixed64 => Cow::Borrowed("sfixed64"),
-            Type::Bool => Cow::Borrowed("bool"),
-            Type::String => Cow::Borrowed("string"),
-            Type::Bytes => Cow::Borrowed("bytes"),
-            Type::Group => Cow::Borrowed("group"),
-            Type::Message => Cow::Borrowed("message"),
-            Type::Enum => Cow::Owned(format!(
-                "enumeration={:?}",
-                self.resolve_ident(field.type_name())
-            )),
-        }
-    }
-
-    fn map_value_type_tag(&self, field: &FieldDescriptorProto) -> Cow<'static, str> {
-        match field.r#type() {
-            Type::Enum => Cow::Owned(format!(
-                "enumeration({})",
-                self.resolve_ident(field.type_name())
-            )),
-            _ => self.field_type_tag(field),
-        }
-    }
-
     fn optional(&self, field: &FieldDescriptorProto) -> bool {
         if field.proto3_optional.unwrap_or(false) {
             return true;
@@ -660,33 +697,14 @@ method.name));
     fn append_footer(&mut self) {}
 
     fn append_header(&mut self) {
-        self.code_buf.push_str("use starknet::testing::cheatcode;\n");
+        self.code_buf
+            .push_str("use starknet::testing::cheatcode;\n");
     }
-}
-
-/// Returns `true` if the repeated field type can be packed.
-fn can_pack(field: &FieldDescriptorProto) -> bool {
-    matches!(
-        field.r#type(),
-        Type::Float
-            | Type::Double
-            | Type::Int32
-            | Type::Int64
-            | Type::Uint32
-            | Type::Uint64
-            | Type::Sint32
-            | Type::Sint64
-            | Type::Fixed32
-            | Type::Fixed64
-            | Type::Sfixed32
-            | Type::Sfixed64
-            | Type::Bool
-            | Type::Enum
-    )
 }
 
 /// Based on [`google::protobuf::UnescapeCEscapeString`][1]
 /// [1]: https://github.com/google/protobuf/blob/3.3.x/src/google/protobuf/stubs/strutil.cc#L312-L322
+#[cfg(test)]
 fn unescape_c_escape_string(s: &str) -> Vec<u8> {
     let src = s.as_bytes();
     let len = src.len();

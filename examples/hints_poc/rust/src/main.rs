@@ -1,32 +1,40 @@
-use axum::{
-    extract,
-    routing::post,
-    Router,
-    Json,
-};
-use serde::{Serialize, Deserialize};
-use tracing::debug;
+use axum::{extract, routing::post, Json, Router};
+use serde::{Deserialize, Serialize};
+use serde_repr::*;
 use tower_http::trace::TraceLayer;
+use tracing::debug;
+
+#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[repr(i32)]
+enum Size {
+    Small,
+    Medium,
+    Large,
+}
 
 #[derive(Debug, Deserialize)]
 struct Request {
-    n: u64,
+    color: String,
 }
 
 #[derive(Debug, Serialize)]
 struct JsonResult {
-    result: Response
+    result: Response,
 }
 
 #[derive(Debug, Serialize)]
 struct Response {
-    n: u64,
+    color: String,
 }
 
 async fn root(extract::Json(payload): extract::Json<Request>) -> Json<JsonResult> {
     debug!("received payload {payload:?}");
-    let n = (payload.n as f64).sqrt() as u64;
-    Json(JsonResult { result: Response { n } })
+    let n = payload; //(payload.n as f64).sqrt() as u64;
+    Json(JsonResult {
+        result: Response {
+            color: n.color.to_string(),
+        },
+    })
 }
 
 #[tokio::main(flavor = "current_thread")]

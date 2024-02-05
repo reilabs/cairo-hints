@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Configuration {
+    pub enums: HashMap<String, Vec<Mapping>>,
     pub messages: HashMap<String, Vec<Field>>,
     pub services: HashMap<String, Service>,
 }
@@ -15,6 +16,9 @@ pub enum PrimitiveType {
     U64,
     U32,
     I32,
+    I64,
+    BOOL,
+    BYTEARRAY,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -22,6 +26,7 @@ pub enum PrimitiveType {
 pub enum FieldType {
     Primitive(PrimitiveType),
     Message(String),
+    Enum(String),
     Option(Box<FieldType>),
     Array(Box<FieldType>),
 }
@@ -33,9 +38,15 @@ pub struct Field {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct Mapping {
+    pub name: String,
+    pub nb: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Service {
-    pub methods: HashMap<String, MethodDeclaration>
+    pub methods: HashMap<String, MethodDeclaration>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -44,14 +55,16 @@ pub struct MethodDeclaration {
     pub output: FieldType,
 }
 
-
 impl From<String> for FieldType {
     fn from(value: String) -> Self {
         match value.as_ref() {
             "u64" => FieldType::Primitive(PrimitiveType::U64),
             "u32" => FieldType::Primitive(PrimitiveType::U32),
             "i32" => FieldType::Primitive(PrimitiveType::I32),
-            _ => FieldType::Message(value)
+            "i64" => FieldType::Primitive(PrimitiveType::I64),
+            "bool" => FieldType::Primitive(PrimitiveType::BOOL),
+            "ByteArray" => FieldType::Primitive(PrimitiveType::BYTEARRAY),
+            _ => FieldType::Message(value),
         }
     }
 }

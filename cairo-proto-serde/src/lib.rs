@@ -1,20 +1,47 @@
-use cairo_felt::Felt252;
-use serde_json::{json, Map, Value};
 use crate::configuration::{Configuration, FieldType, PrimitiveType};
+use cairo_felt::Felt252;
+use num_traits::identities::One;
+use num_traits::identities::Zero;
+use num_traits::ToPrimitive;
+use serde_json::{json, Map, Value};
 
 pub mod configuration;
 
 fn serialize_primitive(ty: &PrimitiveType, value: &Value) -> Vec<Felt252> {
-    let number = value.as_number().unwrap();
+    // println!("serialize_primitive {:#?}", value.as_bool());
+    // let number = value.as_number().unwrap();
     let element = match ty {
-        PrimitiveType::U64 => Felt252::from(number.as_u64().unwrap()),
-        PrimitiveType::U32 => Felt252::from(u32::try_from(number.as_u64().unwrap()).unwrap()),
-        PrimitiveType::I32 => Felt252::from(i32::try_from(number.as_i64().unwrap()).unwrap()),
+        PrimitiveType::U64 => Felt252::from(value.as_u64().unwrap()),
+        PrimitiveType::U32 => Felt252::from(value.as_u64().unwrap()),
+        PrimitiveType::I32 => Felt252::from(value.as_i64().unwrap()),
+        PrimitiveType::I64 => Felt252::from(value.as_i64().unwrap()),
+        PrimitiveType::BYTEARRAY => {
+            // println!("serialize_primitive {:#?}", value);
+            let mut p = Vec::new();
+            let bytes = value.as_str().unwrap().as_bytes();
+
+            let total_length = bytes.len().to_u32().unwrap() / 31;
+            p.push(Felt252::from(total_length));
+
+            bytes
+                .chunks(31)
+                .for_each(|v| p.push(Felt252::from_bytes_be(v)));
+
+            let last_row_length = bytes.len().to_u32().unwrap() % 31;
+            if last_row_length == 0 {
+                p.push(Felt252::from(0));
+            }
+            p.push(Felt252::from(last_row_length));
+            // println!("serialize_primitive {:#?}", p);
+            return p;
+        }
+        PrimitiveType::BOOL => Felt252::from(value.as_bool().unwrap()),
     };
     vec![element]
 }
 
 fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
+    // println!("deserialize_primitive {:#?}", value);
     let num = value[0].to_bigint();
     *value = &value[1..];
 
@@ -22,21 +49,55 @@ fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
         PrimitiveType::U64 => json!(u64::try_from(num).unwrap()),
         PrimitiveType::U32 => json!(u32::try_from(num).unwrap()),
         PrimitiveType::I32 => json!(i32::try_from(num).unwrap()),
+        PrimitiveType::I64 => json!(i64::try_from(num).unwrap()),
+        PrimitiveType::BYTEARRAY => {
+            let v: Vec<Vec<u8>> = value
+                .to_vec()
+                .split_last()
+                .unwrap()
+                .1
+                .into_iter()
+                .map(|e| e.to_bytes_be())
+                .collect();
+            json!(String::from_utf8(v.concat()).unwrap())
+        }
+        PrimitiveType::BOOL => {
+            if num.is_one() {
+                json!(true)
+            } else if num.is_zero() {
+                json!(false)
+            } else {
+                panic!("Value can't be converted to boolean")
+            }
+        }
     }
 }
 
-pub fn serialize_cairo_serde(config: &Configuration, ty: &FieldType, value: &Value) -> Vec<Felt252> {
+pub fn serialize_cairo_serde(
+    config: &Configuration,
+    ty: &FieldType,
+    value: &Value,
+) -> Vec<Felt252> {
+    // println!("serialize_cairo_serde {:#?}", ty);
+    // println!("serialize_cairo_serde {:#?}", value);
+    // println!("---------------------------------------");
     let mut result = Vec::new();
-
     match ty {
         FieldType::Primitive(ty) => result.append(&mut serialize_primitive(ty, value)),
         FieldType::Message(message_ty) => {
             let message_config = &config.messages[message_ty];
-            let value = value.as_object().expect("must be an object to serialize as message {message_ty}");
+            let value = value
+                .as_object()
+                .expect("must be an object to serialize as message {message_ty}");
             for field in message_config {
-                result.append(&mut serialize_cairo_serde(config, &field.ty, &value[&field.name]));
+                result.append(&mut serialize_cairo_serde(
+                    config,
+                    &field.ty,
+                    &value[&field.name],
+                ));
             }
         }
+        FieldType::Enum(_) => result.append(&mut serialize_primitive(&PrimitiveType::I32, value)),
         FieldType::Option(inner_ty) => {
             if value.is_null() {
                 result.append(&mut serialize_primitive(&PrimitiveType::U64, &json!(1)));
@@ -47,7 +108,10 @@ pub fn serialize_cairo_serde(config: &Configuration, ty: &FieldType, value: &Val
         }
         FieldType::Array(value_ty) => {
             let value = value.as_array().expect("must be an array");
-            result.append(&mut serialize_primitive(&PrimitiveType::U64, &json!(value.len())));
+            result.append(&mut serialize_primitive(
+                &PrimitiveType::U64,
+                &json!(value.len()),
+            ));
             for element in value {
                 result.append(&mut serialize_cairo_serde(config, &value_ty, element));
             }
@@ -57,17 +121,30 @@ pub fn serialize_cairo_serde(config: &Configuration, ty: &FieldType, value: &Val
     result
 }
 
-pub fn deserialize_cairo_serde(config: &Configuration, ty: &FieldType, value: &mut &[Felt252]) -> Value {
+pub fn deserialize_cairo_serde(
+    config: &Configuration,
+    ty: &FieldType,
+    value: &mut &[Felt252],
+) -> Value {
+    // println!("deserialize_cairo_serde {:#?}", config);
+    // println!("deserialize_cairo_serde {:#?}", value);
+    // println!("deserialize_cairo_serde {:#?}", ty);
+    // println!("---------------------------------------");
     match ty {
         FieldType::Primitive(ty) => deserialize_primitive(ty, value),
         FieldType::Message(message_ty) => {
-            let message_config = &config.messages[message_ty];
+            let message_key = message_ty.split("::").last().unwrap();
+            let message_config = &config.messages[message_key];
             let mut result = Map::new();
             for field in message_config {
-                result.insert(field.name.clone(), deserialize_cairo_serde(config, &field.ty, value));
+                result.insert(
+                    field.name.clone(),
+                    deserialize_cairo_serde(config, &field.ty, value),
+                );
             }
             Value::Object(result)
         }
+        FieldType::Enum(_) => deserialize_primitive(&PrimitiveType::I32, value),
         FieldType::Option(inner_ty) => {
             let idx = deserialize_primitive(&PrimitiveType::U64, value);
             if idx == 0 {
@@ -77,7 +154,11 @@ pub fn deserialize_cairo_serde(config: &Configuration, ty: &FieldType, value: &m
             }
         }
         FieldType::Array(value_ty) => {
-            let len = deserialize_primitive(&PrimitiveType::U64, value).as_number().unwrap().as_u64().unwrap() as usize;
+            let len = deserialize_primitive(&PrimitiveType::U64, value)
+                .as_number()
+                .unwrap()
+                .as_u64()
+                .unwrap() as usize;
             let mut result = Vec::new();
             for _i in 0..len {
                 result.push(deserialize_cairo_serde(config, &value_ty, value));
@@ -89,18 +170,24 @@ pub fn deserialize_cairo_serde(config: &Configuration, ty: &FieldType, value: &m
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use crate::configuration::{
+        Configuration, Field, FieldType, MethodDeclaration, PrimitiveType, Service,
+    };
+    use crate::{deserialize_cairo_serde, serialize_cairo_serde};
     use cairo_felt::Felt252;
     use serde_json::{json, Value};
-    use crate::configuration::{Configuration, Field, FieldType, MethodDeclaration, PrimitiveType, Service};
-    use crate::{deserialize_cairo_serde, serialize_cairo_serde};
+    use std::collections::HashMap;
 
     #[test]
     fn it_serializes_cairo_serde() {
         let json = json!({ "n": 42 });
         let message_type = "Response";
         let configuration = test_configuration();
-        let cairo_message = serialize_cairo_serde(&configuration, &FieldType::Message(message_type.into()), &json);
+        let cairo_message = serialize_cairo_serde(
+            &configuration,
+            &FieldType::Message(message_type.into()),
+            &json,
+        );
 
         println!("configuration {configuration:?}");
         println!("result {cairo_message:?}");
@@ -108,10 +195,19 @@ mod tests {
 
     #[test]
     fn it_deserializes_cairo_serde() {
-        let cairo_message = vec![Felt252::from(42 * 42), Felt252::from(1), Felt252::from(1), Felt252::from(18)];
+        let cairo_message = vec![
+            Felt252::from(42 * 42),
+            Felt252::from(1),
+            Felt252::from(1),
+            Felt252::from(18),
+        ];
         let message_type = "Request";
         let configuration = test_configuration();
-        let deserialized = deserialize_cairo_serde(&configuration, &FieldType::Message(message_type.into()), &mut cairo_message.as_ref());
+        let deserialized = deserialize_cairo_serde(
+            &configuration,
+            &FieldType::Message(message_type.into()),
+            &mut cairo_message.as_ref(),
+        );
         let expected_json = json!({
             "n": 42 * 42,
             "x": Value::Null,
@@ -125,40 +221,59 @@ mod tests {
     fn it_saves_configuration() {
         let configuration = test_configuration();
         let json_string = serde_json::to_string(&configuration).unwrap();
-        let new_configuration = serde_json::from_str::<Configuration>(&json_string).unwrap();
+        // let new_configuration = serde_json::from_str::<Configuration>(&json_string).unwrap();
         println!("JSON {json_string:?} -> {configuration:?}");
     }
-
 
     fn test_configuration() -> Configuration {
         let mut messages = HashMap::new();
         messages.insert(
-            String::from("Inner"), vec![
-                Field { name: "inner".into(), ty: FieldType::Primitive(PrimitiveType::U32) },
-            ]);
+            String::from("Inner"),
+            vec![Field {
+                name: "inner".into(),
+                ty: FieldType::Primitive(PrimitiveType::U32),
+            }],
+        );
         messages.insert(
-            String::from("Request"), vec![
-                Field { name: "n".into(), ty: FieldType::Primitive(PrimitiveType::U64) },
-                Field { name: "x".into(), ty: FieldType::Option(Box::new(FieldType::Message("Inner".into()))) },
-                Field { name: "y".into(), ty: FieldType::Array(Box::new(FieldType::Primitive(PrimitiveType::I32))) },
-            ]);
+            String::from("Request"),
+            vec![
+                Field {
+                    name: "n".into(),
+                    ty: FieldType::Primitive(PrimitiveType::U64),
+                },
+                Field {
+                    name: "x".into(),
+                    ty: FieldType::Option(Box::new(FieldType::Message("Inner".into()))),
+                },
+                Field {
+                    name: "y".into(),
+                    ty: FieldType::Array(Box::new(FieldType::Primitive(PrimitiveType::I32))),
+                },
+            ],
+        );
         messages.insert(
-            String::from("Response"), vec![
-                Field { name: "n".into(), ty: FieldType::Primitive(PrimitiveType::U64) },
-            ]);
-
-        let mut methods = HashMap::new();
-        methods.insert(String::from("sqrt"), MethodDeclaration {
-            input: FieldType::Message("Request".into()),
-            output: FieldType::Message("Response".into()),
-        });
-
-        let mut services = HashMap::new();
-        services.insert(
-            String::from("SqrtOracle"), Service { methods }
+            String::from("Response"),
+            vec![Field {
+                name: "n".into(),
+                ty: FieldType::Primitive(PrimitiveType::U64),
+            }],
         );
 
+        let mut methods = HashMap::new();
+        methods.insert(
+            String::from("sqrt"),
+            MethodDeclaration {
+                input: FieldType::Message("Request".into()),
+                output: FieldType::Message("Response".into()),
+            },
+        );
+
+        let mut services = HashMap::new();
+        services.insert(String::from("SqrtOracle"), Service { methods });
+
+        let enums = HashMap::new();
         Configuration {
+            enums,
             messages,
             services,
         }

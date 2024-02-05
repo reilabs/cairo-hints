@@ -2,19 +2,18 @@ syntax = "proto3";
 
 package oracle;
 
-message Inner {
-    uint32 inner = 1;
+enum Size {
+    SMALL = 0;
+    MEDIUM = 1;
+    LARGE = 2;
 }
 
 message Request {
-    uint64 n = 1;
-    optional Inner x = 3;
-    repeated int32 y = 4;
-    // map<string, Inner> map = 5;
+    string color = 1;
 }
 
 message Response {
-    uint64 n = 1;
+    string color = 1;
 }
 
 service SqrtOracle {

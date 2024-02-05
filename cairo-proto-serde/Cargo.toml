@@ -9,3 +9,5 @@ edition = "2021"
 cairo-felt = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+num-traits = "0.2"
+cairo-lang-runner = "2.4.4"
