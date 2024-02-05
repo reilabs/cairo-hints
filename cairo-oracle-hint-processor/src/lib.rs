@@ -158,7 +158,6 @@ impl<'a> HintProcessorLogic for RpcHintProcessor<'a> {
         constants: &std::collections::HashMap<String, Felt252>,
     ) -> Result<(), cairo_vm::vm::errors::hint_errors::HintError> {
         let hint = hint_data.downcast_ref::<Hint>().unwrap();
-        // println!("Hint {:#?}", hint);
         match hint {
             Hint::Starknet(StarknetHint::Cheatcode {
                 selector,
