@@ -1,7 +1,5 @@
-use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::iter;
-use std::ops::Add;
 
 use cairo_proto_serde::configuration::{
     Configuration, Field, FieldType, Mapping, MethodDeclaration,
@@ -97,7 +95,6 @@ impl<'a> CodeGenerator<'a> {
 
         // code_gen.append_header();
 
-        let message_count = file.message_type.len();
         code_gen.path.push(4);
         for (idx, message) in file.message_type.into_iter().enumerate() {
             code_gen.path.push(idx as i32);
@@ -154,30 +151,14 @@ impl<'a> CodeGenerator<'a> {
             return;
         }
 
-        // self.append_doc(&fq_proto_enum_name, None);
-        // self.append_type_attributes(&fq_proto_enum_name);
-        // self.append_enum_attributes(&fq_proto_enum_name);
         self.push_indent();
-        // let dbg = if self.should_skip_debug(&fq_proto_enum_name) {
-        //     ""
-        // } else {
-        //     "Debug, "
-        // };
-        // self.code_buf.push_str(&format!(
-        //     "#[derive(Clone, Copy, {}PartialEq, Eq, Hash, PartialOrd, Ord, {}::Enumeration)]\n",
-        //     dbg,
-        //     self.config.prost_path.as_deref().unwrap_or("::prost"),
-        // ));
         self.code_buf
             .push_str("#[derive(Drop, Serde, PartialEq)]\n");
         self.push_indent();
-        // self.code_buf.push_str("#[repr(i32)]\n");
-        // self.push_indent();
         self.code_buf.push_str("enum ");
         self.code_buf.push_str(&enum_name);
         self.code_buf.push_str(" {\n");
 
-        // self.config.strip_enum_prefix = true
         let variant_mappings = build_enum_value_mappings(&enum_name, true, enum_values);
 
         self.depth += 1;
@@ -191,12 +172,8 @@ impl<'a> CodeGenerator<'a> {
             mappings_def.push(m);
             self.path.push(variant.path_idx as i32);
 
-            // self.append_doc(&fq_proto_enum_name, Some(variant.proto_name));
-            // self.append_field_attributes(&fq_proto_enum_name, variant.proto_name);
             self.push_indent();
             self.code_buf.push_str(&variant.generated_variant_name);
-            // self.code_buf.push_str(" = ");
-            // self.code_buf.push_str(&variant.proto_number.to_string());
             self.code_buf.push_str(",\n");
 
             self.path.pop();
@@ -209,91 +186,6 @@ impl<'a> CodeGenerator<'a> {
 
         self.push_indent();
         self.code_buf.push_str("}\n");
-
-        // self.push_indent();
-        // self.code_buf.push_str("impl ");
-        // self.code_buf.push_str(&enum_name);
-        // self.code_buf.push_str(" {\n");
-        // self.depth += 1;
-        // self.path.push(2);
-
-        // self.push_indent();
-        // self.code_buf.push_str(
-        //     "/// String value of the enum field names used in the ProtoBuf definition.\n",
-        // );
-        // self.push_indent();
-        // self.code_buf.push_str("///\n");
-        // self.push_indent();
-        // self.code_buf.push_str(
-        //     "/// The values are not transformed in any way and thus are considered stable\n",
-        // );
-        // self.push_indent();
-        // self.code_buf.push_str(
-        //     "/// (if the ProtoBuf definition does not change) and safe for programmatic use.\n",
-        // );
-        // self.push_indent();
-        // self.code_buf
-        //     .push_str("pub fn as_str_name(&self) -> &'static str {\n");
-        // self.depth += 1;
-
-        // self.push_indent();
-        // self.code_buf.push_str("match self {\n");
-        // self.depth += 1;
-
-        // for variant in variant_mappings.iter() {
-        //     self.push_indent();
-        //     self.code_buf.push_str(&enum_name);
-        //     self.code_buf.push_str("::");
-        //     self.code_buf.push_str(&variant.generated_variant_name);
-        //     self.code_buf.push_str(" => \"");
-        //     self.code_buf.push_str(variant.proto_name);
-        //     self.code_buf.push_str("\",\n");
-        // }
-
-        // self.depth -= 1;
-        // self.push_indent();
-        // self.code_buf.push_str("}\n"); // End of match
-
-        // self.depth -= 1;
-        // self.push_indent();
-        // self.code_buf.push_str("}\n"); // End of as_str_name()
-
-        // self.push_indent();
-        // self.code_buf
-        //     .push_str("/// Creates an enum from field names used in the ProtoBuf definition.\n");
-
-        // self.push_indent();
-        // self.code_buf
-        //     .push_str("pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {\n");
-        // self.depth += 1;
-
-        // self.push_indent();
-        // self.code_buf.push_str("match value {\n");
-        // self.depth += 1;
-
-        // for variant in variant_mappings.iter() {
-        //     self.push_indent();
-        //     self.code_buf.push('\"');
-        //     self.code_buf.push_str(variant.proto_name);
-        //     self.code_buf.push_str("\" => Some(Self::");
-        //     self.code_buf.push_str(&variant.generated_variant_name);
-        //     self.code_buf.push_str("),\n");
-        // }
-        // self.push_indent();
-        // self.code_buf.push_str("_ => None,\n");
-
-        // self.depth -= 1;
-        // self.push_indent();
-        // self.code_buf.push_str("}\n"); // End of match
-
-        // self.depth -= 1;
-        // self.push_indent();
-        // self.code_buf.push_str("}\n"); // End of from_str_name()
-
-        // self.path.pop();
-        // self.depth -= 1;
-        // self.push_indent();
-        // self.code_buf.push_str("}\n"); // End of impl
     }
 
     fn append_message(&mut self, message: DescriptorProto) {
@@ -407,10 +299,6 @@ impl<'a> CodeGenerator<'a> {
             };
 
             panic!("oneof fields are not supported");
-
-            // self.path.push(idx);
-            // self.append_oneof_field(&message_name, &fq_message_name, oneof, fields);
-            // self.path.pop();
         }
         self.path.pop();
 
@@ -445,51 +333,10 @@ impl<'a> CodeGenerator<'a> {
                 };
 
                 panic!("oneof messages are not supported");
-
-                // self.append_oneof(&fq_message_name, oneof, idx, fields);
             }
 
             self.pop_mod();
         }
-
-        // Sendable no longer needed
-        // let type_name = to_upper_camel(&message_name);
-        // self.code_buf.push_str(&format!("impl Sendable{type_name} of Sendable<{type_name}> {{\n"));
-        // self.code_buf.push_str(&format!("    fn send(self: @{type_name}) {{\n"));
-        // self.code_buf.push_str("        cheatcode::<'oracle_path_push'>(array!['struct'].span());\n");
-        // for (field, idx) in fields.clone() {
-        //     let name = to_snake(field.name());
-        //     self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_push'>(array!['{name}'].span());\n"));
-        //     self.code_buf.push_str(&format!("        self.{name}.send();\n"));
-        //     self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_pop'>(array!['{name}'].span());\n"));
-        // }
-        // self.code_buf.push_str("        cheatcode::<'oracle_path_pop'>(array!['struct'].span());\n");
-        //
-        // self.code_buf.push_str("    }\n");
-        // self.code_buf.push_str(&format!("    fn recv() -> {type_name} {{\n"));
-        //
-        // self.code_buf.push_str("        cheatcode::<'oracle_path_push'>(array!['struct'].span());\n");
-        // for (field, idx) in fields.clone() {
-        //     let name = to_snake(field.name());
-        //     let repeated = field.label == Some(Label::Repeated as i32);
-        //     let optional = self.optional(&field);
-        //     let mut ty = self.resolve_type(&field, &fq_message_name);
-        //     if repeated {
-        //         ty = format!("Array<{ty}>");
-        //     } else if optional {
-        //         ty = format!("Option<{ty}>");
-        //     }
-        //
-        //     self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_push'>(array!['{name}'].span());\n"));
-        //     self.code_buf.push_str(&format!("        let {name} = Sendable::<{ty}>::recv();\n"));
-        //     self.code_buf.push_str(&format!("        cheatcode::<'oracle_key_pop'>(array!['{name}'].span());\n"));
-        // }
-        // self.code_buf.push_str("        cheatcode::<'oracle_path_pop'>(array!['struct'].span());\n");
-        //
-        // let all_fields = fields.iter().map(|f| to_snake(f.0.name())).join(", ");
-        // self.code_buf.push_str(&format!("        {type_name} {{ {all_fields} }}\n"));
-        // self.code_buf.push_str("    }\n");
-        // self.code_buf.push_str("}\n");
     }
 
     fn append_field(
@@ -824,42 +671,6 @@ impl<'a> CodeGenerator<'a> {
             .join("::")
     }
 
-    // fn field_type_tag(&self, field: &FieldDescriptorProto) -> Cow<'static, str> {
-    //     match field.r#type() {
-    //         Type::Float => Cow::Borrowed("float"),
-    //         Type::Double => Cow::Borrowed("double"),
-    //         Type::Int32 => Cow::Borrowed("int32"),
-    //         Type::Int64 => Cow::Borrowed("int64"),
-    //         Type::Uint32 => Cow::Borrowed("uint32"),
-    //         Type::Uint64 => Cow::Borrowed("uint64"),
-    //         Type::Sint32 => Cow::Borrowed("sint32"),
-    //         Type::Sint64 => Cow::Borrowed("sint64"),
-    //         Type::Fixed32 => Cow::Borrowed("fixed32"),
-    //         Type::Fixed64 => Cow::Borrowed("fixed64"),
-    //         Type::Sfixed32 => Cow::Borrowed("sfixed32"),
-    //         Type::Sfixed64 => Cow::Borrowed("sfixed64"),
-    //         Type::Bool => Cow::Borrowed("bool"),
-    //         Type::String => Cow::Borrowed("string"),
-    //         Type::Bytes => Cow::Borrowed("bytes"),
-    //         Type::Group => Cow::Borrowed("group"),
-    //         Type::Message => Cow::Borrowed("message"),
-    //         Type::Enum => Cow::Owned(format!(
-    //             "enumeration={:?}",
-    //             self.resolve_ident(field.type_name())
-    //         )),
-    //     }
-    // }
-
-    // fn map_value_type_tag(&self, field: &FieldDescriptorProto) -> Cow<'static, str> {
-    //     match field.r#type() {
-    //         Type::Enum => Cow::Owned(format!(
-    //             "enumeration({})",
-    //             self.resolve_ident(field.type_name())
-    //         )),
-    //         _ => self.field_type_tag(field),
-    //     }
-    // }
-
     fn optional(&self, field: &FieldDescriptorProto) -> bool {
         if field.proto3_optional.unwrap_or(false) {
             return true;
@@ -883,27 +694,6 @@ impl<'a> CodeGenerator<'a> {
             .map_or(false, FieldOptions::deprecated)
     }
 }
-
-// /// Returns `true` if the repeated field type can be packed.
-// fn can_pack(field: &FieldDescriptorProto) -> bool {
-//     matches!(
-//         field.r#type(),
-//         Type::Float
-//             | Type::Double
-//             | Type::Int32
-//             | Type::Int64
-//             | Type::Uint32
-//             | Type::Uint64
-//             | Type::Sint32
-//             | Type::Sint64
-//             | Type::Fixed32
-//             | Type::Fixed64
-//             | Type::Sfixed32
-//             | Type::Sfixed64
-//             | Type::Bool
-//             | Type::Enum
-//     )
-// }
 
 /// Based on [`google::protobuf::UnescapeCEscapeString`][1]
 /// [1]: https://github.com/google/protobuf/blob/3.3.x/src/google/protobuf/stubs/strutil.cc#L312-L322

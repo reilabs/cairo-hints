@@ -1,7 +1,7 @@
 mod hint_processor_utils;
 
 use core::any::Any;
-use std::{collections::HashMap, io::Read};
+use std::collections::HashMap;
 
 use cairo_lang_casm::{
     hints::{Hint, StarknetHint},
@@ -28,7 +28,6 @@ use cairo_vm::{
     },
 };
 use hint_processor_utils::{cell_ref_to_relocatable, extract_buffer, get_ptr};
-use num_traits::ToPrimitive;
 use serde_json::{json, Map, Value};
 
 #[derive(Debug, PartialEq)]
@@ -67,113 +66,6 @@ impl<'a> RpcHintProcessor<'a> {
             configuration,
         }
     }
-
-    // fn to_string(&self, felt: &Felt252) -> String {
-    //     let by = felt.to_bigint().to_bytes_be().1;
-    //     String::from_utf8(by).unwrap()
-    // }
-
-    // fn set_key(val_ref: &mut Map<String, Value>, remaining_path: &[PathElement], value: Value) {
-    //     println!("set_key {val_ref:?} {remaining_path:?} {value:?}");
-
-    //     let Some(PathElement::Key(key)) = remaining_path.first() else {
-    //         return;
-    //     };
-
-    //     let remaining_path = &remaining_path[1..];
-    //     if remaining_path.len() == 0 {
-    //         val_ref.insert(key.clone(), value);
-    //     } else {
-    //         match val_ref.get_mut(key) {
-    //             Some(val_ref) => {
-    //                 Self::set(val_ref, remaining_path, value);
-    //             }
-    //             None => {
-    //                 val_ref.insert(key.clone(), Value::Null);
-    //                 let val_ref = val_ref.get_mut(key).unwrap();
-    //                 Self::set(val_ref, remaining_path, value);
-    //             }
-    //         }
-    //     }
-    // }
-
-    // fn get_key(val_ref: &Map<String, Value>, remaining_path: &[PathElement]) -> Value {
-    //     println!("get_key {val_ref:?} {remaining_path:?}");
-
-    //     let Some(PathElement::Key(key)) = remaining_path.first() else {
-    //         return Value::Null;
-    //     };
-
-    //     let remaining_path = &remaining_path[1..];
-    //     if remaining_path.len() == 0 {
-    //         val_ref.get(key).unwrap().clone()
-    //     } else {
-    //         Self::get(val_ref.get(key).unwrap(), remaining_path)
-    //     }
-    // }
-
-    // fn set(val_ref: &mut Value, remaining_path: &[PathElement], value: Value) {
-    //     println!("set {val_ref:?} {remaining_path:?} {value:?}");
-
-    //     let Some(step) = remaining_path.first() else {
-    //         return;
-    //     };
-
-    //     match step {
-    //         PathElement::Struct => {
-    //             if matches!(val_ref, Value::Null) {
-    //                 *val_ref = Value::Object(Default::default());
-    //             }
-    //             if let Value::Object(inner) = val_ref {
-    //                 Self::set_key(inner, &remaining_path[1..], value);
-    //             } else {
-    //                 panic!("incompatible type already set");
-    //             }
-    //         }
-    //         PathElement::Array => todo!(),
-    //         PathElement::Key(_) => todo!(),
-    //     }
-    // }
-
-    // fn get(val_ref: &Value, remaining_path: &[PathElement]) -> Value {
-    //     println!("get {val_ref:?} {remaining_path:?}");
-
-    //     let Some(step) = remaining_path.first() else {
-    //         return Value::Null;
-    //     };
-
-    //     match step {
-    //         PathElement::Struct => {
-    //             if let Value::Object(inner) = val_ref {
-    //                 Self::get_key(inner, &remaining_path[1..])
-    //             } else {
-    //                 panic!("incompatible type already set");
-    //             }
-    //         }
-    //         PathElement::Array => todo!(),
-    //         PathElement::Key(_) => todo!(),
-    //     }
-    // }
-
-    // fn set_value(&mut self, value: Value) {
-    //     match &mut self.state {
-    //         OracleState::Sending(state) => {
-    //             Self::set(state, &self.path, value);
-    //         }
-    //         _ => {
-    //             panic!("cannot set value when not sending");
-    //         }
-    //     }
-    // }
-
-    // fn get_value(&self) -> Value {
-    //     match &self.state {
-    //         OracleState::Receiving(state) => Self::get(state, &self.path),
-    //         _ => {
-    //             panic!("cannot get value when not receiving");
-    //         }
-    //     }
-    // }
 
     /// Executes a cheatcode.
     fn execute_cheatcode(
@@ -229,16 +121,6 @@ impl<'a> RpcHintProcessor<'a> {
         println!("Output: {output}");
         res_segment.write_data(data.iter())?;
 
-        // let contract_logs = self.starknet_state.logs.get_mut(&as_single_input(inputs)?);
-        // if let Some((keys, data)) =
-        //     contract_logs.and_then(|contract_logs| contract_logs.events.pop_front())
-        // {
-        //     res_segment.write(keys.len())?;
-        //     res_segment.write_data(keys.iter())?;
-        //     res_segment.write(data.len())?;
-        //     res_segment.write_data(data.iter())?;
-        // }
-
         let res_segment_end = res_segment.ptr;
         insert_value_to_cellref!(vm, output_start, res_segment_start)?;
         insert_value_to_cellref!(vm, output_end, res_segment_end)?;
@@ -278,7 +160,6 @@ impl<'a> HintProcessorLogic for RpcHintProcessor<'a> {
         constants: &std::collections::HashMap<String, Felt252>,
     ) -> Result<(), cairo_vm::vm::errors::hint_errors::HintError> {
         let hint = hint_data.downcast_ref::<Hint>().unwrap();
-        // println!("Hint {:#?}", hint);
         match hint {
             Hint::Starknet(StarknetHint::Cheatcode {
                 selector,
@@ -321,16 +202,6 @@ impl<'a> ResourceTracker for RpcHintProcessor<'a> {
         self.inner_processor.run_resources()
     }
 }
-
-// TODO: copied from cairo-lang-runner
-
-// pub fn cell_ref_to_relocatable(cell_ref: &CellRef, vm: &VirtualMachine) -> Relocatable {
-//     let base = match cell_ref.register {
-//         Register::AP => vm.get_ap(),
-//         Register::FP => vm.get_fp(),
-//     };
-//     (base + (cell_ref.offset as i32)).unwrap()
-// }
 
 /// Extracts a parameter assumed to be a buffer, and converts it into a relocatable.
 pub fn extract_relocatable(
