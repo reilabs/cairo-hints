@@ -11,8 +11,8 @@ use cairo_lang_filesystem::cfg::{Cfg, CfgSet};
 use cairo_lang_filesystem::ids::CrateId;
 use cairo_lang_runner::casm_run::format_next_item;
 use cairo_lang_runner::{
-    build_hints_dict, Arg, CairoHintProcessor, RunResult, RunResultStarknet, RunResultValue,
-    RunnerError, SierraCasmRunner, StarknetState,
+    build_hints_dict, Arg, CairoHintProcessor, RunResultStarknet, RunResultValue, RunnerError,
+    SierraCasmRunner, StarknetState,
 };
 use cairo_lang_sierra::extensions::gas::CostTokenType;
 use cairo_lang_sierra::ids::FunctionId;
@@ -31,7 +31,6 @@ use cairo_lang_utils::casts::IntoOrPanic;
 use cairo_lang_utils::ordered_hash_map::OrderedHashMap;
 use cairo_oracle_hint_processor::RpcHintProcessor;
 use cairo_proto_serde::configuration::Configuration;
-use cairo_vm::hint_processor::hint_processor_definition::HintProcessor;
 use cairo_vm::vm::runners::cairo_runner::RunResources;
 use colored::Colorize;
 use itertools::{chain, Itertools};
@@ -101,7 +100,6 @@ impl CompiledTestRunner {
             self.config.ignored,
             self.config.filter,
         );
-        println!("Filtered test cases");
         let TestsSummary {
             passed,
             failed,
