@@ -9,7 +9,10 @@ enum Size {
 }
 
 message Request {
-    Size color = 1;
+    message Inner {
+        Size color = 1;
+    }
+    Inner inner = 1;
 }
 
 message Response {

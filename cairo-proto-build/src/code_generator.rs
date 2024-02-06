@@ -375,6 +375,8 @@ impl<'a> CodeGenerator<'a> {
             boxed
         );
 
+        // println!("append_field {:#?}", fq_message_name);
+
         if deprecated {
             self.push_indent();
             self.code_buf.push_str("#[deprecated]\n");
@@ -429,25 +431,27 @@ impl<'a> CodeGenerator<'a> {
         self.code_buf.push_str(&type_name);
         self.code_buf.push_str(",\n");
 
+        let ty_without_super = ty.split("super::").last().unwrap().to_string();
+
         if repeated {
             Field {
                 name: field_name,
-                ty: FieldType::Array(Box::new(ty.into())),
+                ty: FieldType::Array(Box::new(ty_without_super.into())),
             }
         } else if optional {
             Field {
                 name: field_name,
-                ty: FieldType::Option(Box::new(ty.into())),
+                ty: FieldType::Option(Box::new(ty_without_super.into())),
             }
         } else if type_ == Type::Enum {
             Field {
                 name: field_name,
-                ty: FieldType::Enum(ty),
+                ty: FieldType::Enum(ty_without_super),
             }
         } else {
             Field {
                 name: field_name,
-                ty: ty.into(),
+                ty: ty_without_super.into(),
             }
         }
     }
@@ -576,11 +580,23 @@ impl<'a> CodeGenerator<'a> {
             ));
 
             self.code_buf.push_str("    }\n");
+            let input_without_super = method
+                .input_type
+                .split("super::")
+                .last()
+                .unwrap()
+                .to_string();
+            let output_without_super = method
+                .output_type
+                .split("super::")
+                .last()
+                .unwrap()
+                .to_string();
             methods.insert(
                 method.name,
                 MethodDeclaration {
-                    input: FieldType::Message(method.input_type),
-                    output: FieldType::Message(method.output_type),
+                    input: FieldType::Message(input_without_super),
+                    output: FieldType::Message(output_without_super),
                 },
             );
         }
@@ -625,7 +641,6 @@ impl<'a> CodeGenerator<'a> {
     }
 
     fn resolve_type(&self, field: &FieldDescriptorProto, fq_message_name: &str) -> String {
-        // println!("{:#?} {:#?}", field, fq_message_name);
         match field.r#type() {
             Type::Float => panic!("Float type not supported"),
             Type::Double => panic!("Double type not supported"),
@@ -663,15 +678,10 @@ impl<'a> CodeGenerator<'a> {
 
         let mut ident_path = pb_ident[1..].split('.');
         let ident_type = ident_path.next_back().unwrap();
-        let mut ident_path = ident_path.peekable();
-
-        // Skip path elements in common.
-        while local_path.peek().is_some() && local_path.peek() == ident_path.peek() {
-            local_path.next();
-            ident_path.next();
-        }
+        let ident_path = ident_path.peekable();
 
         local_path
+            .clone()
             .map(|_| "super".to_string())
             .chain(ident_path.map(to_snake))
             .chain(iter::once(to_upper_camel(ident_type)))

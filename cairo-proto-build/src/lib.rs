@@ -402,6 +402,8 @@ impl Config {
             }
         }
 
+        // println!("generate {:#?}", modules);
+
         for p in protos {
             let path = p.as_ref().to_str().unwrap().to_string();
             let mut super_enums: HashMap<String, Vec<Mapping>> = HashMap::new();
@@ -415,17 +417,17 @@ impl Config {
                 }
 
                 for (name, v) in &content.1.enums {
-                    let k = format!("super::{}::{}", module.components[0], name);
+                    let k = format!("{}::{}", module.components[0], name);
                     super_enums.insert(k, v.to_owned());
                 }
 
                 for (name, v) in &content.1.messages {
-                    let k = format!("super::{}::{}", module.components[0], name);
+                    let k = format!("{}::{}", module.components[0], name);
                     super_messages.insert(k, v.to_owned());
                 }
 
                 for (name, v) in &content.1.services {
-                    let k = format!("super::{}::{}", module.components[0], name);
+                    let k = format!("{}::{}", module.components[0], name);
                     super_services.insert(k, v.to_owned());
                 }
             }

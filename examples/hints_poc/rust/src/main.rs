@@ -13,8 +13,13 @@ enum Size {
 }
 
 #[derive(Debug, Deserialize)]
-struct Request {
+struct Inner {
     color: Size,
+}
+
+#[derive(Debug, Deserialize)]
+struct Request {
+    inner: Option<Inner>,
 }
 
 #[derive(Debug, Serialize)]
@@ -31,7 +36,9 @@ async fn root(extract::Json(payload): extract::Json<Request>) -> Json<JsonResult
     debug!("received payload {payload:?}");
     let n = payload; //(payload.n as f64).sqrt() as u64;
     Json(JsonResult {
-        result: Response { color: n.color },
+        result: Response {
+            color: n.inner.unwrap().color,
+        },
     })
 }
 
