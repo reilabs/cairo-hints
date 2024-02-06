@@ -283,7 +283,18 @@ impl<'a> CodeGenerator<'a> {
             self.path.pop();
         }
         self.path.pop();
-        self.serde_config.messages.insert(struct_name, fields_def);
+
+        let struct_key = format!(
+            "{}{}{}",
+            self.type_path.join("::").to_lowercase(),
+            if self.type_path.is_empty() {
+                "".to_string()
+            } else {
+                "::".to_string()
+            },
+            struct_name
+        );
+        self.serde_config.messages.insert(struct_key, fields_def);
 
         self.path.push(8);
         for (idx, oneof) in message.oneof_decl.iter().enumerate() {
