@@ -454,9 +454,6 @@ impl Config {
         Ok(modules)
     }
 
-    // Not used yet. If used, it requires checking the last iteration in the for loop.
-    // fn append_footer(&mut self, code_buf: &mut String) {}
-
     fn append_header(code_buf: &mut String) {
         code_buf.push_str("use starknet::testing::cheatcode;\n");
     }

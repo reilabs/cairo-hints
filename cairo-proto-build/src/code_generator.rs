@@ -93,8 +93,6 @@ impl<'a> CodeGenerator<'a> {
             code_gen.package
         );
 
-        // code_gen.append_header();
-
         code_gen.path.push(4);
         for (idx, message) in file.message_type.into_iter().enumerate() {
             code_gen.path.push(idx as i32);
@@ -117,8 +115,6 @@ impl<'a> CodeGenerator<'a> {
             code_gen.append_service(service);
             code_gen.path.pop();
         }
-
-        // code_gen.append_footer();
 
         code_gen.path.pop();
     }
