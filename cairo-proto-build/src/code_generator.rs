@@ -431,8 +431,7 @@ impl<'a> CodeGenerator<'a> {
         self.code_buf.push_str(&type_name);
         self.code_buf.push_str(",\n");
 
-        let ty_without_super = ty.split("super::").last().unwrap().to_string();
-
+        let ty_without_super = self.remove_super(&ty);
         if repeated {
             Field {
                 name: field_name,
@@ -580,18 +579,8 @@ impl<'a> CodeGenerator<'a> {
             ));
 
             self.code_buf.push_str("    }\n");
-            let input_without_super = method
-                .input_type
-                .split("super::")
-                .last()
-                .unwrap()
-                .to_string();
-            let output_without_super = method
-                .output_type
-                .split("super::")
-                .last()
-                .unwrap()
-                .to_string();
+            let input_without_super = self.remove_super(&method.input_type);
+            let output_without_super = self.remove_super(&method.output_type);
             methods.insert(
                 method.name,
                 MethodDeclaration {
@@ -701,6 +690,10 @@ impl<'a> CodeGenerator<'a> {
             Type::Message => true,
             _ => self.syntax == Syntax::Proto2,
         }
+    }
+
+    fn remove_super(&self, input: &str) -> String {
+        input.split("super::").last().unwrap().to_string()
     }
 
     /// Returns `true` if the field options includes the `deprecated` option.
