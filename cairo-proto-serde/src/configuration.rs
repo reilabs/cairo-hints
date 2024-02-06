@@ -1,11 +1,11 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Configuration {
-    pub enums: HashMap<String, Vec<Mapping>>,
-    pub messages: HashMap<String, Vec<Field>>,
-    pub services: HashMap<String, Service>,
+    pub enums: BTreeMap<String, Vec<Mapping>>,
+    pub messages: BTreeMap<String, Vec<Field>>,
+    pub services: BTreeMap<String, Service>,
 }
 
 // primitive types supported by both Protocol Buffers and Cairo
@@ -31,25 +31,25 @@ pub enum FieldType {
     Array(Box<FieldType>),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Field {
     pub name: String,
     pub ty: FieldType,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Mapping {
     pub name: String,
     pub nb: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Service {
     pub methods: HashMap<String, MethodDeclaration>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MethodDeclaration {
     pub input: FieldType,
     pub output: FieldType,

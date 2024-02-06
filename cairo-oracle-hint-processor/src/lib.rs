@@ -98,6 +98,8 @@ impl<'a> RpcHintProcessor<'a> {
             ))));
         };
 
+        // println!("Configuration {:#?}", self.configuration);
+
         let data = deserialize_cairo_serde(
             self.configuration,
             &configuration.input,

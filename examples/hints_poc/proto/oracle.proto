@@ -2,20 +2,8 @@ syntax = "proto3";
 
 package oracle;
 
-enum Size {
-    SMALL = 0;
-    MEDIUM = 1;
-    LARGE = 2;
-}
-
-message Request {
-    string color = 1;
-}
-
-message Response {
-    string color = 1;
-}
+import "field.proto";
 
 service SqrtOracle {
-    rpc Sqrt(Request) returns (Response);
+    rpc Sqrt(shirts.Request) returns (shirts.Response);
 }

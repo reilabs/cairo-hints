@@ -93,8 +93,6 @@ impl<'a> CodeGenerator<'a> {
             code_gen.package
         );
 
-        code_gen.append_header();
-
         code_gen.path.push(4);
         for (idx, message) in file.message_type.into_iter().enumerate() {
             code_gen.path.push(idx as i32);
@@ -117,8 +115,6 @@ impl<'a> CodeGenerator<'a> {
             code_gen.append_service(service);
             code_gen.path.pop();
         }
-
-        code_gen.append_footer();
 
         code_gen.path.pop();
     }
@@ -287,7 +283,18 @@ impl<'a> CodeGenerator<'a> {
             self.path.pop();
         }
         self.path.pop();
-        self.serde_config.messages.insert(struct_name, fields_def);
+
+        let struct_key = format!(
+            "{}{}{}",
+            self.type_path.join("::").to_lowercase(),
+            if self.type_path.is_empty() {
+                "".to_string()
+            } else {
+                "::".to_string()
+            },
+            struct_name
+        );
+        self.serde_config.messages.insert(struct_key, fields_def);
 
         self.path.push(8);
         for (idx, oneof) in message.oneof_decl.iter().enumerate() {
@@ -368,6 +375,8 @@ impl<'a> CodeGenerator<'a> {
             boxed
         );
 
+        // println!("append_field {:#?}", fq_message_name);
+
         if deprecated {
             self.push_indent();
             self.code_buf.push_str("#[deprecated]\n");
@@ -422,25 +431,26 @@ impl<'a> CodeGenerator<'a> {
         self.code_buf.push_str(&type_name);
         self.code_buf.push_str(",\n");
 
+        let ty_without_super = self.remove_super(&ty);
         if repeated {
             Field {
                 name: field_name,
-                ty: FieldType::Array(Box::new(ty.into())),
+                ty: FieldType::Array(Box::new(ty_without_super.into())),
             }
         } else if optional {
             Field {
                 name: field_name,
-                ty: FieldType::Option(Box::new(ty.into())),
+                ty: FieldType::Option(Box::new(ty_without_super.into())),
             }
         } else if type_ == Type::Enum {
             Field {
                 name: field_name,
-                ty: FieldType::Enum(ty),
+                ty: FieldType::Enum(ty_without_super),
             }
         } else {
             Field {
                 name: field_name,
-                ty: ty.into(),
+                ty: ty_without_super.into(),
             }
         }
     }
@@ -569,11 +579,13 @@ impl<'a> CodeGenerator<'a> {
             ));
 
             self.code_buf.push_str("    }\n");
+            let input_without_super = self.remove_super(&method.input_type);
+            let output_without_super = self.remove_super(&method.output_type);
             methods.insert(
                 method.name,
                 MethodDeclaration {
-                    input: FieldType::Message(method.input_type),
-                    output: FieldType::Message(method.output_type),
+                    input: FieldType::Message(input_without_super),
+                    output: FieldType::Message(output_without_super),
                 },
             );
         }
@@ -618,7 +630,6 @@ impl<'a> CodeGenerator<'a> {
     }
 
     fn resolve_type(&self, field: &FieldDescriptorProto, fq_message_name: &str) -> String {
-        // println!("{:#?} {:#?}", field, fq_message_name);
         match field.r#type() {
             Type::Float => panic!("Float type not supported"),
             Type::Double => panic!("Double type not supported"),
@@ -656,15 +667,10 @@ impl<'a> CodeGenerator<'a> {
 
         let mut ident_path = pb_ident[1..].split('.');
         let ident_type = ident_path.next_back().unwrap();
-        let mut ident_path = ident_path.peekable();
-
-        // Skip path elements in common.
-        while local_path.peek().is_some() && local_path.peek() == ident_path.peek() {
-            local_path.next();
-            ident_path.next();
-        }
+        let ident_path = ident_path.peekable();
 
         local_path
+            .clone()
             .map(|_| "super".to_string())
             .chain(ident_path.map(to_snake))
             .chain(iter::once(to_upper_camel(ident_type)))
@@ -686,19 +692,16 @@ impl<'a> CodeGenerator<'a> {
         }
     }
 
+    fn remove_super(&self, input: &str) -> String {
+        input.split("super::").last().unwrap().to_string()
+    }
+
     /// Returns `true` if the field options includes the `deprecated` option.
     fn deprecated(&self, field: &FieldDescriptorProto) -> bool {
         field
             .options
             .as_ref()
             .map_or(false, FieldOptions::deprecated)
-    }
-
-    fn append_footer(&mut self) {}
-
-    fn append_header(&mut self) {
-        self.code_buf
-            .push_str("use starknet::testing::cheatcode;\n");
     }
 }
 
