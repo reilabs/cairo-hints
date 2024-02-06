@@ -85,7 +85,9 @@ pub fn serialize_cairo_serde(
     match ty {
         FieldType::Primitive(ty) => result.append(&mut serialize_primitive(ty, value)),
         FieldType::Message(message_ty) => {
-            let message_config = &config.messages[message_ty];
+            let message_config = config.messages.get(message_ty).expect(
+                format!("Key `{}` not found in configuration JSON file", message_ty).as_str(),
+            );
             let value = value
                 .as_object()
                 .expect("must be an object to serialize as message {message_ty}");
@@ -133,7 +135,9 @@ pub fn deserialize_cairo_serde(
     match ty {
         FieldType::Primitive(ty) => deserialize_primitive(ty, value),
         FieldType::Message(message_ty) => {
-            let message_config = &config.messages[message_ty];
+            let message_config = config.messages.get(message_ty).expect(
+                format!("Key `{}` not found in configuration JSON file", message_ty).as_str(),
+            );
             let mut result = Map::new();
             for field in message_config {
                 result.insert(
