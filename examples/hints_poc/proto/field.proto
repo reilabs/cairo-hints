@@ -7,3 +7,11 @@ enum Size {
     MEDIUM = 1;
     LARGE = 2;
 }
+
+message Request {
+    Size color = 1;
+}
+
+message Response {
+    Size color = 1;
+}

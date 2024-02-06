@@ -31,25 +31,25 @@ pub enum FieldType {
     Array(Box<FieldType>),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Field {
     pub name: String,
     pub ty: FieldType,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Mapping {
     pub name: String,
     pub nb: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Service {
     pub methods: HashMap<String, MethodDeclaration>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MethodDeclaration {
     pub input: FieldType,
     pub output: FieldType,

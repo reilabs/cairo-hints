@@ -4,14 +4,6 @@ package oracle;
 
 import "field.proto";
 
-message Request {
-    shirts.Size color = 1;
-}
-
-message Response {
-    shirts.Size color = 1;
-}
-
 service SqrtOracle {
-    rpc Sqrt(Request) returns (Response);
+    rpc Sqrt(shirts.Request) returns (shirts.Response);
 }

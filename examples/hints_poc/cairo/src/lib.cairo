@@ -1,7 +1,8 @@
 mod oracle;
 mod shirts;
 
-use shirts::{Request, Size, SqrtOracle};
+use oracle::{SqrtOracle};
+use shirts::{Request, Response, Size};
 
 fn main() -> bool {
     true
@@ -14,7 +15,7 @@ fn main() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{Request, Size, SqrtOracle};
+    use super::{Request, Response, Size, SqrtOracle};
 
     #[test]
     fn sqrt_test() {

@@ -1,4 +1,8 @@
 use cairo_proto_serde::configuration::Configuration;
+use cairo_proto_serde::configuration::Field;
+use cairo_proto_serde::configuration::FieldType;
+use cairo_proto_serde::configuration::Mapping;
+use cairo_proto_serde::configuration::Service;
 use code_generator::CodeGenerator;
 use core::fmt::Debug;
 use extern_paths::ExternPaths;
@@ -16,9 +20,11 @@ use std::env;
 use std::fmt;
 use std::fs;
 use std::io::{Error, ErrorKind};
+use std::ops::RangeBounds;
 use std::ops::RangeToInclusive;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::str::FromStr;
 use std::sync::Once;
 
 mod ast;
@@ -303,32 +309,47 @@ impl Config {
             })
             .collect::<HashMap<Module, String>>();
 
-        println!("compile_fds {:#?}", requests);
-        let modules = self.generate(requests)?;
+        let modules = self.generate(protos, requests)?;
+
         for (module, content) in &modules {
             let file_name = file_names
                 .get(module)
                 .expect("every module should have a filename");
-            println!("compile_fds {:#?} {:#?}", file_name, module);
+            // assuming one component == one package per module
+            let component = &module.components[0];
+            let list_paths: Vec<String> = protos
+                .iter()
+                .map(|p| p.as_ref().to_str().unwrap().to_string())
+                .collect();
+
             // Extract only the json matching the protos
             let code_output_path = target.join(file_name);
-            let config_output_path = target.join(&format!("{file_name}.json"));
-
-            let config_json = serde_json::to_string(&content.1).unwrap();
 
             let unchanged_code = fs::read(&code_output_path)
                 .map(|previous_content| previous_content == content.0.as_bytes())
                 .unwrap_or(false);
-            let unchanged_config = fs::read(&config_output_path)
-                .map(|previous_content| previous_content == config_json.as_bytes())
-                .unwrap_or(false);
 
-            if unchanged_code && unchanged_config {
-                trace!("unchanged: {:?}", file_name);
+            if unchanged_code {
+                trace!("unchanged code: {:?}", file_name);
             } else {
-                trace!("writing: {:?}", file_name);
+                trace!("writing code: {:?}", file_name);
                 fs::write(code_output_path, &content.0)?;
-                fs::write(config_output_path, &config_json)?;
+            }
+
+            // Writing the JSON only for files belonging to `protos`
+            if list_paths.iter().any(|p| p.contains(component)) {
+                let config_output_path = target.join(&format!("{file_name}.json"));
+                let config_json = serde_json::to_string(&content.1).unwrap();
+                let unchanged_config = fs::read(&config_output_path)
+                    .map(|previous_content| previous_content == config_json.as_bytes())
+                    .unwrap_or(false);
+
+                if unchanged_config {
+                    trace!("unchanged config: {:?}", file_name);
+                } else {
+                    trace!("writing config: {:?}", file_name);
+                    fs::write(config_output_path, &config_json)?;
+                }
             }
         }
 
@@ -343,6 +364,7 @@ impl Config {
     /// `build.rs` file, instead use [`compile_protos()`].
     pub fn generate(
         &mut self,
+        protos: &[impl AsRef<Path>],
         requests: Vec<(Module, FileDescriptorProto)>,
     ) -> std::io::Result<HashMap<Module, (String, Configuration)>> {
         let mut modules = HashMap::new();
@@ -377,6 +399,53 @@ impl Config {
             if code_buf.is_empty() {
                 // Did not generate any code, remove from list to avoid inclusion in include file or output file list
                 modules.remove(&request_module);
+            }
+        }
+
+        for p in protos {
+            let path = p.as_ref().to_str().unwrap().to_string();
+            let mut super_enums: HashMap<String, Vec<Mapping>> = HashMap::new();
+            let mut super_messages: HashMap<String, Vec<Field>> = HashMap::new();
+            let mut super_services: HashMap<String, Service> = HashMap::new();
+
+            // assuming one component == one package per module
+            for (module, content) in &modules {
+                if path.contains(&module.components[0]) {
+                    continue;
+                }
+
+                for (name, v) in &content.1.enums {
+                    let k = format!("super::{}::{}", module.components[0], name);
+                    super_enums.insert(k, v.to_owned());
+                }
+
+                for (name, v) in &content.1.messages {
+                    let k = format!("super::{}::{}", module.components[0], name);
+                    super_messages.insert(k, v.to_owned());
+                }
+
+                for (name, v) in &content.1.services {
+                    let k = format!("super::{}::{}", module.components[0], name);
+                    super_services.insert(k, v.to_owned());
+                }
+            }
+
+            for (module, content) in &mut modules {
+                if !path.contains(&module.components[0]) {
+                    continue;
+                }
+
+                for (k, v) in &super_enums {
+                    content.1.enums.insert(k.to_owned(), v.to_owned());
+                }
+
+                for (k, v) in &super_messages {
+                    content.1.messages.insert(k.to_owned(), v.to_owned());
+                }
+
+                for (k, v) in &super_services {
+                    content.1.services.insert(k.to_owned(), v.to_owned());
+                }
             }
         }
 
