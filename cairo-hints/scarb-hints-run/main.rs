@@ -550,7 +550,6 @@ fn run_1() -> Result<Vec<MaybeRelocatable>, Error> {
     // .clone();
 
     let metadata_config = Some(Default::default());
-
     let gas_usage_check = metadata_config.is_some();
     let metadata = create_metadata(&sierra_program, metadata_config)?;
     let sierra_program_registry = ProgramRegistry::<CoreType, CoreLibfunc>::new(&sierra_program)?;
@@ -563,8 +562,8 @@ fn run_1() -> Result<Vec<MaybeRelocatable>, Error> {
 
     let initial_gas = 9999999999999_usize;
 
-    // Modified entry code to be compatible with custom cairo1 Proof Mode.
-    // This adds code that's needed for dictionaries, adjusts ap for builtin pointers, adds initial gas for the gas builtin if needed, and sets up other necessary code for cairo1
+    // Entry code and footer are part of the whole instructions that are
+    // ran by the VM.
     let (entry_code, builtins) = create_entry_code(
         &sierra_program_registry,
         &casm_program,
@@ -573,31 +572,14 @@ fn run_1() -> Result<Vec<MaybeRelocatable>, Error> {
         initial_gas,
     )?;
 
-    println!("Compiling with proof mode and running ...");
-
-    // This information can be useful for the users using the prover.
-    println!("Builtins used: {:?}", builtins);
-
-    // Prepare "canonical" proof mode instructions. These are usually added by the compiler in cairo 0
-    let mut ctx = casm! {};
-    casm_extend! {ctx,
-        call rel 4;
-        jmp rel 0;
-    };
-    let proof_mode_header = ctx.instructions;
-
-    // Get the user program instructions
-    let program_instructions = casm_program.instructions.iter();
-
     // This footer is used by lib funcs
     let libfunc_footer = SierraCasmRunner::create_code_footer();
 
     // This is the program we are actually proving
     // With embedded proof mode, cairo1 header and the libfunc footer
     let instructions = chain!(
-        proof_mode_header.iter(),
         entry_code.iter(),
-        program_instructions,
+        casm_program.instructions.iter(),
         libfunc_footer.iter()
     );
 
@@ -624,15 +606,10 @@ fn run_1() -> Result<Vec<MaybeRelocatable>, Error> {
 
     let data_len = data.len();
 
-    let starting_pc = 0;
-
-    let program = Program::new_for_proof(
+    let program = Program::new(
         builtins,
         data,
-        starting_pc,
-        // Proof mode is on top
-        // jmp rel 0 is on PC == 2
-        2,
+        Some(0),
         program_hints,
         ReferenceManager {
             references: Vec::new(),
@@ -642,7 +619,8 @@ fn run_1() -> Result<Vec<MaybeRelocatable>, Error> {
         None,
     )?;
 
-    let proof_mode = true;
+    let proof_mode = false;
+    // println!("Entrypoint {:#?}", &program); //program.shared_program_data.main
     let mut runner = CairoRunner::new(&program, &args.layout, proof_mode).unwrap();
     let mut vm = VirtualMachine::new(args.trace_file.is_some());
     let end = runner.initialize(&mut vm).unwrap();
@@ -651,9 +629,7 @@ fn run_1() -> Result<Vec<MaybeRelocatable>, Error> {
 
     // Run it until the infinite loop
     runner.run_until_pc(end, &mut vm, &mut hint_processor)?;
-
-    // Then pad it to the power of 2
-    runner.run_until_next_power_of_2(&mut vm, &mut hint_processor)?;
+    runner.end_run(true, false, &mut vm, &mut hint_processor)?;
 
     // Fetch return type data
     let return_type_id = main_func
