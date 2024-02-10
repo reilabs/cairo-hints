@@ -7,16 +7,14 @@ use std::io::BufReader;
 use std::io::Write;
 use std::path::PathBuf;
 
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{Context, Result};
+use bincode::enc::write::Writer;
+use cairo_lang_casm::casm;
+use cairo_lang_casm::casm_extend;
+use cairo_lang_casm::hints::Hint;
 use cairo_lang_casm::instructions::Instruction;
-use cairo_lang_compiler::compile_cairo_project_at_path;
-use cairo_lang_compiler::CompilerConfig;
-use cairo_lang_runner::build_hints_dict;
-use cairo_lang_runner::short_string::as_cairo_short_string;
-use cairo_lang_runner::Arg;
-use cairo_lang_runner::CairoHintProcessor;
 use cairo_lang_runner::RunnerError;
-use cairo_lang_runner::{RunResultStarknet, RunResultValue, SierraCasmRunner, StarknetState};
+use cairo_lang_runner::SierraCasmRunner;
 use cairo_lang_sierra::extensions::bitwise::BitwiseType;
 use cairo_lang_sierra::extensions::core::CoreLibfunc;
 use cairo_lang_sierra::extensions::core::CoreType;
@@ -32,6 +30,7 @@ use cairo_lang_sierra::extensions::ConcreteType;
 use cairo_lang_sierra::extensions::NamedType;
 use cairo_lang_sierra::ids::ConcreteTypeId;
 use cairo_lang_sierra::program::Function;
+use cairo_lang_sierra::program::Program as SierraProgram;
 use cairo_lang_sierra::program::VersionedProgram;
 use cairo_lang_sierra::program_registry::ProgramRegistry;
 use cairo_lang_sierra::program_registry::ProgramRegistryError;
@@ -41,19 +40,24 @@ use cairo_lang_sierra_to_casm::metadata::calc_metadata;
 use cairo_lang_sierra_to_casm::metadata::calc_metadata_ap_change_only;
 use cairo_lang_sierra_to_casm::metadata::MetadataComputationConfig;
 use cairo_lang_sierra_to_casm::metadata::MetadataError;
+use cairo_lang_sierra_type_size::get_type_size_map;
+use cairo_lang_utils::unordered_hash_map::UnorderedHashMap;
 use cairo_oracle_hint_processor::rpc_1_hint_processor::Rpc1HintProcessor;
-use cairo_oracle_hint_processor::rpc_hint_processor::RpcHintProcessor;
+use cairo_proto_serde::configuration::Configuration;
 use cairo_vm::air_public_input::PublicInputError;
 use cairo_vm::cairo_run;
 use cairo_vm::cairo_run::EncodeTraceError;
 use cairo_vm::felt::Felt252;
+use cairo_vm::hint_processor::cairo_1_hint_processor::hint_processor::Cairo1HintProcessor;
 use cairo_vm::serde::deserialize_program::BuiltinName;
 use cairo_vm::serde::deserialize_program::HintParams;
 use cairo_vm::serde::deserialize_program::ReferenceManager;
+use cairo_vm::serde::deserialize_program::{ApTracking, FlowTrackingData};
 use cairo_vm::types::errors::program_errors::ProgramError;
 use cairo_vm::types::program::Program;
 use cairo_vm::types::relocatable::MaybeRelocatable;
 use cairo_vm::vm::errors::memory_errors::MemoryError;
+use cairo_vm::vm::errors::runner_errors::RunnerError as VMError;
 use cairo_vm::vm::errors::trace_errors::TraceError;
 use cairo_vm::vm::errors::vm_errors::VirtualMachineError;
 use cairo_vm::vm::runners::cairo_runner::CairoRunner;
@@ -61,17 +65,13 @@ use cairo_vm::vm::runners::cairo_runner::RunResources;
 use cairo_vm::vm::vm_core::VirtualMachine;
 use camino::Utf8PathBuf;
 use clap::Parser;
-use clap::ValueHint;
-use indoc::formatdoc;
 use itertools::chain;
 use itertools::Itertools;
-use serde::Serializer;
-
-use cairo_proto_serde::configuration::Configuration;
-use scarb_metadata::{Metadata, MetadataCommand, ScarbCommand};
+use scarb_metadata::{MetadataCommand, ScarbCommand};
 use scarb_ui::args::PackagesFilter;
 use scarb_ui::components::Status;
-use scarb_ui::{Message, OutputFormat, Ui, Verbosity};
+use scarb_ui::{OutputFormat, Ui, Verbosity};
+use thiserror::Error;
 
 mod deserialization;
 
@@ -133,228 +133,36 @@ fn validate_layout(value: &str) -> Result<String, String> {
     }
 }
 
-fn run() -> Result<()> {
-    let args: Args = Args::parse();
-    let available_gas = GasLimit::parse(args.available_gas);
-
-    let ui = Ui::new(Verbosity::default(), OutputFormat::Text);
-
-    let metadata = MetadataCommand::new().inherit_stderr().exec()?;
-
-    let package = args.packages_filter.match_one(&metadata)?;
-
-    if !args.no_build {
-        let filter = PackagesFilter::generate_for::<Metadata>(vec![package.clone()].iter());
-        ScarbCommand::new()
-            .arg("build")
-            .env("SCARB_PACKAGES_FILTER", filter.to_env())
-            .run()?;
-    }
-
-    let filename = format!("{}.sierra.json", package.name);
-    let scarb_target_dir = env::var("SCARB_TARGET_DIR")?;
-    let scarb_profile = env::var("SCARB_PROFILE")?;
-    let path = Utf8PathBuf::from(scarb_target_dir.clone())
-        .join(scarb_profile.clone())
-        .join(filename.clone());
-
-    ensure!(
-        path.exists(),
-        formatdoc! {r#"
-            package has not been compiled, file does not exist: {filename}
-            help: run `scarb build` to compile the package
-        "#}
-    );
-
-    ui.print(Status::new("Running", &package.name));
-
-    let sierra_program = serde_json::from_str::<VersionedProgram>(
-        &fs::read_to_string(path.clone())
-            .with_context(|| format!("failed to read Sierra file: {path}"))?,
-    )
-    .with_context(|| format!("failed to deserialize Sierra program: {path}"))?
-    .into_v1()
-    .with_context(|| format!("failed to load Sierra program: {path}"))?;
-
-    if available_gas.is_disabled() && sierra_program.program.requires_gas_counter() {
-        bail!("program requires gas counter, please provide `--available-gas` argument");
-    }
-
-    let metadata_config = if available_gas.is_disabled() {
-        None
-    } else {
-        Some(Default::default())
-    };
-    let runner = SierraCasmRunner::new(
-        sierra_program.program.clone(),
-        metadata_config.clone(),
-        Default::default(),
-        false,
-    )?;
-
-    // TODO: this shouldn't be needed. we should call into cairo-lang-runner
-    let metadata = create_metadata(&sierra_program.program, metadata_config.clone())?;
-    let casm_program = cairo_lang_sierra_to_casm::compiler::compile(
-        &sierra_program.program,
-        &metadata,
-        metadata_config.is_some(),
-    )?;
-
-    let result = run_with_oracle_hint_processor(
-        &runner,
-        &casm_program,
-        runner.find_function("::main")?,
-        &args.program_input,
-        available_gas.value(),
-        StarknetState::default(),
-        &args.oracle_server,
-        &args.service_config,
-    )
-    .context("failed to run the function")?;
-
-    ui.print(Summary {
-        result,
-        print_full_memory: args.print_full_memory,
-        gas_defined: available_gas.is_defined(),
-    });
-
-    Ok(())
-}
-
-/// Runs the vm starting from a function in the context of a given starknet state.
-pub fn run_with_oracle_hint_processor(
-    runner: &SierraCasmRunner,
-    casm_program: &CairoProgram,
-    func: &Function,
-    args: &[Arg],
-    available_gas: Option<usize>,
-    starknet_state: StarknetState,
-    oracle_server: &Option<String>,
-    service_config: &Option<PathBuf>,
-) -> Result<RunResultStarknet, RunnerError> {
-    let initial_gas = runner.get_initial_available_gas(func, available_gas)?;
-    let (entry_code, builtins) = runner.create_entry_code(func, args, initial_gas)?;
-    let footer = SierraCasmRunner::create_code_footer();
-    let (hints_dict, string_to_hint) =
-        build_hints_dict(chain!(entry_code.iter(), casm_program.instructions.iter()));
-    let assembled_program = casm_program.clone().assemble_ex(&entry_code, &footer);
-
-    let cairo_hint_processor = CairoHintProcessor {
-        runner: Some(runner),
-        starknet_state: starknet_state.clone(),
-        string_to_hint,
-        run_resources: RunResources::default(),
-    };
-
-    let service_config = match service_config {
-        Some(path) => {
-            let file = File::open(path).unwrap();
-            let reader = BufReader::new(file);
-            serde_json::from_reader(reader).unwrap()
-        }
-        None => Configuration::default(),
-    };
-    let mut hint_processor =
-        RpcHintProcessor::new(cairo_hint_processor, oracle_server, &service_config);
-
-    runner
-        .run_function(
-            func,
-            &mut hint_processor,
-            hints_dict,
-            assembled_program.bytecode.iter(),
-            builtins,
-        )
-        .map(|v| RunResultStarknet {
-            gas_counter: v.gas_counter,
-            memory: v.memory,
-            value: v.value,
-            starknet_state: hint_processor.starknet_state(),
-            profiling_info: v.profiling_info,
-        })
-}
-
-struct Summary {
-    result: RunResultStarknet,
-    print_full_memory: bool,
-    gas_defined: bool,
-}
-
-impl Message for Summary {
-    fn print_text(self)
-    where
-        Self: Sized,
-    {
-        match self.result.value {
-            RunResultValue::Success(values) => {
-                println!("Run completed successfully, returning {values:?}")
+fn main() -> Result<(), Error> {
+    match run_1() {
+        Err(Error::Cli(err)) => err.exit(),
+        Ok(return_values) => {
+            if !return_values.is_empty() {
+                let return_values_string_list =
+                    return_values.iter().map(|m| m.to_string()).join(", ");
+                println!("Return values : [{}]", return_values_string_list);
             }
-            RunResultValue::Panic(values) => {
-                print!("Run panicked with [");
-                for value in &values {
-                    match as_cairo_short_string(value) {
-                        Some(as_string) => print!("{value} ('{as_string}'), "),
-                        None => print!("{value}, "),
-                    }
-                }
-                println!("].")
+            Ok(())
+        }
+        Err(Error::RunPanic(panic_data)) => {
+            if !panic_data.is_empty() {
+                let panic_data_string_list = panic_data
+                    .iter()
+                    .map(|m| {
+                        // Try to parse to utf8 string
+                        let msg = String::from_utf8(m.to_be_bytes().to_vec());
+                        if let Ok(msg) = msg {
+                            format!("{} ('{}')", m, msg)
+                        } else {
+                            m.to_string()
+                        }
+                    })
+                    .join(", ");
+                println!("Run panicked with: [{}]", panic_data_string_list);
             }
+            Ok(())
         }
-
-        if self.gas_defined {
-            if let Some(gas) = self.result.gas_counter {
-                println!("Remaining gas: {gas}");
-            }
-        }
-
-        if self.print_full_memory {
-            print!("Full memory: [");
-            for cell in &self.result.memory {
-                match cell {
-                    None => print!("_, "),
-                    Some(value) => print!("{value}, "),
-                }
-            }
-            println!("]");
-        }
-    }
-
-    fn structured<S: Serializer>(self, _ser: S) -> Result<S::Ok, S::Error>
-    where
-        Self: Sized,
-    {
-        todo!("JSON output is not implemented yet for this command")
-    }
-}
-
-enum GasLimit {
-    Disabled,
-    Unlimited,
-    Limited(usize),
-}
-impl GasLimit {
-    pub fn parse(value: Option<usize>) -> Self {
-        match value {
-            Some(0) => GasLimit::Disabled,
-            Some(value) => GasLimit::Limited(value),
-            None => GasLimit::Unlimited,
-        }
-    }
-
-    pub fn is_disabled(&self) -> bool {
-        matches!(self, GasLimit::Disabled)
-    }
-
-    pub fn is_defined(&self) -> bool {
-        !matches!(self, GasLimit::Unlimited)
-    }
-
-    pub fn value(&self) -> Option<usize> {
-        match self {
-            GasLimit::Disabled => None,
-            GasLimit::Limited(value) => Some(*value),
-            GasLimit::Unlimited => Some(usize::MAX),
-        }
+        Err(err) => Err(err),
     }
 }
 
@@ -373,19 +181,6 @@ fn create_metadata(
         MetadataError::CostError(_) => RunnerError::FailedGasCalculation,
     })
 }
-
-// NEW
-use bincode::enc::write::Writer;
-use cairo_lang_casm::casm;
-use cairo_lang_casm::casm_extend;
-use cairo_lang_casm::hints::Hint;
-use cairo_lang_sierra::program::Program as SierraProgram;
-use cairo_lang_sierra_type_size::get_type_size_map;
-use cairo_lang_utils::unordered_hash_map::UnorderedHashMap;
-use cairo_vm::hint_processor::cairo_1_hint_processor::hint_processor::Cairo1HintProcessor;
-use cairo_vm::serde::deserialize_program::{ApTracking, FlowTrackingData};
-use cairo_vm::vm::errors::runner_errors::RunnerError as VMError;
-use thiserror::Error;
 
 #[derive(Debug, Error)]
 enum Error {
@@ -407,8 +202,6 @@ enum Error {
     ProgramRegistry(#[from] Box<ProgramRegistryError>),
     #[error(transparent)]
     Compilation(#[from] Box<CompilationError>),
-    #[error("Failed to compile to sierra:\n {0}")]
-    SierraCompilation(String),
     #[error(transparent)]
     Metadata(#[from] MetadataError),
     #[error(transparent)]
@@ -459,39 +252,6 @@ impl FileWriter {
 
     fn flush(&mut self) -> io::Result<()> {
         self.buf_writer.flush()
-    }
-}
-
-fn main() -> Result<(), Error> {
-    match run_1() {
-        Err(Error::Cli(err)) => err.exit(),
-        Ok(return_values) => {
-            if !return_values.is_empty() {
-                let return_values_string_list =
-                    return_values.iter().map(|m| m.to_string()).join(", ");
-                println!("Return values : [{}]", return_values_string_list);
-            }
-            Ok(())
-        }
-        Err(Error::RunPanic(panic_data)) => {
-            if !panic_data.is_empty() {
-                let panic_data_string_list = panic_data
-                    .iter()
-                    .map(|m| {
-                        // Try to parse to utf8 string
-                        let msg = String::from_utf8(m.to_be_bytes().to_vec());
-                        if let Ok(msg) = msg {
-                            format!("{} ('{}')", m, msg)
-                        } else {
-                            m.to_string()
-                        }
-                    })
-                    .join(", ");
-                println!("Run panicked with: [{}]", panic_data_string_list);
-            }
-            Ok(())
-        }
-        Err(err) => Err(err),
     }
 }
 
