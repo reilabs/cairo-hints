@@ -818,8 +818,6 @@ fn create_entry_code(
         let ty_size = type_sizes[ty];
         let generic_ty = &info.long_id.generic_id;
         if let Some(offset) = builtin_offset.get(generic_ty) {
-            // Everything is off by 2 due to the proof mode header
-            let offset = offset + 2;
             casm_extend! {ctx,
                 [ap + 0] = [fp - offset], ap++;
             }
@@ -837,8 +835,6 @@ fn create_entry_code(
             casm_extend! {ctx,
                 [ap + 0] = [ap + offset] + 3, ap++;
             }
-            // This code should be re enabled to make the programs work with arguments
-
             // } else if let Some(Arg::Array(_)) = arg_iter.peek() {
             //     let values = extract_matches!(arg_iter.next().unwrap(), Arg::Array);
             //     let offset = -ap_offset + vecs.pop().unwrap();
@@ -867,18 +863,15 @@ fn create_entry_code(
     //         actual: args.len(),
     //     });
     // }
-
     let before_final_call = ctx.current_code_offset;
     let final_call_size = 3;
     let offset = final_call_size
         + casm_program.debug_info.sierra_statement_info[func.entry_point.0].code_offset;
-
     casm_extend! {ctx,
         call rel offset;
         ret;
     }
     assert_eq!(before_final_call + final_call_size, ctx.current_code_offset);
-
     Ok((ctx.instructions, builtins))
 }
 
