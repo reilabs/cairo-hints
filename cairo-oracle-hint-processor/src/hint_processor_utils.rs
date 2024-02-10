@@ -18,11 +18,11 @@ macro_rules! insert_value_to_cellref {
     };
 }
 
-pub fn bigint_to_felt(bigint: &BigInt) -> Result<crate::Felt252, MathError> {
+pub fn bigint_to_felt(bigint: &BigInt) -> Result<Felt252, MathError> {
     let (sign, bytes) = bigint
         .mod_floor(&CAIRO_PRIME.to_bigint().unwrap())
         .to_bytes_le();
-    let felt = crate::Felt252::from_bytes_le(&bytes);
+    let felt = Felt252::from_bytes_le(&bytes);
     if sign == Sign::Minus {
         Ok(felt.neg())
     } else {

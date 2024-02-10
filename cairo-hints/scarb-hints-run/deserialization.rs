@@ -1,7 +1,7 @@
 use std::{ops::Deref, str::FromStr};
 
-use cairo_felt::Felt252;
 use cairo_lang_runner::Arg;
+use cairo_vm::felt::Felt252;
 use serde::{de::Visitor, Deserialize};
 use serde_json::Value;
 use thiserror::Error;

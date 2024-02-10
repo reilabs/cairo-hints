@@ -18,13 +18,14 @@ edition = "2021"
 [workspace.dependencies]
 anyhow = "1.0.79"
 bytes = "1.5.0"
-cairo-felt = "0.8.7"
+# cairo-felt = "0.8.7"
 cairo-lang-casm = "2.4.4"
 cairo-lang-compiler = { version = "2.4.4" }
 cairo-lang-filesystem = { version = "2.4.4" }
 cairo-lang-runner = { version = "2.4.4" }
 cairo-lang-sierra = { version = "2.4.4" }
 cairo-lang-sierra-to-casm = { version = "2.4.4" }
+cairo-lang-sierra-type-size = { version = "2.4.4", default-features = false }
 cairo-lang-starknet = { version = "2.4.4" }
 cairo-lang-hints-test-runner = { path = "./cairo-lang-hints-test-runner" }
 cairo-lang-test-plugin = { version = "2.4.4" }
@@ -32,7 +33,7 @@ cairo-lang-utils = { version = "2.4.4" }
 cairo-oracle-hint-processor = { path = "./cairo-oracle-hint-processor" }
 cairo-proto-build = { path = "./cairo-proto-build", default-features = false }
 cairo-proto-serde = { path = "./cairo-proto-serde" }
-cairo-vm = "0.8.4-rc.0"
+cairo-vm = { version = "0.9.1", features = ["cairo-1-hints"] }
 camino = "1.1.6"
 clap = "4.4.18"
 colored = "2.1.0"

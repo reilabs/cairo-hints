@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# cairo-felt = { workspace = true }
 cairo-lang-casm = { workspace = true }
 cairo-lang-runner = { workspace = true }
 cairo-lang-utils = { workspace = true }
