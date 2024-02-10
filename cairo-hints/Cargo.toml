@@ -26,7 +26,6 @@ bincode = { version = "2.0.0-rc.3", default-features = false, features = [
 cairo-proto-build = { workspace = true }
 env_logger = { workspace = true }
 anyhow = { workspace = true }
-# cairo-felt = { workspace = true }
 cairo-lang-casm = { workspace = true }
 cairo-lang-compiler = { workspace = true }
 cairo-lang-runner = { workspace = true }

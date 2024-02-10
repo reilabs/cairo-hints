@@ -18,7 +18,6 @@ edition = "2021"
 [workspace.dependencies]
 anyhow = "1.0.79"
 bytes = "1.5.0"
-# cairo-felt = "0.8.7"
 cairo-lang-casm = "2.4.4"
 cairo-lang-compiler = { version = "2.4.4" }
 cairo-lang-filesystem = { version = "2.4.4" }
