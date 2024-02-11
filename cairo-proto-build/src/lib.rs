@@ -1,6 +1,5 @@
 use cairo_proto_serde::configuration::Configuration;
 use cairo_proto_serde::configuration::Field;
-use cairo_proto_serde::configuration::FieldType;
 use cairo_proto_serde::configuration::Mapping;
 use cairo_proto_serde::configuration::Service;
 use code_generator::CodeGenerator;
@@ -20,12 +19,8 @@ use std::env;
 use std::fmt;
 use std::fs;
 use std::io::{Error, ErrorKind};
-use std::ops::RangeBounds;
-use std::ops::RangeToInclusive;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::str::FromStr;
-use std::sync::Once;
 
 mod ast;
 mod code_generator;
@@ -37,10 +32,9 @@ mod path;
 /// The map collection type to output for Protobuf `map` fields.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(dead_code)]
 enum MapType {
-    /// The [`std::collections::HashMap`] type.
     HashMap,
-    /// The [`std::collections::BTreeMap`] type.
     BTreeMap,
 }
 
@@ -53,6 +47,7 @@ impl Default for MapType {
 /// The bytes collection type to output for Protobuf `bytes` fields.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(dead_code)]
 enum BytesType {
     /// The [`alloc::collections::Vec::<u8>`] type.
     Vec,
@@ -126,14 +121,6 @@ impl Module {
     /// Whether the module's path contains any components.
     pub fn is_empty(&self) -> bool {
         self.components.is_empty()
-    }
-
-    fn to_partial_file_name(&self, range: RangeToInclusive<usize>) -> String {
-        self.components[range].join(".")
-    }
-
-    fn part(&self, idx: usize) -> &str {
-        self.components[idx].as_str()
     }
 }
 

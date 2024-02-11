@@ -7,7 +7,6 @@ use cairo_lang_casm::{
     hints::{Hint, StarknetHint},
     operand::{CellRef, ResOperand},
 };
-use cairo_lang_runner::StarknetState;
 use cairo_lang_utils::bigint::BigIntAsHex;
 use cairo_proto_serde::configuration::Configuration;
 use cairo_proto_serde::{deserialize_cairo_serde, serialize_cairo_serde};
@@ -29,23 +28,8 @@ use cairo_vm::{
 };
 use serde_json::Value;
 
-#[derive(Debug, PartialEq)]
-enum PathElement {
-    Struct,
-    Array,
-    Key(String),
-}
-
-#[derive(Debug)]
-enum OracleState {
-    Sending(Value),
-    Receiving(Value),
-}
-
 /// HintProcessor for Cairo 1 compiler hints.
 pub struct Rpc1HintProcessor<'a> {
-    _path: Vec<PathElement>,
-    _state: OracleState,
     inner_processor: Cairo1HintProcessor,
     server: Option<String>,
     configuration: &'a Configuration,
@@ -58,8 +42,6 @@ impl<'a> Rpc1HintProcessor<'a> {
         configuration: &'a Configuration,
     ) -> Self {
         Self {
-            _state: OracleState::Sending(Value::Null),
-            _path: Default::default(),
             inner_processor,
             server: server.clone(),
             configuration,
@@ -128,10 +110,6 @@ impl<'a> Rpc1HintProcessor<'a> {
         insert_value_to_cellref!(vm, output_end, res_segment_end)?;
         Ok(())
     }
-
-    // pub fn starknet_state(self) -> StarknetState {
-    //     self.inner_processor.starknet_state
-    // }
 }
 
 impl<'a> HintProcessorLogic for Rpc1HintProcessor<'a> {
