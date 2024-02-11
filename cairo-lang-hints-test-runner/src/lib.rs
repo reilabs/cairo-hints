@@ -3,7 +3,6 @@ use std::sync::Mutex;
 use std::vec::IntoIter;
 
 use anyhow::{bail, Context, Result};
-use cairo_felt::Felt252;
 use cairo_lang_compiler::db::RootDatabase;
 use cairo_lang_compiler::diagnostics::DiagnosticsReporter;
 use cairo_lang_compiler::project::setup_project;
@@ -29,8 +28,9 @@ use cairo_lang_test_plugin::{
 };
 use cairo_lang_utils::casts::IntoOrPanic;
 use cairo_lang_utils::ordered_hash_map::OrderedHashMap;
-use cairo_oracle_hint_processor::RpcHintProcessor;
+use cairo_oracle_hint_processor::rpc_hint_processor::RpcHintProcessor;
 use cairo_proto_serde::configuration::Configuration;
+use cairo_vm::felt::Felt252;
 use cairo_vm::vm::runners::cairo_runner::RunResources;
 use colored::Colorize;
 use itertools::{chain, Itertools};
@@ -201,7 +201,7 @@ impl TestCompiler {
         let main_crate_ids = setup_project(db, Path::new(&path))?;
 
         if DiagnosticsReporter::stderr()
-            .with_extra_crates(&main_crate_ids)
+            .with_crates(&main_crate_ids)
             .check(db)
         {
             bail!("failed to compile: {}", path.display());
@@ -304,6 +304,7 @@ pub fn run_tests(
         sierra_program.clone(),
         metadata_config.clone(),
         contracts_info,
+        false,
     )
     .with_context(|| "Failed setting up runner.")?;
     println!("running {} tests", named_tests.len());
@@ -433,13 +434,12 @@ pub fn run_with_oracle_hint_processor(
 ) -> Result<RunResultStarknet, RunnerError> {
     let initial_gas = runner.get_initial_available_gas(func, available_gas)?;
     let (entry_code, builtins) = runner.create_entry_code(func, args, initial_gas)?;
-    let footer = runner.create_code_footer();
-    let instructions = chain!(
-        entry_code.iter(),
-        casm_program.instructions.iter(),
-        footer.iter()
-    );
-    let (hints_dict, string_to_hint) = build_hints_dict(instructions.clone());
+    let footer = SierraCasmRunner::create_code_footer();
+
+    let (hints_dict, string_to_hint) =
+        build_hints_dict(chain!(entry_code.iter(), casm_program.instructions.iter()));
+    let assembled_program = casm_program.clone().assemble_ex(&entry_code, &footer);
+
     let cairo_hint_processor = CairoHintProcessor {
         runner: Some(runner),
         starknet_state: starknet_state.clone(),
@@ -448,12 +448,13 @@ pub fn run_with_oracle_hint_processor(
     };
     let mut hint_processor =
         RpcHintProcessor::new(cairo_hint_processor, oracle_server, configuration);
+
     runner
         .run_function(
             func,
             &mut hint_processor,
             hints_dict,
-            instructions,
+            assembled_program.bytecode.iter(),
             builtins,
         )
         .map(|v| RunResultStarknet {
@@ -461,6 +462,7 @@ pub fn run_with_oracle_hint_processor(
             memory: v.memory,
             value: v.value,
             starknet_state: hint_processor.starknet_state(),
+            profiling_info: v.profiling_info,
         })
 }
 

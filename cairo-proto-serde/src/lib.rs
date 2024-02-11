@@ -1,8 +1,8 @@
 use crate::configuration::{Configuration, FieldType, PrimitiveType};
-use cairo_felt::Felt252;
-use num_traits::identities::One;
-use num_traits::identities::Zero;
+use cairo_vm::felt::Felt252;
+use num_traits::One;
 use num_traits::ToPrimitive;
+use num_traits::Zero;
 use serde_json::{json, Map, Value};
 
 pub mod configuration;
@@ -177,9 +177,9 @@ mod tests {
         Configuration, Field, FieldType, MethodDeclaration, PrimitiveType, Service,
     };
     use crate::{deserialize_cairo_serde, serialize_cairo_serde};
-    use cairo_felt::Felt252;
+    use cairo_vm::felt::Felt252;
     use serde_json::{json, Value};
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
 
     #[test]
     fn it_serializes_cairo_serde() {
@@ -229,7 +229,7 @@ mod tests {
     }
 
     fn test_configuration() -> Configuration {
-        let mut messages = HashMap::new();
+        let mut messages = BTreeMap::new();
         messages.insert(
             String::from("Inner"),
             vec![Field {
@@ -271,10 +271,10 @@ mod tests {
             },
         );
 
-        let mut services = HashMap::new();
+        let mut services = BTreeMap::new();
         services.insert(String::from("SqrtOracle"), Service { methods });
 
-        let enums = HashMap::new();
+        let enums = BTreeMap::new();
         Configuration {
             enums,
             messages,

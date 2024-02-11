@@ -1,24 +1,25 @@
 mod oracle;
 mod shirts;
 
+use alexandria_math::is_power_of_two::is_power_of_two;
 use oracle::{SqrtOracle};
-use shirts::{Request, Response, Size, request};
+use shirts::{Request, Response, Size, request::Inner};
 
 fn main() -> bool {
-    true
-    //let x = 42;
-    //let r = Request { n: x * x, x: Option::Some(Inner { inner: 5 }), y: array![1,2,3,4] };
-    //let result = SqrtOracle::sqrt(r);
+    is_power_of_two(0) == false;
+    let r = Request { inner: Option::Some(Inner { color: Size::Large }) } ;
+    let result = SqrtOracle::sqrt(r);
 
-    //result.n == x
+    result.color == Size::Large
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Request, Response, Size, SqrtOracle, request::Inner};
+    use super::{Request, Response, Size, SqrtOracle, Inner, is_power_of_two};
 
     #[test]
     fn sqrt_test() {
+        is_power_of_two(0) == false;
         let r = Request { inner: Option::Some(Inner { color: Size::Large }) } ;
         let result = SqrtOracle::sqrt(r);
 
