@@ -28,23 +28,8 @@ use cairo_vm::{
 };
 use serde_json::Value;
 
-#[derive(Debug, PartialEq)]
-enum PathElement {
-    Struct,
-    Array,
-    Key(String),
-}
-
-#[derive(Debug)]
-enum OracleState {
-    Sending(Value),
-    Receiving(Value),
-}
-
 /// HintProcessor for Cairo 1 compiler hints.
 pub struct RpcHintProcessor<'a> {
-    _path: Vec<PathElement>,
-    _state: OracleState,
     inner_processor: CairoHintProcessor<'a>,
     server: Option<String>,
     configuration: &'a Configuration,
@@ -57,8 +42,6 @@ impl<'a> RpcHintProcessor<'a> {
         configuration: &'a Configuration,
     ) -> Self {
         Self {
-            _state: OracleState::Sending(Value::Null),
-            _path: Default::default(),
             inner_processor,
             server: server.clone(),
             configuration,

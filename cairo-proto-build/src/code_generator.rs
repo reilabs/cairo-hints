@@ -19,7 +19,7 @@ use crate::ast::{Comments, Method, Service};
 use crate::extern_paths::ExternPaths;
 use crate::ident::{to_snake, to_upper_camel};
 use crate::message_graph::MessageGraph;
-use crate::{BytesType, Config, MapType};
+use crate::Config;
 
 #[derive(PartialEq)]
 enum Syntax {
@@ -238,7 +238,7 @@ impl<'a> CodeGenerator<'a> {
         // Path indexes are preserved so that comments can be retrieved.
         type Fields = Vec<(FieldDescriptorProto, usize)>;
         type OneofFields = MultiMap<i32, (FieldDescriptorProto, usize)>;
-        let (fields, mut oneof_fields): (Fields, OneofFields) = message
+        let (fields, oneof_fields): (Fields, OneofFields) = message
             .field
             .into_iter()
             .enumerate()
@@ -297,14 +297,7 @@ impl<'a> CodeGenerator<'a> {
         self.serde_config.messages.insert(struct_key, fields_def);
 
         self.path.push(8);
-        for (idx, oneof) in message.oneof_decl.iter().enumerate() {
-            let idx = idx as i32;
-
-            let fields = match oneof_fields.get_vec(&idx) {
-                Some(fields) => fields,
-                None => continue,
-            };
-
+        for (_idx, _oneof) in message.oneof_decl.iter().enumerate() {
             panic!("oneof fields are not supported");
         }
         self.path.pop();
@@ -331,14 +324,7 @@ impl<'a> CodeGenerator<'a> {
             }
             self.path.pop();
 
-            for (idx, oneof) in message.oneof_decl.into_iter().enumerate() {
-                let idx = idx as i32;
-                // optional fields create a synthetic oneof that we want to skip
-                let fields = match oneof_fields.remove(&idx) {
-                    Some(fields) => fields,
-                    None => continue,
-                };
-
+            for (_idx, _oneof) in message.oneof_decl.into_iter().enumerate() {
                 panic!("oneof messages are not supported");
             }
 
@@ -355,7 +341,7 @@ impl<'a> CodeGenerator<'a> {
         let repeated = field.label == Some(Label::Repeated as i32);
         let deprecated = self.deprecated(&field);
         let optional = self.optional(&field);
-        let ty = self.resolve_type(&field, fq_message_name);
+        let ty = self.resolve_type(&field);
 
         let boxed = !repeated
             && ((type_ == Type::Message || type_ == Type::Group)
@@ -457,29 +443,12 @@ impl<'a> CodeGenerator<'a> {
 
     fn append_map_field(
         &mut self,
-        fq_message_name: &str,
-        field: FieldDescriptorProto,
-        key: &FieldDescriptorProto,
-        value: &FieldDescriptorProto,
+        _fq_message_name: &str,
+        _field: FieldDescriptorProto,
+        _key: &FieldDescriptorProto,
+        _value: &FieldDescriptorProto,
     ) {
         todo!("cairo maps are not serializable");
-
-        let key_ty = self.resolve_type(key, fq_message_name);
-        let value_ty = self.resolve_type(value, fq_message_name);
-
-        debug!(
-            "    map field: {:?}, key type: {:?}, value type: {:?}",
-            field.name(),
-            key_ty,
-            value_ty
-        );
-
-        let field_name = to_snake(field.name());
-        self.push_indent();
-        self.code_buf
-            .push_str(&format!("{field_name}: Felt252Dict<{value_ty}>,\n"));
-
-        //self.config_buf.push_str(&format!("{{\"name\": \"{field_name}\", \"type\": \"dictionary\", \"key\": \"{key_ty}\", \"value\": \"{value_ty}\", \"map\": true}}"));
     }
 
     fn location(&self) -> Option<&Location> {
@@ -629,7 +598,7 @@ impl<'a> CodeGenerator<'a> {
         self.code_buf.push_str("}\n");
     }
 
-    fn resolve_type(&self, field: &FieldDescriptorProto, fq_message_name: &str) -> String {
+    fn resolve_type(&self, field: &FieldDescriptorProto) -> String {
         match field.r#type() {
             Type::Float => panic!("Float type not supported"),
             Type::Double => panic!("Double type not supported"),
@@ -880,42 +849,6 @@ fn build_enum_value_mappings<'a>(
         })
     }
     mappings
-}
-
-impl MapType {
-    /// The `prost-derive` annotation type corresponding to the map type.
-    pub(crate) fn annotation(&self) -> &'static str {
-        match self {
-            MapType::HashMap => "map",
-            MapType::BTreeMap => "btree_map",
-        }
-    }
-
-    /// The fully-qualified Rust type corresponding to the map type.
-    pub(crate) fn rust_type(&self) -> &'static str {
-        match self {
-            MapType::HashMap => "::std::collections::HashMap",
-            MapType::BTreeMap => "::prost::alloc::collections::BTreeMap",
-        }
-    }
-}
-
-impl BytesType {
-    /// The `prost-derive` annotation type corresponding to the bytes type.
-    pub(crate) fn annotation(&self) -> &'static str {
-        match self {
-            BytesType::Vec => "vec",
-            BytesType::Bytes => "bytes",
-        }
-    }
-
-    /// The fully-qualified Rust type corresponding to the bytes type.
-    pub(crate) fn rust_type(&self) -> &'static str {
-        match self {
-            BytesType::Vec => "::prost::alloc::vec::Vec<u8>",
-            BytesType::Bytes => "::prost::bytes::Bytes",
-        }
-    }
 }
 
 #[cfg(test)]
