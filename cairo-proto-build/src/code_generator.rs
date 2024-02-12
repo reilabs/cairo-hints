@@ -67,7 +67,7 @@ impl<'a> CodeGenerator<'a> {
             s
         });
 
-        let syntax = match file.syntax.as_ref().map(String::as_str) {
+        let syntax = match file.syntax.as_deref() {
             None | Some("proto2") => Syntax::Proto2,
             Some("proto3") => Syntax::Proto3,
             Some(s) => panic!("unknown syntax: {}", s),
@@ -272,9 +272,7 @@ impl<'a> CodeGenerator<'a> {
                 .as_ref()
                 .and_then(|type_name| map_types.get(type_name))
             {
-                Some(&(ref key, ref value)) => {
-                    self.append_map_field(&fq_message_name, field, key, value)
-                }
+                Some((key, value)) => self.append_map_field(&fq_message_name, field, key, value),
                 None => {
                     let field_def = self.append_field(&fq_message_name, field);
                     fields_def.push(field_def);
@@ -297,6 +295,7 @@ impl<'a> CodeGenerator<'a> {
         self.serde_config.messages.insert(struct_key, fields_def);
 
         self.path.push(8);
+        #[allow(clippy::never_loop)]
         for (_idx, _oneof) in message.oneof_decl.iter().enumerate() {
             panic!("oneof fields are not supported");
         }
@@ -323,7 +322,7 @@ impl<'a> CodeGenerator<'a> {
                 self.path.pop();
             }
             self.path.pop();
-
+            #[allow(clippy::never_loop)]
             for (_idx, _oneof) in message.oneof_decl.into_iter().enumerate() {
                 panic!("oneof messages are not supported");
             }
@@ -351,7 +350,7 @@ impl<'a> CodeGenerator<'a> {
             || (self
                 .config
                 .boxed
-                .get_first_field(&fq_message_name, field.name())
+                .get_first_field(fq_message_name, field.name())
                 .is_some());
 
         debug!(
@@ -409,10 +408,10 @@ impl<'a> CodeGenerator<'a> {
         }
         type_name.push_str(&ty);
         if boxed {
-            type_name.push_str(">");
+            type_name.push('>');
         }
         if repeated || optional {
-            type_name.push_str(">");
+            type_name.push('>');
         }
         self.code_buf.push_str(&type_name);
         self.code_buf.push_str(",\n");
