@@ -890,17 +890,28 @@ dependencies = [
 name = "cairo-oracle-hint-processor"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "bincode",
  "cairo-lang-casm",
  "cairo-lang-runner",
+ "cairo-lang-sierra",
+ "cairo-lang-sierra-to-casm",
+ "cairo-lang-sierra-type-size",
  "cairo-lang-utils",
  "cairo-proto-serde",
  "cairo-vm",
+ "camino",
+ "clap",
+ "itertools 0.12.1",
  "num-bigint",
  "num-integer",
  "num-traits 0.2.18",
  "reqwest",
+ "scarb-metadata",
+ "scarb-ui",
  "serde_json",
  "starknet-types-core",
+ "thiserror",
 ]
 
 [[package]]

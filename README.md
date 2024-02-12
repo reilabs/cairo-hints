@@ -6,8 +6,9 @@ It uses protocol buffers to define messages shared between Cairo and RPC server,
 
 ## Installation
 
-1. Make sure you have `protoc` and `scarb` installed.
-2. Clone this repo and run:
+1. Make sure you have `protoc` from [here](https://grpc.io/docs/protoc-installation/)
+2. Make sure you have at least `scarb-v2.5.1` installed from [here](https://docs.swmansion.com/scarb/download.html)
+3. Clone this repo and run:
     * `cargo install --path cairo-hints --locked`
 
 ## Usage

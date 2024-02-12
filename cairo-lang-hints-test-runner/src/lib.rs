@@ -2,39 +2,28 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::vec::IntoIter;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use cairo_lang_compiler::db::RootDatabase;
 use cairo_lang_compiler::diagnostics::DiagnosticsReporter;
 use cairo_lang_compiler::project::setup_project;
 use cairo_lang_filesystem::cfg::{Cfg, CfgSet};
 use cairo_lang_filesystem::ids::CrateId;
 use cairo_lang_runner::casm_run::format_next_item;
-use cairo_lang_runner::{
-    build_hints_dict, Arg, CairoHintProcessor, RunResultStarknet, RunResultValue, RunnerError,
-    SierraCasmRunner, StarknetState,
-};
+use cairo_lang_runner::RunResultValue;
 use cairo_lang_sierra::extensions::gas::CostTokenType;
 use cairo_lang_sierra::ids::FunctionId;
-use cairo_lang_sierra::program::{Function, Program};
-use cairo_lang_sierra_to_casm::compiler::CairoProgram;
-use cairo_lang_sierra_to_casm::metadata::{
-    calc_metadata, calc_metadata_ap_change_only, MetadataComputationConfig, MetadataError,
-};
+use cairo_lang_sierra::program::Program;
 use cairo_lang_starknet::contract::ContractInfo;
 use cairo_lang_starknet::starknet_plugin_suite;
-use cairo_lang_test_plugin::test_config::{PanicExpectation, TestExpectation};
 use cairo_lang_test_plugin::{
     compile_test_prepared_db, test_plugin_suite, TestCompilation, TestConfig,
 };
-use cairo_lang_utils::casts::IntoOrPanic;
 use cairo_lang_utils::ordered_hash_map::OrderedHashMap;
-use cairo_oracle_hint_processor::rpc_hint_processor::RpcHintProcessor;
+use cairo_oracle_hint_processor::{run_1, Error};
 use cairo_proto_serde::configuration::Configuration;
 use cairo_vm::felt::Felt252;
-use cairo_vm::vm::runners::cairo_runner::RunResources;
 use colored::Colorize;
-use itertools::{chain, Itertools};
-use num_traits::ToPrimitive;
+use itertools::Itertools;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 #[cfg(test)]
@@ -290,23 +279,11 @@ pub struct TestsSummary {
 pub fn run_tests(
     named_tests: Vec<(String, TestConfig)>,
     sierra_program: Program,
-    function_set_costs: OrderedHashMap<FunctionId, OrderedHashMap<CostTokenType, i32>>,
-    contracts_info: OrderedHashMap<Felt252, ContractInfo>,
+    _function_set_costs: OrderedHashMap<FunctionId, OrderedHashMap<CostTokenType, i32>>,
+    _contracts_info: OrderedHashMap<Felt252, ContractInfo>,
     oracle_server: &Option<String>,
     configuration: &Configuration,
 ) -> Result<TestsSummary> {
-    let metadata_config = Some(MetadataComputationConfig {
-        function_set_costs,
-        linear_gas_solver: true,
-        linear_ap_change_solver: true,
-    });
-    let runner = SierraCasmRunner::new(
-        sierra_program.clone(),
-        metadata_config.clone(),
-        contracts_info,
-        false,
-    )
-    .with_context(|| "Failed setting up runner.")?;
     println!("running {} tests", named_tests.len());
     let wrapped_summary = Mutex::new(Ok(TestsSummary {
         passed: vec![],
@@ -321,7 +298,6 @@ pub fn run_tests(
                 if test.ignored {
                     return Ok((name, None));
                 }
-                let func = runner.find_function(name.as_str())?;
 
                 println!(
                     "requires gas counter {:?}, available gas {:?}",
@@ -329,57 +305,27 @@ pub fn run_tests(
                     test.available_gas
                 );
 
-                // // TODO: this shouldn't be needed. we should call into cairo-lang-runner
-                let metadata = create_metadata(&sierra_program, metadata_config.clone())?;
-                let casm_program = cairo_lang_sierra_to_casm::compiler::compile(
-                    &sierra_program,
-                    &metadata,
-                    metadata_config.is_some(),
-                )?;
-
-                let result = run_with_oracle_hint_processor(
-                    &runner,
-                    &casm_program,
-                    func,
-                    &[],
-                    test.available_gas,
-                    StarknetState::default(),
-                    oracle_server,
+                let r = run_1(
                     configuration,
-                )
-                .context("failed to run the function")?;
+                    oracle_server,
+                    &"all_cairo".to_string(),
+                    &None,
+                    &None,
+                    &sierra_program,
+                    &name,
+                );
 
                 Ok((
                     name,
                     Some(TestResult {
-                        status: match &result.value {
-                            RunResultValue::Success(_) => match test.expectation {
-                                TestExpectation::Success => TestStatus::Success,
-                                TestExpectation::Panics(_) => TestStatus::Fail(result.value),
-                            },
-                            RunResultValue::Panic(value) => match test.expectation {
-                                TestExpectation::Success => TestStatus::Fail(result.value),
-                                TestExpectation::Panics(panic_expectation) => {
-                                    match panic_expectation {
-                                        PanicExpectation::Exact(expected) if value != &expected => {
-                                            TestStatus::Fail(result.value)
-                                        }
-                                        _ => TestStatus::Success,
-                                    }
-                                }
-                            },
+                        status: match r {
+                            Ok(_) => TestStatus::Success,
+                            Err(Error::RunPanic(panic_data)) => {
+                                TestStatus::Fail(RunResultValue::Panic(panic_data))
+                            }
+                            Err(_) => panic!("Error!"),
                         },
-                        gas_usage: test
-                            .available_gas
-                            .zip(result.gas_counter)
-                            .map(|(before, after)| {
-                                before.into_or_panic::<i64>() - after.to_bigint().to_i64().unwrap()
-                            })
-                            .or_else(|| {
-                                runner
-                                    .initial_required_gas(func)
-                                    .map(|gas| gas.into_or_panic::<i64>())
-                            }),
+                        gas_usage: None,
                     }),
                 ))
             },
@@ -419,65 +365,4 @@ pub fn run_tests(
             res_type.push(name);
         });
     wrapped_summary.into_inner().unwrap()
-}
-
-/// Runs the vm starting from a function in the context of a given starknet state.
-pub fn run_with_oracle_hint_processor(
-    runner: &SierraCasmRunner,
-    casm_program: &CairoProgram,
-    func: &Function,
-    args: &[Arg],
-    available_gas: Option<usize>,
-    starknet_state: StarknetState,
-    oracle_server: &Option<String>,
-    configuration: &Configuration,
-) -> Result<RunResultStarknet, RunnerError> {
-    let initial_gas = runner.get_initial_available_gas(func, available_gas)?;
-    let (entry_code, builtins) = runner.create_entry_code(func, args, initial_gas)?;
-    let footer = SierraCasmRunner::create_code_footer();
-
-    let (hints_dict, string_to_hint) =
-        build_hints_dict(chain!(entry_code.iter(), casm_program.instructions.iter()));
-    let assembled_program = casm_program.clone().assemble_ex(&entry_code, &footer);
-
-    let cairo_hint_processor = CairoHintProcessor {
-        runner: Some(runner),
-        starknet_state: starknet_state.clone(),
-        string_to_hint,
-        run_resources: RunResources::default(),
-    };
-    let mut hint_processor =
-        RpcHintProcessor::new(cairo_hint_processor, oracle_server, configuration);
-
-    runner
-        .run_function(
-            func,
-            &mut hint_processor,
-            hints_dict,
-            assembled_program.bytecode.iter(),
-            builtins,
-        )
-        .map(|v| RunResultStarknet {
-            gas_counter: v.gas_counter,
-            memory: v.memory,
-            value: v.value,
-            starknet_state: hint_processor.starknet_state(),
-            profiling_info: v.profiling_info,
-        })
-}
-
-/// Creates the metadata required for a Sierra program lowering to casm.
-fn create_metadata(
-    sierra_program: &cairo_lang_sierra::program::Program,
-    metadata_config: Option<MetadataComputationConfig>,
-) -> Result<cairo_lang_sierra_to_casm::metadata::Metadata, RunnerError> {
-    if let Some(metadata_config) = metadata_config {
-        calc_metadata(sierra_program, metadata_config)
-    } else {
-        calc_metadata_ap_change_only(sierra_program)
-    }
-    .map_err(|err| match err {
-        MetadataError::ApChangeError(err) => RunnerError::ApChangeError(err),
-        MetadataError::CostError(_) => RunnerError::FailedGasCalculation,
-    })
 }
