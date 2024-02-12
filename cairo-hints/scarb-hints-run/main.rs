@@ -8,12 +8,12 @@ use std::{
 use anyhow::{Context, Result};
 use cairo_lang_sierra::program::VersionedProgram;
 use cairo_oracle_hint_processor::{run_1, Error};
-use cairo_proto_serde::configuration::Configuration;
 use camino::Utf8PathBuf;
 use clap::Parser;
 use itertools::Itertools;
 use scarb_metadata::{MetadataCommand, ScarbCommand};
 use scarb_ui::args::PackagesFilter;
+use scarb_utils::absolute_path;
 
 mod deserialization;
 
@@ -51,7 +51,7 @@ struct Args {
     oracle_server: Option<String>,
 
     #[arg(long)]
-    service_config: Option<PathBuf>,
+    oracle_lock: Option<PathBuf>,
 
     #[clap(long = "trace_file", value_parser)]
     trace_file: Option<PathBuf>,
@@ -77,11 +77,8 @@ fn validate_layout(value: &str) -> Result<String, String> {
 
 fn main() -> Result<(), Error> {
     let args: Args = Args::parse();
-
     let metadata = MetadataCommand::new().inherit_stderr().exec().unwrap();
-
     let package = args.packages_filter.match_one(&metadata).unwrap();
-    // println!("Package {:#?}", package);
 
     ScarbCommand::new().arg("build").run().unwrap();
 
@@ -101,14 +98,11 @@ fn main() -> Result<(), Error> {
     //     "#}
     // );
 
-    let service_configuration = match args.service_config {
-        Some(path) => {
-            let file = File::open(path).unwrap();
-            let reader = BufReader::new(file);
-            serde_json::from_reader(reader).unwrap()
-        }
-        None => Configuration::default(),
-    };
+    let lock_output = absolute_path(&package, args.oracle_lock, "oracle_lock", Some(PathBuf::from("Oracle.lock")))
+        .expect("lock path must be provided either as an argument (--oracle-lock src) or in the Scarb.toml file in the [tool.hints] section.");
+    let lock_file = File::open(lock_output).unwrap();
+    let reader = BufReader::new(lock_file);
+    let service_configuration = serde_json::from_reader(reader).unwrap();
 
     let sierra_program = serde_json::from_str::<VersionedProgram>(
         &fs::read_to_string(path.clone())

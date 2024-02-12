@@ -7,3 +7,8 @@ edition = "2023_10"
 
 [dependencies]
 alexandria_math = { git = "https://github.com/keep-starknet-strange/alexandria.git" }
+
+[tool.hints]
+definitions = "../proto/oracle.proto"  # must be provided
+# cairo_output = "src"                 # default "src"
+# oracle_lock = "Oracle.lock"          # default "Oracle.lock"

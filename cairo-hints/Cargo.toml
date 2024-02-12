@@ -19,6 +19,10 @@ path = "scarb-hints-run/main.rs"
 name = "scarb-hints-test"
 path = "scarb-hints-test/main.rs"
 
+[lib]
+name = "scarb_utils"
+path = "scarb-utils/lib.rs"
+
 [dependencies]
 bincode = { version = "2.0.0-rc.3", default-features = false, features = [
     "serde",
