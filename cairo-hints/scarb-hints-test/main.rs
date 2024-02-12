@@ -7,8 +7,6 @@ use anyhow::{Context, Result};
 use cairo_lang_hints_test_runner::{CompiledTestRunner, TestRunConfig};
 use cairo_lang_test_plugin::TestCompilation;
 use clap::Parser;
-
-use cairo_proto_serde::configuration::Configuration;
 use scarb_metadata::{Metadata, MetadataCommand, PackageMetadata, ScarbCommand, TargetMetadata};
 use scarb_ui::args::PackagesFilter;
 
@@ -36,7 +34,7 @@ struct Args {
     oracle_server: Option<String>,
 
     #[arg(long)]
-    service_config: Option<PathBuf>,
+    oracle_lock: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -62,17 +60,14 @@ fn main() -> Result<()> {
         .unwrap_or(default_target_dir)
         .join(profile);
 
-    let service_config = match &args.service_config {
-        Some(path) => {
-            let file = File::open(path).unwrap();
-            let reader = BufReader::new(file);
-            serde_json::from_reader(reader).unwrap()
-        }
-        None => Configuration::default(),
-    };
-
     for package in matched {
         println!("testing {} ...", package.name);
+
+        let lock_output = absolute_path(&package, args.oracle_lock.clone(), "oracle_lock", Some(PathBuf::from("Oracle.lock")))
+            .expect("lock path must be provided either as an argument (--oracle-lock src) or in the Scarb.toml file in the [tool.hints] section.");
+        let lock_file = File::open(lock_output).unwrap();
+        let reader = BufReader::new(lock_file);
+        let service_config = serde_json::from_reader(reader).unwrap();
 
         for target in find_testable_targets(&package) {
             let file_path = target_dir.join(format!("{}.test.json", target.name.clone()));
@@ -118,5 +113,22 @@ fn check_scarb_version(metadata: &Metadata) {
          cairo-test: `{}`, scarb: `{}`",
             app_version, scarb_version
         );
+    }
+}
+
+fn absolute_path(package: &PackageMetadata, arg: Option<PathBuf>, config_key: &str, default: Option<PathBuf>) -> Option<PathBuf> {
+    let manifest_path = package.manifest_path.clone().into_std_path_buf();
+    let project_dir = manifest_path.parent().unwrap();
+
+    let definitions = arg.or_else(|| {
+        package.tool_metadata("hints").and_then(|tool_config| {
+            tool_config[config_key].as_str().map(PathBuf::from)
+        })
+    }).or(default)?;
+
+    if definitions.is_absolute() {
+        Some(definitions)
+    } else {
+        Some(project_dir.join(definitions))
     }
 }

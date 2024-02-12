@@ -10,6 +10,5 @@ alexandria_math = { git = "https://github.com/keep-starknet-strange/alexandria.g
 
 [tool.hints]
 definitions = "../proto/oracle.proto"  # must be provided
-cairo_output = "src"                   # defaults to "src"
-oracle_module = "lib"                  # defaults to "oracle"
-lock_path = "Oracle.lock"              # default value
+# cairo_output = "src"                 # default "src"
+# oracle_lock = "Oracle.lock"          # default "Oracle.lock"

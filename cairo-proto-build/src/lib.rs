@@ -141,7 +141,7 @@ impl fmt::Display for Module {
 pub struct Config {
     boxed: PathMap<()>,
     out_dir: Option<PathBuf>,
-    lock_path: Option<PathBuf>,
+    oracle_lock: Option<PathBuf>,
     default_package_filename: String,
 }
 
@@ -178,11 +178,11 @@ impl Config {
     ///
     /// If unset, defaults to the `OUT_DIR` environment variable. `OUT_DIR` is set by Cargo when
     /// executing build scripts, so `out_dir` typically does not need to be configured.
-    pub fn lock_path<P>(&mut self, path: P) -> &mut Self
+    pub fn oracle_lock<P>(&mut self, path: P) -> &mut Self
     where
         P: Into<PathBuf>,
     {
-        self.lock_path = Some(path.into());
+        self.oracle_lock = Some(path.into());
         self
     }
 
@@ -351,8 +351,8 @@ impl Config {
 
             // Writing the JSON only for files belonging to `protos`
             if list_paths.iter().any(|p| p.contains(component)) {
-                let config_output_path = self.lock_path.as_ref().ok_or_else(|| {
-                    Error::new(ErrorKind::Other, "lock_path configuration option is not set")
+                let config_output_path = self.oracle_lock.as_ref().ok_or_else(|| {
+                    Error::new(ErrorKind::Other, "oracle_lock configuration option is not set")
                 })?;
                 let config_json = serde_json::to_string(&content.1).unwrap();
                 let unchanged_config = fs::read(config_output_path)
@@ -493,7 +493,7 @@ impl default::Default for Config {
         Config {
             boxed: PathMap::default(),
             out_dir: None,
-            lock_path: None,
+            oracle_lock: None,
             default_package_filename: String::from("oracle"),
         }
     }

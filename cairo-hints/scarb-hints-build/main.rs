@@ -22,7 +22,7 @@ struct Args {
     oracle_module: Option<String>,
 
     #[structopt(long)]
-    lock_path: Option<PathBuf>,
+    oracle_lock: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -44,13 +44,13 @@ fn main() -> Result<()> {
         })
     }).unwrap_or("lib.cairo".to_string());
 
-    let lock_output = absolute_path(&package, args.lock_path, "lock_path", Some(PathBuf::from("Oracle.lock")))
-        .expect("lock path must be provided either as an argument (--lock_path src) or in the Scarb.toml file in the [tool.hints] section.");
+    let lock_output = absolute_path(&package, args.oracle_lock, "oracle_lock", Some(PathBuf::from("Oracle.lock")))
+        .expect("lock path must be provided either as an argument (--oracle-lock src) or in the Scarb.toml file in the [tool.hints] section.");
 
     Config::new()
         .out_dir(cairo_output)
         .oracle_module(&oracle_module)
-        .lock_path(lock_output)
+        .oracle_lock(lock_output)
         .compile_protos(
             &[&definitions], 
             &[includes]
