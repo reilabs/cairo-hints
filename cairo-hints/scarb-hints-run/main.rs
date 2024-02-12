@@ -81,6 +81,8 @@ fn main() -> Result<(), Error> {
     let metadata = MetadataCommand::new().inherit_stderr().exec().unwrap();
 
     let package = args.packages_filter.match_one(&metadata).unwrap();
+    println!("metadata {metadata:?}");
+
     // println!("Package {:#?}", package);
 
     ScarbCommand::new().arg("build").run().unwrap();
