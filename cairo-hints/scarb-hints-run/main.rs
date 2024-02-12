@@ -11,8 +11,9 @@ use cairo_oracle_hint_processor::{run_1, Error};
 use camino::Utf8PathBuf;
 use clap::Parser;
 use itertools::Itertools;
-use scarb_metadata::{MetadataCommand, PackageMetadata, ScarbCommand};
+use scarb_metadata::{MetadataCommand, ScarbCommand};
 use scarb_ui::args::PackagesFilter;
+use scarb_utils::absolute_path;
 
 mod deserialization;
 
@@ -153,22 +154,5 @@ fn main() -> Result<(), Error> {
             Ok(())
         }
         Err(err) => Err(err),
-    }
-}
-
-fn absolute_path(package: &PackageMetadata, arg: Option<PathBuf>, config_key: &str, default: Option<PathBuf>) -> Option<PathBuf> {
-    let manifest_path = package.manifest_path.clone().into_std_path_buf();
-    let project_dir = manifest_path.parent().unwrap();
-
-    let definitions = arg.or_else(|| {
-        package.tool_metadata("hints").and_then(|tool_config| {
-            tool_config[config_key].as_str().map(PathBuf::from)
-        })
-    }).or(default)?;
-
-    if definitions.is_absolute() {
-        Some(definitions)
-    } else {
-        Some(project_dir.join(definitions))
     }
 }
