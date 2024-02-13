@@ -7,10 +7,9 @@ use anyhow::{Context, Result};
 use cairo_lang_hints_test_runner::{CompiledTestRunner, TestRunConfig};
 use cairo_lang_test_plugin::TestCompilation;
 use clap::Parser;
-
-use cairo_proto_serde::configuration::Configuration;
 use scarb_metadata::{Metadata, MetadataCommand, PackageMetadata, ScarbCommand, TargetMetadata};
 use scarb_ui::args::PackagesFilter;
+use scarb_utils::absolute_path;
 
 /// Execute all unit tests of a local package.
 #[derive(Parser, Clone, Debug)]
@@ -36,7 +35,7 @@ struct Args {
     oracle_server: Option<String>,
 
     #[arg(long)]
-    service_config: Option<PathBuf>,
+    oracle_lock: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -62,17 +61,14 @@ fn main() -> Result<()> {
         .unwrap_or(default_target_dir)
         .join(profile);
 
-    let service_config = match &args.service_config {
-        Some(path) => {
-            let file = File::open(path).unwrap();
-            let reader = BufReader::new(file);
-            serde_json::from_reader(reader).unwrap()
-        }
-        None => Configuration::default(),
-    };
-
     for package in matched {
         println!("testing {} ...", package.name);
+
+        let lock_output = absolute_path(&package, args.oracle_lock.clone(), "oracle_lock", Some(PathBuf::from("Oracle.lock")))
+            .expect("lock path must be provided either as an argument (--oracle-lock src) or in the Scarb.toml file in the [tool.hints] section.");
+        let lock_file = File::open(lock_output).unwrap();
+        let reader = BufReader::new(lock_file);
+        let service_config = serde_json::from_reader(reader).unwrap();
 
         for target in find_testable_targets(&package) {
             let file_path = target_dir.join(format!("{}.test.json", target.name.clone()));

@@ -133,6 +133,7 @@ impl fmt::Display for Module {
 pub struct Config {
     boxed: PathMap<()>,
     out_dir: Option<PathBuf>,
+    oracle_lock: Option<PathBuf>,
     default_package_filename: String,
 }
 
@@ -142,7 +143,7 @@ impl Config {
         Config::default()
     }
 
-    /// Configures the output directory where generated Rust files will be written.
+    /// Configures the output directory where generated Cairo files will be written.
     ///
     /// If unset, defaults to the `OUT_DIR` environment variable. `OUT_DIR` is set by Cargo when
     /// executing build scripts, so `out_dir` typically does not need to be configured.
@@ -153,6 +154,30 @@ impl Config {
         self.out_dir = Some(path.into());
         self
     }
+
+    /// Configures the output directory where generated Cairo files will be written.
+    ///
+    /// If unset, defaults to the `OUT_DIR` environment variable. `OUT_DIR` is set by Cargo when
+    /// executing build scripts, so `out_dir` typically does not need to be configured.
+    pub fn oracle_module(&mut self, name: &str) -> &mut Self
+    {
+        self.default_package_filename = name.into();
+        self
+    }
+
+
+    /// Configures the output path where generated .lock file will be written.
+    ///
+    /// If unset, defaults to the `OUT_DIR` environment variable. `OUT_DIR` is set by Cargo when
+    /// executing build scripts, so `out_dir` typically does not need to be configured.
+    pub fn oracle_lock<P>(&mut self, path: P) -> &mut Self
+    where
+        P: Into<PathBuf>,
+    {
+        self.oracle_lock = Some(path.into());
+        self
+    }
+
 
     /// Compile `.proto` files into Rust files during a Cargo build with additional code generator
     /// configuration options.
@@ -288,6 +313,7 @@ impl Config {
                 .collect();
 
             // Extract only the json matching the protos
+            fs::create_dir_all(&target)?;
             let code_output_path = target.join(file_name);
 
             let unchanged_code = fs::read(&code_output_path)
@@ -303,9 +329,11 @@ impl Config {
 
             // Writing the JSON only for files belonging to `protos`
             if list_paths.iter().any(|p| p.contains(component)) {
-                let config_output_path = target.join(&format!("{file_name}.json"));
+                let config_output_path = self.oracle_lock.as_ref().ok_or_else(|| {
+                    Error::new(ErrorKind::Other, "oracle_lock configuration option is not set")
+                })?;
                 let config_json = serde_json::to_string(&content.1).unwrap();
-                let unchanged_config = fs::read(&config_output_path)
+                let unchanged_config = fs::read(config_output_path)
                     .map(|previous_content| previous_content == config_json.as_bytes())
                     .unwrap_or(false);
 
@@ -443,6 +471,7 @@ impl default::Default for Config {
         Config {
             boxed: PathMap::default(),
             out_dir: None,
+            oracle_lock: None,
             default_package_filename: String::from("oracle"),
         }
     }
