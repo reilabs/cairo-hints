@@ -82,7 +82,9 @@ impl<'a> Rpc1HintProcessor<'a> {
             ))));
         };
 
-        // println!("Configuration {:#?}", self.configuration);
+        self.server
+            .as_ref()
+            .expect("Please provide an --oracle-server argument to execute hints");
 
         let data = deserialize_cairo_serde(
             self.configuration,
@@ -96,11 +98,35 @@ impl<'a> Rpc1HintProcessor<'a> {
             .post(self.server.as_ref().unwrap())
             .json(&data)
             .send()
+            .map_err(|_| {
+                format!(
+                    "Error sending request to oracle server {}",
+                    self.server.as_ref().unwrap()
+                )
+            })
             .unwrap()
             .json::<Value>()
+            .map_err(|_| {
+                format!(
+                    "Error reading response from oracle server {}",
+                    self.server.as_ref().unwrap()
+                )
+            })
             .unwrap();
 
-        let output = &resp["result"];
+        let resp = resp
+            .as_object()
+            .expect("Error serialising response as object from oracle server.");
+
+        if resp.keys().count() != 1 {
+            panic!(
+                "Response object from oracle server shall contain only the key `result`. More than one key found."
+            )
+        }
+
+        let output = resp
+            .get("result")
+            .expect("Key `result` not found in response from oracle server.");
         let data = serialize_cairo_serde(self.configuration, &configuration.output, output);
         println!("Output: {output}");
         res_segment.write_data(data.iter())?;
@@ -186,7 +212,7 @@ impl<'a> ResourceTracker for Rpc1HintProcessor<'a> {
 }
 
 /// Extracts a parameter assumed to be a buffer, and converts it into a relocatable.
-pub fn extract_relocatable(
+fn extract_relocatable(
     vm: &VirtualMachine,
     buffer: &ResOperand,
 ) -> Result<Relocatable, VirtualMachineError> {
@@ -195,7 +221,7 @@ pub fn extract_relocatable(
 }
 
 /// Loads a range of values from the VM memory.
-pub fn vm_get_range(
+fn vm_get_range(
     vm: &mut VirtualMachine,
     mut calldata_start_ptr: Relocatable,
     calldata_end_ptr: Relocatable,
@@ -210,7 +236,7 @@ pub fn vm_get_range(
 }
 
 /// Wrapper trait for a VM owner.
-pub trait VMWrapper {
+trait VMWrapper {
     fn vm(&mut self) -> &mut VirtualMachine;
 }
 impl VMWrapper for VirtualMachine {
@@ -220,7 +246,7 @@ impl VMWrapper for VirtualMachine {
 }
 
 /// A helper struct to continuously write and read from a buffer in the VM memory.
-pub struct MemBuffer<'a> {
+struct MemBuffer<'a> {
     /// The VM to write to.
     /// This is a trait so that we would borrow the actual VM only once.
     vm: &'a mut dyn VMWrapper,

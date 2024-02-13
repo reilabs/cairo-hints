@@ -56,8 +56,6 @@ impl<'a> CodeGenerator<'a> {
         code_buf: &mut String,
         serde_config: &mut Configuration,
     ) {
-        // println!("{:#?}", file);
-
         let source_info = file.source_code_info.map(|mut s| {
             s.location.retain(|loc| {
                 let len = loc.path.len();
@@ -359,8 +357,6 @@ impl<'a> CodeGenerator<'a> {
             ty,
             boxed
         );
-
-        // println!("append_field {:#?}", fq_message_name);
 
         if deprecated {
             self.push_indent();

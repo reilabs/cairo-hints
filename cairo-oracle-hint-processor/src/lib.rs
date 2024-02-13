@@ -181,7 +181,8 @@ pub fn run_1(
     let casm_program =
         cairo_lang_sierra_to_casm::compiler::compile(sierra_program, &metadata, gas_usage_check)?;
 
-    let entry_func = find_function(sierra_program, entry_func_name).unwrap();
+    let entry_func = find_function(sierra_program, entry_func_name)
+        .expect(format!("Missing entry point {entry_func_name} in cairo file.").as_str());
 
     let initial_gas = 9999999999999_usize;
 
@@ -233,7 +234,6 @@ pub fn run_1(
     )?;
 
     let proof_mode = false;
-    // println!("Entrypoint {:#?}", &program); //program.shared_program_data.main
     let mut runner = CairoRunner::new(&program, layout, proof_mode).unwrap();
     let mut vm = VirtualMachine::new(trace_file.is_some());
     let end = runner.initialize(&mut vm).unwrap();

@@ -1,3 +1,3 @@
 fn main() {
-    println!("Hello hints-new")
+    todo!("Scarb-hints-new")
 }

@@ -159,12 +159,10 @@ impl Config {
     ///
     /// If unset, defaults to the `OUT_DIR` environment variable. `OUT_DIR` is set by Cargo when
     /// executing build scripts, so `out_dir` typically does not need to be configured.
-    pub fn oracle_module(&mut self, name: &str) -> &mut Self
-    {
+    pub fn oracle_module(&mut self, name: &str) -> &mut Self {
         self.default_package_filename = name.into();
         self
     }
-
 
     /// Configures the output path where generated .lock file will be written.
     ///
@@ -177,7 +175,6 @@ impl Config {
         self.oracle_lock = Some(path.into());
         self
     }
-
 
     /// Compile `.proto` files into Rust files during a Cargo build with additional code generator
     /// configuration options.
@@ -330,7 +327,10 @@ impl Config {
             // Writing the JSON only for files belonging to `protos`
             if list_paths.iter().any(|p| p.contains(component)) {
                 let config_output_path = self.oracle_lock.as_ref().ok_or_else(|| {
-                    Error::new(ErrorKind::Other, "oracle_lock configuration option is not set")
+                    Error::new(
+                        ErrorKind::Other,
+                        "oracle_lock configuration option is not set",
+                    )
                 })?;
                 let config_json = serde_json::to_string(&content.1).unwrap();
                 let unchanged_config = fs::read(config_output_path)
@@ -368,8 +368,6 @@ impl Config {
         let extern_paths = ExternPaths::new(&[], true)
             .map_err(|error| Error::new(ErrorKind::InvalidInput, error))?;
 
-        // println!("generate {:#?}", requests);
-
         for (request_module, request_fd) in requests {
             // Only record packages that have services
             if !request_fd.service.is_empty() {
@@ -394,8 +392,6 @@ impl Config {
                 modules.remove(&request_module);
             }
         }
-
-        // println!("generate {:#?}", modules);
 
         for p in protos {
             let path = p.as_ref().to_str().unwrap().to_string();

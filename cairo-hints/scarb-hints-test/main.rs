@@ -36,6 +36,24 @@ struct Args {
 
     #[arg(long)]
     oracle_lock: Option<PathBuf>,
+
+    #[clap(long = "layout", default_value = "plain", value_parser=validate_layout)]
+    layout: String,
+}
+
+fn validate_layout(value: &str) -> Result<String, String> {
+    match value {
+        "plain"
+        | "small"
+        | "dex"
+        | "starknet"
+        | "starknet_with_keccak"
+        | "recursive_large_output"
+        | "all_cairo"
+        | "all_solidity"
+        | "dynamic" => Ok(value.to_string()),
+        _ => Err(format!("{value} is not a valid layout")),
+    }
 }
 
 fn main() -> Result<()> {
@@ -66,9 +84,9 @@ fn main() -> Result<()> {
 
         let lock_output = absolute_path(&package, args.oracle_lock.clone(), "oracle_lock", Some(PathBuf::from("Oracle.lock")))
             .expect("lock path must be provided either as an argument (--oracle-lock src) or in the Scarb.toml file in the [tool.hints] section.");
-        let lock_file = File::open(lock_output).unwrap();
+        let lock_file = File::open(lock_output)?;
         let reader = BufReader::new(lock_file);
-        let service_config = serde_json::from_reader(reader).unwrap();
+        let service_config = serde_json::from_reader(reader)?;
 
         for target in find_testable_targets(&package) {
             let file_path = target_dir.join(format!("{}.test.json", target.name.clone()));
@@ -84,7 +102,7 @@ fn main() -> Result<()> {
                 ignored: args.ignored,
             };
             let runner = CompiledTestRunner::new(test_compilation, config);
-            runner.run(&args.oracle_server, &service_config)?;
+            runner.run(&args.oracle_server, &service_config, &args.layout)?;
             println!();
         }
     }
@@ -110,8 +128,8 @@ fn check_scarb_version(metadata: &Metadata) {
         .to_string();
     if app_version != scarb_version {
         println!(
-            "warn: the version of cairo-test does not match the version of scarb.\
-         cairo-test: `{}`, scarb: `{}`",
+            "warn: the version of scarb-hints-test does not match the version of scarb. \
+         scarb-hints-test: `{}`, scarb: `{}`",
             app_version, scarb_version
         );
     }
