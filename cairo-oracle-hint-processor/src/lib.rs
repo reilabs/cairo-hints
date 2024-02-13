@@ -157,7 +157,7 @@ impl FileWriter {
 pub fn run_1(
     service_config: &Configuration,
     oracle_server: &Option<String>,
-    layout: &String,
+    layout: &str,
     trace_file: &Option<PathBuf>,
     memory_file: &Option<PathBuf>,
     sierra_program: &SierraProgram,

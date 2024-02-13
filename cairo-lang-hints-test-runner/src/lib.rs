@@ -308,7 +308,7 @@ pub fn run_tests(
                 let r = run_1(
                     configuration,
                     oracle_server,
-                    &"all_cairo".to_string(),
+                    "all_cairo",
                     &None,
                     &None,
                     &sierra_program,

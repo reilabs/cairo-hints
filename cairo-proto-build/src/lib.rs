@@ -33,33 +33,29 @@ mod path;
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[allow(dead_code)]
+#[derive(Default)]
 enum MapType {
+    #[default]
     HashMap,
     BTreeMap,
 }
 
-impl Default for MapType {
-    fn default() -> MapType {
-        MapType::HashMap
-    }
-}
+
 
 /// The bytes collection type to output for Protobuf `bytes` fields.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[allow(dead_code)]
+#[derive(Default)]
 enum BytesType {
     /// The [`alloc::collections::Vec::<u8>`] type.
+    #[default]
     Vec,
     /// The [`bytes::Bytes`] type.
     Bytes,
 }
 
-impl Default for BytesType {
-    fn default() -> BytesType {
-        BytesType::Vec
-    }
-}
+
 
 /// A Rust module path for a Protobuf package.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]

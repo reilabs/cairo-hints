@@ -56,7 +56,7 @@ fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
                 .split_last()
                 .unwrap()
                 .1
-                .into_iter()
+                .iter()
                 .map(|e| e.to_bytes_be())
                 .collect();
             json!(String::from_utf8(v.concat()).unwrap())
@@ -85,9 +85,7 @@ pub fn serialize_cairo_serde(
     match ty {
         FieldType::Primitive(ty) => result.append(&mut serialize_primitive(ty, value)),
         FieldType::Message(message_ty) => {
-            let message_config = config.messages.get(message_ty).expect(
-                format!("Key `{}` not found in configuration JSON file", message_ty).as_str(),
-            );
+            let message_config = config.messages.get(message_ty).unwrap_or_else(|| panic!("Key `{}` not found in configuration JSON file", message_ty));
             let value = value
                 .as_object()
                 .expect("must be an object to serialize as message {message_ty}");
@@ -105,7 +103,7 @@ pub fn serialize_cairo_serde(
                 result.append(&mut serialize_primitive(&PrimitiveType::U64, &json!(1)));
             } else {
                 result.append(&mut serialize_primitive(&PrimitiveType::U64, &json!(0)));
-                result.append(&mut serialize_cairo_serde(config, &inner_ty, value));
+                result.append(&mut serialize_cairo_serde(config, inner_ty, value));
             }
         }
         FieldType::Array(value_ty) => {
@@ -115,7 +113,7 @@ pub fn serialize_cairo_serde(
                 &json!(value.len()),
             ));
             for element in value {
-                result.append(&mut serialize_cairo_serde(config, &value_ty, element));
+                result.append(&mut serialize_cairo_serde(config, value_ty, element));
             }
         }
     }
@@ -135,9 +133,7 @@ pub fn deserialize_cairo_serde(
     match ty {
         FieldType::Primitive(ty) => deserialize_primitive(ty, value),
         FieldType::Message(message_ty) => {
-            let message_config = config.messages.get(message_ty).expect(
-                format!("Key `{}` not found in configuration JSON file", message_ty).as_str(),
-            );
+            let message_config = config.messages.get(message_ty).unwrap_or_else(|| panic!("Key `{}` not found in configuration JSON file", message_ty));
             let mut result = Map::new();
             for field in message_config {
                 result.insert(
@@ -151,7 +147,7 @@ pub fn deserialize_cairo_serde(
         FieldType::Option(inner_ty) => {
             let idx = deserialize_primitive(&PrimitiveType::U64, value);
             if idx == 0 {
-                deserialize_cairo_serde(config, &inner_ty, value)
+                deserialize_cairo_serde(config, inner_ty, value)
             } else {
                 Value::Null
             }
@@ -164,7 +160,7 @@ pub fn deserialize_cairo_serde(
                 .unwrap() as usize;
             let mut result = Vec::new();
             for _i in 0..len {
-                result.push(deserialize_cairo_serde(config, &value_ty, value));
+                result.push(deserialize_cairo_serde(config, value_ty, value));
             }
             Value::Array(result)
         }
