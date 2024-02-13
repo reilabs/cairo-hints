@@ -381,16 +381,6 @@ fn find_function<'a>(
         .ok_or_else(|| VMError::MissingMain)
 }
 
-// /// Creates a list of instructions that will be appended to the program's bytecode.
-// fn create_code_footer() -> Vec<Instruction> {
-//     casm! {
-//         // Add a `ret` instruction used in libfuncs that retrieve the current value of the `fp`
-//         // and `pc` registers.
-//         ret;
-//     }
-//     .instructions
-// }
-
 /// Returns the instructions to add to the beginning of the code to successfully call the main
 /// function, as well as the builtins required to execute the program.
 fn create_entry_code(

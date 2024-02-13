@@ -23,3 +23,17 @@ It uses protocol buffers to define messages shared between Cairo and RPC server,
 
 ## Example Project
 [See example project](https://github.com/reilabs/cairo-hints/tree/main/examples/hints_poc)
+
+
+## Testing
+Prerequisite for testing is to download the correct version of `corelib`. Execute the following commands for the root folder of this repo:
+```bash
+git clone https://github.com/starkware-libs/cairo.git
+cd cairo
+git checkout v2.5.3
+cd ..
+mv cairo/corelib/ .
+rm -rf cairo
+```
+
+To run all tests execute the following command `cargo test --workspace --no-fail-fast`.
