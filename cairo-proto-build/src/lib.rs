@@ -40,8 +40,6 @@ enum MapType {
     BTreeMap,
 }
 
-
-
 /// The bytes collection type to output for Protobuf `bytes` fields.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -54,8 +52,6 @@ enum BytesType {
     /// The [`bytes::Bytes`] type.
     Bytes,
 }
-
-
 
 /// A Rust module path for a Protobuf package.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -273,20 +269,6 @@ impl Config {
     ///
     /// This method is like `compile_protos` function except it does not invoke `protoc`
     /// and instead requires the user to supply a [`FileDescriptorSet`].
-    ///
-    /// # Example `build.rs`
-    ///
-    /// ```rust,no_run
-    /// # use cairo_proto_build::Config;
-    /// # use prost_types::FileDescriptorSet;
-    /// # fn fds() -> FileDescriptorSet { todo!() }
-    /// fn main() -> std::io::Result<()> {
-    ///   let file_descriptor_set = fds();
-    ///
-    ///   Config::new()
-    ///     .compile_fds(file_descriptor_set)
-    /// }
-    /// ```
     pub fn compile_fds(
         &mut self,
         protos: &[impl AsRef<Path>],
