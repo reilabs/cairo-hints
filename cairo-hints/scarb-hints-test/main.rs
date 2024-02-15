@@ -61,8 +61,6 @@ fn main() -> Result<()> {
 
     let metadata = MetadataCommand::new().inherit_stderr().exec()?;
 
-    check_scarb_version(&metadata);
-
     let matched = args.packages_filter.match_many(&metadata)?;
     let filter = PackagesFilter::generate_for::<Metadata>(matched.iter());
     ScarbCommand::new()
@@ -116,21 +114,4 @@ fn find_testable_targets(package: &PackageMetadata) -> Vec<&TargetMetadata> {
         .iter()
         .filter(|target| target.kind == "test")
         .collect()
-}
-
-fn check_scarb_version(metadata: &Metadata) {
-    let app_version = env!("CARGO_PKG_VERSION").to_string();
-    let scarb_version = metadata
-        .app_version_info
-        .clone()
-        .version
-        .clone()
-        .to_string();
-    if app_version != scarb_version {
-        println!(
-            "warn: the version of scarb-hints-test does not match the version of scarb. \
-         scarb-hints-test: `{}`, scarb: `{}`",
-            app_version, scarb_version
-        );
-    }
 }
