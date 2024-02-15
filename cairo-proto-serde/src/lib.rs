@@ -9,18 +9,26 @@ pub mod configuration;
 
 fn serialize_primitive(ty: &PrimitiveType, value: &Value) -> Vec<Felt252> {
     let element = match ty {
-        PrimitiveType::U64 => {
-            Felt252::from(value.as_u64().expect("Error converting {value} to u64"))
-        }
-        PrimitiveType::U32 => {
-            Felt252::from(value.as_u64().expect("Error converting {value} to u64"))
-        }
-        PrimitiveType::I32 => {
-            Felt252::from(value.as_i64().expect("Error converting {value} to i64"))
-        }
-        PrimitiveType::I64 => {
-            Felt252::from(value.as_i64().expect("Error converting {value} to i64"))
-        }
+        PrimitiveType::U64 => Felt252::from(
+            value
+                .as_u64()
+                .expect(format!("Error converting {value:?} to u64").as_str()),
+        ),
+        PrimitiveType::U32 => Felt252::from(
+            value
+                .as_u64()
+                .expect(format!("Error converting {value:?} to u64").as_str()),
+        ),
+        PrimitiveType::I32 => Felt252::from(
+            value
+                .as_i64()
+                .expect(format!("Error converting {value:?} to i64").as_str()),
+        ),
+        PrimitiveType::I64 => Felt252::from(
+            value
+                .as_i64()
+                .expect(format!("Error converting {value:?} to i64").as_str()),
+        ),
         PrimitiveType::BYTEARRAY => {
             let mut p = Vec::new();
             let bytes = value.as_str().unwrap().as_bytes();
@@ -39,9 +47,11 @@ fn serialize_primitive(ty: &PrimitiveType, value: &Value) -> Vec<Felt252> {
             p.push(Felt252::from(last_row_length));
             return p;
         }
-        PrimitiveType::BOOL => {
-            Felt252::from(value.as_bool().expect("Error converting {value} to bool"))
-        }
+        PrimitiveType::BOOL => Felt252::from(
+            value
+                .as_bool()
+                .expect(format!("Error converting {value} to bool").as_str()),
+        ),
     };
     vec![element]
 }
@@ -51,10 +61,18 @@ fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
     *value = &value[1..];
 
     match ty {
-        PrimitiveType::U64 => json!(u64::try_from(num).expect("Error converting {value} to u64")),
-        PrimitiveType::U32 => json!(u32::try_from(num).expect("Error converting {value} to u32")),
-        PrimitiveType::I32 => json!(i32::try_from(num).expect("Error converting {value} to i32")),
-        PrimitiveType::I64 => json!(i64::try_from(num).expect("Error converting {value} to i64")),
+        PrimitiveType::U64 => {
+            json!(u64::try_from(num).expect(format!("Error converting {value:?} to u64").as_str()))
+        }
+        PrimitiveType::U32 => {
+            json!(u32::try_from(num).expect(format!("Error converting {value:?} to u32").as_str()))
+        }
+        PrimitiveType::I32 => {
+            json!(i32::try_from(num).expect(format!("Error converting {value:?} to i32").as_str()))
+        }
+        PrimitiveType::I64 => {
+            json!(i64::try_from(num).expect(format!("Error converting {value:?} to i64").as_str()))
+        }
         PrimitiveType::BYTEARRAY => {
             let v: Vec<Vec<u8>> = value
                 .to_vec()
@@ -87,13 +105,12 @@ pub fn serialize_cairo_serde(
     match ty {
         FieldType::Primitive(ty) => result.append(&mut serialize_primitive(ty, value)),
         FieldType::Message(message_ty) => {
-            let message_config = config
-                .messages
-                .get(message_ty)
-                .expect("Key `{message_ty}` not found in configuration JSON file");
+            let message_config = config.messages.get(message_ty).expect(
+                format!("Key `{message_ty}` not found in configuration JSON file").as_str(),
+            );
             let value = value
                 .as_object()
-                .expect("must be an object to serialize as message {message_ty}");
+                .expect(format!("must be an object to serialize as message {message_ty}").as_str());
             for field in message_config {
                 result.append(&mut serialize_cairo_serde(
                     config,
@@ -134,10 +151,9 @@ pub fn deserialize_cairo_serde(
     match ty {
         FieldType::Primitive(ty) => deserialize_primitive(ty, value),
         FieldType::Message(message_ty) => {
-            let message_config = config
-                .messages
-                .get(message_ty)
-                .expect("Key `{message_ty}` not found in configuration JSON file");
+            let message_config = config.messages.get(message_ty).expect(
+                format!("Key `{message_ty}` not found in configuration JSON file").as_str(),
+            );
             let mut result = Map::new();
             for field in message_config {
                 result.insert(

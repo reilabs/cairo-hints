@@ -1,7 +1,6 @@
 //! Mostly [`fs`] extensions with extra error messaging.
 
 use std::fs;
-use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context, Result};
@@ -35,27 +34,6 @@ pub fn create_dir_all(p: impl AsRef<Path>) -> Result<()> {
     }
 }
 
-/// Equivalent to [`fs::remove_file`] with better error messages.
-pub fn remove_file(p: impl AsRef<Path>) -> Result<()> {
-    return inner(p.as_ref());
-
-    fn inner(p: &Path) -> Result<()> {
-        fs::remove_file(p).with_context(|| format!("failed to remove file `{}`", p.display()))?;
-        Ok(())
-    }
-}
-
-/// Equivalent to [`fs::remove_dir_all`] with better error messages.
-pub fn remove_dir_all(p: impl AsRef<Path>) -> Result<()> {
-    return inner(p.as_ref());
-
-    fn inner(p: &Path) -> Result<()> {
-        fs::remove_dir_all(p)
-            .with_context(|| format!("failed to remove directory `{}`", p.display()))?;
-        Ok(())
-    }
-}
-
 /// Equivalent to [`fs::write`] with better error messages.
 pub fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> Result<()> {
     return inner(path.as_ref(), contents.as_ref());
@@ -63,92 +41,6 @@ pub fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> Result<()> {
     fn inner(path: &Path, contents: &[u8]) -> Result<()> {
         fs::write(path, contents).with_context(|| format!("failed to write `{}`", path.display()))
     }
-}
-
-/// Equivalent to [`File::create`] with better error messages.
-pub fn create(path: impl AsRef<Path>) -> Result<File> {
-    return inner(path.as_ref());
-
-    fn inner(path: &Path) -> Result<File> {
-        File::create(path).with_context(|| format!("failed to create `{}`", path.display()))
-    }
-}
-
-/// Equivalent to [`fs::read`] with better error messages.
-pub fn read(path: impl AsRef<Path>) -> Result<Vec<u8>> {
-    return inner(path.as_ref());
-
-    fn inner(path: &Path) -> Result<Vec<u8>> {
-        fs::read(path).with_context(|| format!("failed to read `{}`", path.display()))
-    }
-}
-
-/// Equivalent to [`fs::read_to_string`] with better error messages.
-pub fn read_to_string(path: impl AsRef<Path>) -> Result<String> {
-    return inner(path.as_ref());
-
-    fn inner(path: &Path) -> Result<String> {
-        fs::read_to_string(path).with_context(|| format!("failed to read `{}`", path.display()))
-    }
-}
-
-/// Equivalent to [`fs::rename`] with better error messages.
-pub fn rename(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<()> {
-    return inner(from.as_ref(), to.as_ref());
-
-    fn inner(from: &Path, to: &Path) -> Result<()> {
-        fs::rename(from, to).with_context(|| format!("failed to rename file: {}", from.display()))
-    }
-}
-
-/// Equivalent to [`fs::copy`] with better error messages.
-pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<u64> {
-    return inner(from.as_ref(), to.as_ref());
-
-    fn inner(from: &Path, to: &Path) -> Result<u64> {
-        fs::copy(from, to)
-            .with_context(|| format!("failed to copy file {} to {}", from.display(), to.display()))
-    }
-}
-
-#[cfg(unix)]
-pub fn is_executable<P: AsRef<Path>>(path: P) -> bool {
-    use std::os::unix::prelude::*;
-    fs::metadata(path)
-        .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
-        .unwrap_or(false)
-}
-
-#[cfg(windows)]
-pub fn is_executable<P: AsRef<Path>>(path: P) -> bool {
-    path.as_ref().is_file()
-}
-
-#[cfg(unix)]
-pub fn is_hidden(entry: impl AsRef<Path>) -> bool {
-    is_hidden_by_dot(entry)
-}
-
-#[cfg(windows)]
-pub fn is_hidden(entry: impl AsRef<Path>) -> bool {
-    use std::os::windows::prelude::*;
-
-    let is_hidden = fs::metadata(entry.as_ref())
-        .ok()
-        .map(|metadata| metadata.file_attributes())
-        .map(|attributes| (attributes & 0x2) > 0)
-        .unwrap_or(false);
-
-    is_hidden || is_hidden_by_dot(entry)
-}
-
-fn is_hidden_by_dot(entry: impl AsRef<Path>) -> bool {
-    entry
-        .as_ref()
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .map(|s| s.starts_with('.'))
-        .unwrap_or(false)
 }
 
 pub trait PathUtf8Ext {

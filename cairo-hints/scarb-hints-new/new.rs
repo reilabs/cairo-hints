@@ -1,17 +1,23 @@
 use crate::{fsx, restricted_names};
 use anyhow::{bail, ensure, Context, Result};
-use cairo_lang_filesystem::db::Edition;
 use camino::{Utf8Path, Utf8PathBuf};
 use indoc::{formatdoc, indoc};
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use scarb::core::{edition_variant, Config, PackageName};
+use scarb::core::{Config, PackageName};
 use scarb::ops;
 
-pub static DEFAULT_SOURCE_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["cairo", "src", "lib.cairo"].iter().collect());
 pub const DEFAULT_TARGET_DIR_NAME: &str = "target";
-pub const MANIFEST_FILE_NAME: &str = "Scarb.toml";
+pub const CAIRO_SOURCE_PATH: Lazy<Utf8PathBuf> =
+    Lazy::new(|| ["cairo", "src", "lib.cairo"].iter().collect());
+pub const CAIRO_MANIFEST_PATH: Lazy<Utf8PathBuf> =
+    Lazy::new(|| ["cairo", "Scarb.toml"].iter().collect());
+pub const PROTO_SOURCE_PATH: Lazy<Utf8PathBuf> =
+    Lazy::new(|| ["proto", "oracle.proto"].iter().collect());
+pub const SERVER_SOURCE_PATH: Lazy<Utf8PathBuf> =
+    Lazy::new(|| ["rust", "src", "main.rs"].iter().collect());
+pub const SERVER_MANIFEST_PATH: Lazy<Utf8PathBuf> =
+    Lazy::new(|| ["rust", "Cargo.toml"].iter().collect());
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VersionControl {
@@ -54,27 +60,6 @@ pub fn new_package(opts: InitOptions, config: &Config) -> Result<NewResult> {
         config,
     )
     .with_context(|| format!("failed to create package `{name}` at: {}", opts.path))?;
-
-    Ok(NewResult { name })
-}
-
-pub fn init_package(opts: InitOptions, config: &Config) -> Result<NewResult> {
-    ensure!(
-        !opts.path.join(MANIFEST_FILE_NAME).exists(),
-        "`scarb init` cannot be run on existing Scarb packages"
-    );
-
-    let name = infer_name(opts.name, &opts.path, config)?;
-
-    mk(
-        MkOpts {
-            path: opts.path,
-            name: name.clone(),
-            version_control: opts.vcs,
-        },
-        config,
-    )
-    .with_context(|| format!("failed to create package: {name}"))?;
 
     Ok(NewResult { name })
 }
@@ -131,29 +116,34 @@ fn mk(
     fsx::create_dir_all(&path)?;
 
     let canonical_path = fsx::canonicalize_utf8(&path).unwrap_or(path);
-
     init_vcs(&canonical_path, version_control)?;
     write_vcs_ignore(&canonical_path, config, version_control)?;
 
     // Create the `Scarb.toml` file.
-    let manifest_path = canonical_path.join(MANIFEST_FILE_NAME);
-    let edition = edition_variant(Edition::latest());
-    fsx::write(
-        &manifest_path,
-        formatdoc! {r#"
+    let manifest_path = canonical_path.join(CAIRO_MANIFEST_PATH.as_path());
+    if !manifest_path.exists() {
+        fsx::create_dir_all(manifest_path.parent().unwrap())?;
+
+        fsx::write(
+            &manifest_path,
+            formatdoc! {r#"
             [package]
             name = "{name}"
             version = "0.1.0"
-            edition = "{edition}"
+            edition = "2023_10"
 
             # See more keys and their definitions at https://docs.swmansion.com/scarb/docs/reference/manifest.html
 
             [dependencies]
-        "#},
-    )?;
 
-    // Create hello world source files (with respective parent directories) if none exist.
-    let source_path = canonical_path.join(DEFAULT_SOURCE_PATH.as_path());
+            [tool.hints]
+            definitions = "../proto/oracle.proto"  # must be provided
+        "#},
+        )?;
+    }
+
+    // Create the `lib.cairo` file.
+    let source_path = canonical_path.join(CAIRO_SOURCE_PATH.as_path());
     if !source_path.exists() {
         fsx::create_dir_all(source_path.parent().unwrap())?;
 
@@ -176,6 +166,142 @@ fn mk(
         )?;
     }
 
+    // Create the `oracle.proto` file.
+    let proto_path = canonical_path.join(PROTO_SOURCE_PATH.as_path());
+    if !proto_path.exists() {
+        fsx::create_dir_all(proto_path.parent().unwrap())?;
+
+        fsx::write(
+            proto_path,
+            indoc! {r#"
+                syntax = "proto3";
+
+                package oracle;
+
+                message Request {
+                    uint64 n = 1;
+                }
+
+                message Response {
+                    uint64 n = 1;
+                }
+
+                service SqrtOracle {
+                    rpc Sqrt(Request) returns (Response);
+                }
+            "#},
+        )?;
+    }
+
+    // Create the `main.rs` file.
+    let server_path = canonical_path.join(SERVER_SOURCE_PATH.as_path());
+    if !server_path.exists() {
+        fsx::create_dir_all(server_path.parent().unwrap())?;
+
+        fsx::write(
+            server_path,
+            indoc! {r#"
+                use axum::{
+                    extract,
+                    routing::post,
+                    Router,
+                    Json,
+                };
+                use serde::{Serialize, Deserialize};
+                use tracing::debug;
+                use tower_http::trace::TraceLayer;
+
+                #[derive(Debug, Deserialize)]
+                struct Request {
+                    n: u64,
+                }
+
+                #[derive(Debug, Serialize)]
+                struct JsonResult {
+                    result: Response
+                }
+
+                #[derive(Debug, Serialize)]
+                struct Response {
+                    n: u64,
+                }
+
+                async fn root(extract::Json(payload): extract::Json<Request>) -> Json<JsonResult> {
+                    debug!("received payload {payload:?}");
+                    let n = (payload.n as f64).sqrt() as u64;
+                    Json(JsonResult { result: Response { n } })
+                }
+
+                #[tokio::main(flavor = "current_thread")]
+                async fn main() {
+                    tracing_subscriber::fmt()
+                        .with_max_level(tracing::Level::DEBUG)
+                        .init();
+
+                    let app = Router::new()
+                        .route("/", post(root))
+                        .layer(TraceLayer::new_for_http());
+
+                    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+                    debug!("Server started on http://0.0.0.0:3000");
+                    axum::serve(listener, app).await.unwrap();
+                }
+            "#},
+        )?;
+    }
+
+    // Create the `cargo.toml` file.
+    let server_manifest_path = canonical_path.join(SERVER_MANIFEST_PATH.as_path());
+    if !server_manifest_path.exists() {
+        fsx::create_dir_all(server_manifest_path.parent().unwrap())?;
+
+        fsx::write(
+            &server_manifest_path,
+            formatdoc! {r#"
+                [package]
+                name = "{name}-rpc-server"
+                version = "0.1.0"
+                edition = "2021"
+
+                [dependencies]
+                axum = "0.7.3"
+                serde = {{ version = "1.0.195", features = ["serde_derive"] }}
+                serde_repr = "0.1.18"
+                tokio = "1.35.1"
+                tower-http = {{ version = "0.5.0", features = ["trace"] }}
+                tracing = "0.1.40"
+                tracing-subscriber = "0.3.18"
+            "#},
+        )?;
+    }
+
+    let readme_path = canonical_path.join("README.md");
+    if !readme_path.exists() {
+        fsx::create_dir_all(readme_path.parent().unwrap())?;
+
+        fsx::write(
+            &readme_path,
+            formatdoc! {r#"
+                # Example Project
+
+                It calculates `sqrt` using an RPC server implemented in Rust.
+
+                ## Usage
+
+                1. Follow [installation guide from cairo-hints](https://github.com/reilabs/cairo-hints/tree/main?tab=readme-ov-file#cairo-1-hints).
+                2. `cd {name}/cairo`
+                3. Run `scarb hints-build`
+                4. In a new shell tab
+                    * `cd {name}/rust; cargo run`
+                5. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --trace_file lib.trace --memory_file lib.memory --layout all_cairo`
+
+                ## Testing
+
+                The command for running tests is: `scarb hints-test --oracle-server http://127.0.0.1:3000 --layout all_cairo`
+            "#},
+        )?;
+    }
+
     if let Err(err) = ops::read_workspace(&manifest_path, config) {
         config.ui().warn(formatdoc! {r#"
             compiling this new package may not work due to invalid workspace configuration
@@ -187,7 +313,7 @@ fn mk(
     Ok(())
 }
 
-fn init_vcs(path: &Utf8Path, vcs: VersionControl) -> Result<()> {
+fn init_vcs(_path: &Utf8Path, vcs: VersionControl) -> Result<()> {
     match vcs {
         VersionControl::Git => {
             todo!()

@@ -1459,6 +1459,7 @@ dependencies = [
  "reqwest",
  "scarb-metadata 1.11.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "scarb-ui 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde",
  "serde_json",
  "starknet-types-core",
  "thiserror",

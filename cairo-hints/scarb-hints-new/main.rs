@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Error, Result};
 use camino::Utf8PathBuf;
 use clap::Parser;
 use new::{new_package, InitOptions, VersionControl};
@@ -16,10 +16,17 @@ struct Args {
     path: Utf8PathBuf,
     #[clap(long = "name", value_parser)]
     name: Option<PackageName>,
-    #[clap(long = "rust", value_parser)]
-    rust: bool,
-    #[clap(long = "js", value_parser)]
-    js: bool,
+    #[clap(long = "lang", value_parser=validate_lang)]
+    lang: String,
+}
+
+fn validate_lang(value: &str) -> Result<String, String> {
+    match value {
+        "js" | "rust" => Ok(value.to_string()),
+        _ => Err(format!(
+            "{value} is not a supported language. Choose `rust` or `js`."
+        )),
+    }
 }
 
 /// Arguments accepted by the `init` command.
@@ -58,10 +65,12 @@ pub fn run(args: NewArgs, config: &Config) -> Result<()> {
         config,
     )?;
 
-    // config
-    //     .ui()
-    //     .print(format!("Created `{}` package.", result.name));
     Ok(())
+}
+
+fn exit_with_error(err: Error) {
+    println!("Encountered error {}", err);
+    std::process::exit(1);
 }
 
 fn main() {
@@ -76,7 +85,8 @@ fn main() {
             no_vcs: true,
         },
     };
-    let _ = run(new_args, &config);
 
-    todo!("Scarb-hints-new")
+    if let Err(err) = run(new_args, &config) {
+        exit_with_error(err);
+    }
 }
