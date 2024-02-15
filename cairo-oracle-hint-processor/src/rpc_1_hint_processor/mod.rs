@@ -1,6 +1,3 @@
-use core::any::Any;
-use std::collections::HashMap;
-
 use crate::hint_processor_utils::{cell_ref_to_relocatable, extract_buffer, get_ptr};
 use crate::insert_value_to_cellref;
 use cairo_lang_casm::{
@@ -26,7 +23,11 @@ use cairo_vm::{
         vm_core::VirtualMachine,
     },
 };
+use core::any::Any;
+use indoc::formatdoc;
+use itertools::Itertools;
 use serde_json::Value;
+use std::collections::HashMap;
 
 /// HintProcessor for Cairo 1 compiler hints.
 pub struct Rpc1HintProcessor<'a> {
@@ -82,7 +83,9 @@ impl<'a> Rpc1HintProcessor<'a> {
             ))));
         };
 
-        // println!("Configuration {:#?}", self.configuration);
+        let server_url = self.server.as_ref().expect(
+            format!("Please provide an --oracle-server argument to execute hints").as_str(),
+        );
 
         let data = deserialize_cairo_serde(
             self.configuration,
@@ -92,15 +95,66 @@ impl<'a> Rpc1HintProcessor<'a> {
         println!("let the oracle decide... Inputs: {data:?}");
 
         let client = reqwest::blocking::Client::new();
-        let resp = client
-            .post(self.server.as_ref().unwrap())
+
+        let req = client
+            .post(server_url)
             .json(&data)
             .send()
-            .unwrap()
-            .json::<Value>()
+            .expect(format!("Error sending request to oracle server {server_url}").as_str());
+
+        let status_code = req.error_for_status_ref().map(|_| ());
+        let body = req.text().expect(
+            formatdoc! {
+                r#"
+                Response from oracle server can't be parsed as string."#
+            }
+            .as_str(),
+        );
+
+        status_code.expect(
+            formatdoc! {
+                r#"
+                Received {body:?}.
+                Response status from oracle server not successful."#
+            }
+            .as_str(),
+        );
+
+        let body = serde_json::from_str::<Value>(body.as_str()).expect(
+            formatdoc! {
+                r#"
+                Received {body:?}.
+                Error converting response from oracle server {server_url} to JSON."#
+            }
+            .as_str(),
+        );
+
+        let body = body.as_object().expect(
+            formatdoc! {r#"
+                Received {body:?}.
+                Error serialising response as object from oracle server.
+            "#}
+            .as_str(),
+        );
+
+        body.keys()
+            .exactly_one()
+            .map_err(|_| {
+                formatdoc! {r#"
+                    Received {body:?}.
+                    Expected response format from oracle server is {{"result": <response_object>}}.
+                "#}
+            })
             .unwrap();
 
-        let output = &resp["result"];
+        let output = body.get("result").expect(
+            formatdoc! {r#"
+                Received {body:?}.
+                Expected response format from oracle server is {{"result": <response_object>}}.
+            "#}
+            .as_str(),
+        );
+
         let data = serialize_cairo_serde(self.configuration, &configuration.output, output);
         println!("Output: {output}");
         res_segment.write_data(data.iter())?;
@@ -186,7 +240,7 @@ impl<'a> ResourceTracker for Rpc1HintProcessor<'a> {
 }
 
 /// Extracts a parameter assumed to be a buffer, and converts it into a relocatable.
-pub fn extract_relocatable(
+fn extract_relocatable(
     vm: &VirtualMachine,
     buffer: &ResOperand,
 ) -> Result<Relocatable, VirtualMachineError> {
@@ -195,7 +249,7 @@ pub fn extract_relocatable(
 }
 
 /// Loads a range of values from the VM memory.
-pub fn vm_get_range(
+fn vm_get_range(
     vm: &mut VirtualMachine,
     mut calldata_start_ptr: Relocatable,
     calldata_end_ptr: Relocatable,
@@ -210,7 +264,7 @@ pub fn vm_get_range(
 }
 
 /// Wrapper trait for a VM owner.
-pub trait VMWrapper {
+trait VMWrapper {
     fn vm(&mut self) -> &mut VirtualMachine;
 }
 impl VMWrapper for VirtualMachine {
@@ -220,7 +274,7 @@ impl VMWrapper for VirtualMachine {
 }
 
 /// A helper struct to continuously write and read from a buffer in the VM memory.
-pub struct MemBuffer<'a> {
+struct MemBuffer<'a> {
     /// The VM to write to.
     /// This is a trait so that we would borrow the actual VM only once.
     vm: &'a mut dyn VMWrapper,

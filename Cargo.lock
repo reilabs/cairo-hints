@@ -902,6 +902,7 @@ dependencies = [
  "cairo-vm",
  "camino",
  "clap",
+ "indoc",
  "itertools 0.12.1",
  "num-bigint",
  "num-integer",

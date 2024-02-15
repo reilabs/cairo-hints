@@ -1,13 +1,9 @@
-use std::ops::Neg;
-
 use cairo_lang_casm::operand::{CellRef, DerefOrImmediate, Register, ResOperand};
 use cairo_vm::felt::Felt252;
 use cairo_vm::types::{errors::math_errors::MathError, relocatable::Relocatable};
-use cairo_vm::utils::CAIRO_PRIME;
+
 use cairo_vm::vm::errors::{hint_errors::HintError, vm_errors::VirtualMachineError};
 use cairo_vm::vm::vm_core::VirtualMachine;
-use num_bigint::{BigInt, Sign, ToBigInt};
-use num_integer::Integer;
 
 /// Inserts a value into the vm memory cell represented by the cellref.
 #[macro_export]
@@ -18,25 +14,13 @@ macro_rules! insert_value_to_cellref {
     };
 }
 
-pub fn bigint_to_felt(bigint: &BigInt) -> Result<Felt252, MathError> {
-    let (sign, bytes) = bigint
-        .mod_floor(&CAIRO_PRIME.to_bigint().unwrap())
-        .to_bytes_le();
-    let felt = Felt252::from_bytes_le(&bytes);
-    if sign == Sign::Minus {
-        Ok(felt.neg())
-    } else {
-        Ok(felt)
-    }
-}
-
 /// Extracts a parameter assumed to be a buffer.
-pub(crate) fn extract_buffer(buffer: &ResOperand) -> Result<(&CellRef, Felt252), HintError> {
+pub fn extract_buffer(buffer: &ResOperand) -> Result<(&CellRef, Felt252), HintError> {
     let (cell, base_offset) = match buffer {
         ResOperand::Deref(cell) => (cell, 0.into()),
         ResOperand::BinOp(bin_op) => {
             if let DerefOrImmediate::Immediate(val) = &bin_op.b {
-                (&bin_op.a, bigint_to_felt(&val.value)?)
+                (&bin_op.a, val.clone().value.into())
             } else {
                 return Err(HintError::CustomHint(
                     "Failed to extract buffer, expected ResOperand of BinOp type to have Inmediate b value".to_owned().into_boxed_str()

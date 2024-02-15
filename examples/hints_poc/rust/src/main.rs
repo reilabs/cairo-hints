@@ -4,7 +4,7 @@ use serde_repr::*;
 use tower_http::trace::TraceLayer;
 use tracing::debug;
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Debug, Copy, Clone, Serialize_repr, Deserialize_repr)]
 #[repr(i32)]
 enum Size {
     Small,

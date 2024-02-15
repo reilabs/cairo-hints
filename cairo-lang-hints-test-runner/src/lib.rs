@@ -55,9 +55,10 @@ impl TestRunner {
         &self,
         oracle_server: &Option<String>,
         configuration: &Configuration,
+        layout: &String,
     ) -> Result<Option<TestsSummary>> {
         let runner = CompiledTestRunner::new(self.compiler.build()?, self.config.clone());
-        runner.run(oracle_server, configuration)
+        runner.run(oracle_server, configuration, layout)
     }
 }
 
@@ -82,6 +83,7 @@ impl CompiledTestRunner {
         self,
         oracle_server: &Option<String>,
         configuration: &Configuration,
+        layout: &String,
     ) -> Result<Option<TestsSummary>> {
         let (compiled, filtered_out) = filter_test_cases(
             self.compiled,
@@ -101,6 +103,7 @@ impl CompiledTestRunner {
             compiled.contracts_info,
             oracle_server,
             configuration,
+            layout,
         )?;
 
         if failed.is_empty() {
@@ -283,6 +286,7 @@ pub fn run_tests(
     _contracts_info: OrderedHashMap<Felt252, ContractInfo>,
     oracle_server: &Option<String>,
     configuration: &Configuration,
+    layout: &String,
 ) -> Result<TestsSummary> {
     println!("running {} tests", named_tests.len());
     let wrapped_summary = Mutex::new(Ok(TestsSummary {
@@ -299,16 +303,10 @@ pub fn run_tests(
                     return Ok((name, None));
                 }
 
-                println!(
-                    "requires gas counter {:?}, available gas {:?}",
-                    sierra_program.requires_gas_counter(),
-                    test.available_gas
-                );
-
                 let r = run_1(
                     configuration,
                     oracle_server,
-                    "all_cairo",
+                    layout,
                     &None,
                     &None,
                     &sierra_program,

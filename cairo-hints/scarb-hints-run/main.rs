@@ -25,26 +25,12 @@ struct Args {
     #[command(flatten)]
     packages_filter: PackagesFilter,
 
-    /// Print more items in memory.
-    #[arg(long, default_value_t = false)]
-    print_full_memory: bool,
-
     /// Do not rebuild the package.
     #[arg(long, default_value_t = false)]
     no_build: bool,
 
-    // #[clap(value_parser, value_hint=ValueHint::FilePath)]
-    // filename: PathBuf,
-    /// Input to the program.
-    #[arg(default_value = "[]")]
-    program_input: deserialization::Args,
-
     #[clap(long = "layout", default_value = "plain", value_parser=validate_layout)]
     layout: String,
-
-    /// Maximum amount of gas available to the program.
-    #[arg(long)]
-    available_gas: Option<usize>,
 
     /// Oracle server URL.
     #[arg(long)]
@@ -80,29 +66,25 @@ fn main() -> Result<(), Error> {
     let metadata = MetadataCommand::new().inherit_stderr().exec().unwrap();
     let package = args.packages_filter.match_one(&metadata).unwrap();
 
-    ScarbCommand::new().arg("build").run().unwrap();
+    if !args.no_build {
+        ScarbCommand::new().arg("build").run().unwrap();
+    }
 
     let filename = format!("{}.sierra.json", package.name);
-    // println!("filename {:#?}", filename);
     let scarb_target_dir = env::var("SCARB_TARGET_DIR").unwrap();
     let scarb_profile = env::var("SCARB_PROFILE").unwrap();
     let path = Utf8PathBuf::from(scarb_target_dir.clone())
         .join(scarb_profile.clone())
         .join(filename.clone());
 
-    // ensure!(
-    //     path.exists(),
-    //     formatdoc! {r#"
-    //         package has not been compiled, file does not exist: {filename}
-    //         help: run `scarb build` to compile the package
-    //     "#}
-    // );
+    path.try_exists()
+        .expect("package has not been compiled, file does not exist: {filename}");
 
     let lock_output = absolute_path(&package, args.oracle_lock, "oracle_lock", Some(PathBuf::from("Oracle.lock")))
         .expect("lock path must be provided either as an argument (--oracle-lock src) or in the Scarb.toml file in the [tool.hints] section.");
-    let lock_file = File::open(lock_output).unwrap();
+    let lock_file = File::open(lock_output).map_err(|e| Error::IO(e))?;
     let reader = BufReader::new(lock_file);
-    let service_configuration = serde_json::from_reader(reader).unwrap();
+    let service_configuration = serde_json::from_reader(reader).map_err(|e| Error::IO(e.into()))?;
 
     let sierra_program = serde_json::from_str::<VersionedProgram>(
         &fs::read_to_string(path.clone())
