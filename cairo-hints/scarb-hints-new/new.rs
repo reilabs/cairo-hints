@@ -339,6 +339,7 @@ fn mk(
 
                 - `protoc` from [here](https://grpc.io/docs/protoc-installation/)
                 - `scarb-v2.5.1` or greater from [here](https://docs.swmansion.com/scarb/download.html)
+                - `lambdaworks/provers/cairo` from [here](https://github.com/lambdaclass/lambdaworks.git) for proving only. As of February 2024, the tested revision is `fed12d6`.
 
                 ## Usage
 
@@ -355,9 +356,8 @@ fn mk(
                 by adding the flags `--trace_file <PATH> --memory_file <PATH>`.
 
                 The proof can be generated and verified using [`lambdaworks/provers/cairo`](https://github.com/lambdaclass/lambdaworks.git).
-                As of February 2024, the tested revision of `lambdaworks` is `fed12d6`. After cloning the repo, `cd provers/cairo`.
-                The command to generate the proof is: `cargo run --release --features=cli,instruments,parallel prove <TRACE_FILE> <MEMORY_FILE> <PROOF_FILE>`.
-                The command to verify a proof is: `cargo run --release --features=cli,instruments,parallel verify <PROOF_FILE>`.
+                The command to generate the proof is: `platinum-prover prove <TRACE_FILE> <MEMORY_FILE> <PROOF_FILE>`.
+                The command to verify a proof is: `platinum-prover verify <PROOF_FILE>`.
 
                 ## Testing
 
