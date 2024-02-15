@@ -21,6 +21,7 @@ cairo-vm = { workspace = true }
 camino = { workspace = true }
 clap = { workspace = true }
 itertools = { workspace = true }
+indoc = { workspace = true }
 num-bigint = { workspace = true }
 num-integer = { workspace = true }
 num-traits = { workspace = true }

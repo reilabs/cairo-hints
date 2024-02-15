@@ -1,6 +1,3 @@
-use core::any::Any;
-use std::collections::HashMap;
-
 use crate::hint_processor_utils::{cell_ref_to_relocatable, extract_buffer, get_ptr};
 use crate::insert_value_to_cellref;
 use cairo_lang_casm::{
@@ -26,7 +23,11 @@ use cairo_vm::{
         vm_core::VirtualMachine,
     },
 };
+use core::any::Any;
+use indoc::formatdoc;
+use itertools::Itertools;
 use serde_json::Value;
+use std::collections::HashMap;
 
 /// HintProcessor for Cairo 1 compiler hints.
 pub struct Rpc1HintProcessor<'a> {
@@ -82,9 +83,9 @@ impl<'a> Rpc1HintProcessor<'a> {
             ))));
         };
 
-        self.server
-            .as_ref()
-            .expect("Please provide an --oracle-server argument to execute hints");
+        let server_url = self.server.as_ref().expect(
+            format!("Please provide an --oracle-server argument to execute hints").as_str(),
+        );
 
         let data = deserialize_cairo_serde(
             self.configuration,
@@ -94,39 +95,66 @@ impl<'a> Rpc1HintProcessor<'a> {
         println!("let the oracle decide... Inputs: {data:?}");
 
         let client = reqwest::blocking::Client::new();
-        let resp = client
-            .post(self.server.as_ref().unwrap())
+
+        let req = client
+            .post(server_url)
             .json(&data)
             .send()
+            .expect(format!("Error sending request to oracle server {server_url}").as_str());
+
+        let status_code = req.error_for_status_ref().map(|_| ());
+        let body = req.text().expect(
+            formatdoc! {
+                r#"
+                Response from oracle server can't be parsed as string."#
+            }
+            .as_str(),
+        );
+
+        status_code.expect(
+            formatdoc! {
+                r#"
+                Received {body:?}.
+                Response status from oracle server not successful."#
+            }
+            .as_str(),
+        );
+
+        let body = serde_json::from_str::<Value>(body.as_str()).expect(
+            formatdoc! {
+                r#"
+                Received {body:?}.
+                Error converting response from oracle server {server_url} to JSON."#
+            }
+            .as_str(),
+        );
+
+        let body = body.as_object().expect(
+            formatdoc! {r#"
+                Received {body:?}.
+                Error serialising response as object from oracle server.
+            "#}
+            .as_str(),
+        );
+
+        body.keys()
+            .exactly_one()
             .map_err(|_| {
-                format!(
-                    "Error sending request to oracle server {}",
-                    self.server.as_ref().unwrap()
-                )
-            })
-            .unwrap()
-            .json::<Value>()
-            .map_err(|_| {
-                format!(
-                    "Error reading response from oracle server {}",
-                    self.server.as_ref().unwrap()
-                )
+                formatdoc! {r#"
+                    Received {body:?}.
+                    Expected response format from oracle server is {{"result": <response_object>}}.
+                "#}
             })
             .unwrap();
 
-        let resp = resp
-            .as_object()
-            .expect("Error serialising response as object from oracle server.");
+        let output = body.get("result").expect(
+            formatdoc! {r#"
+                Received {body:?}.
+                Expected response format from oracle server is {{"result": <response_object>}}.
+            "#}
+            .as_str(),
+        );
 
-        if resp.keys().count() != 1 {
-            panic!(
-                "Response object from oracle server shall contain only the key `result`. More than one key found."
-            )
-        }
-
-        let output = resp
-            .get("result")
-            .expect("Key `result` not found in response from oracle server.");
         let data = serialize_cairo_serde(self.configuration, &configuration.output, output);
         println!("Output: {output}");
         res_segment.write_data(data.iter())?;
