@@ -351,10 +351,11 @@ fn mk(
 
                 If the circuit requires built-ins, it's possible to add the flag `--layout <VALUE>`
 
-                It's possible to generate trace and memory files when running the circuit by adding the flags `--trace_file <PATH> --memory_file <PATH>`.
+                It's possible to generate trace and memory files when running the circuit
+                by adding the flags `--trace_file <PATH> --memory_file <PATH>`.
 
                 The proof can be generated and verified using [`lambdaworks/provers/cairo`](https://github.com/lambdaclass/lambdaworks.git).
-                As of February 2024, the tested revision is `fed12d6`. After cloning the repo, `cd provers/cairo`.
+                As of February 2024, the tested revision of `lambdaworks` is `fed12d6`. After cloning the repo, `cd provers/cairo`.
                 The command to generate the proof is: `cargo run --release --features=cli,instruments,parallel prove <TRACE_FILE> <MEMORY_FILE> <PROOF_FILE>`.
                 The command to verify a proof is: `cargo run --release --features=cli,instruments,parallel verify <PROOF_FILE>`.
 
