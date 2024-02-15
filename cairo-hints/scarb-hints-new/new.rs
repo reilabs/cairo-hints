@@ -10,6 +10,8 @@ use scarb::ops;
 pub const DEFAULT_TARGET_DIR_NAME: &str = "target";
 pub const CAIRO_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["cairo", "src", "lib.cairo"].iter().collect());
+pub const ORACLE_SOURCE_PATH: Lazy<Utf8PathBuf> =
+    Lazy::new(|| ["cairo", "src", "oracle.cairo"].iter().collect());
 pub const CAIRO_MANIFEST_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["cairo", "Scarb.toml"].iter().collect());
 pub const PROTO_SOURCE_PATH: Lazy<Utf8PathBuf> =
@@ -18,6 +20,8 @@ pub const SERVER_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["rust", "src", "main.rs"].iter().collect());
 pub const SERVER_MANIFEST_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["rust", "Cargo.toml"].iter().collect());
+pub const ORACLE_LOCK_PATH: Lazy<Utf8PathBuf> =
+    Lazy::new(|| ["cairo", "Oracle.lock"].iter().collect());
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VersionControl {
@@ -143,12 +147,12 @@ fn mk(
     }
 
     // Create the `lib.cairo` file.
-    let source_path = canonical_path.join(CAIRO_SOURCE_PATH.as_path());
-    if !source_path.exists() {
-        fsx::create_dir_all(source_path.parent().unwrap())?;
+    let filename = canonical_path.join(CAIRO_SOURCE_PATH.as_path());
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
 
         fsx::write(
-            source_path,
+            filename,
             indoc! {r#"
                 mod oracle;
 
@@ -166,13 +170,43 @@ fn mk(
         )?;
     }
 
-    // Create the `oracle.proto` file.
-    let proto_path = canonical_path.join(PROTO_SOURCE_PATH.as_path());
-    if !proto_path.exists() {
-        fsx::create_dir_all(proto_path.parent().unwrap())?;
+    // Create the `oracle.cairo` file.
+    let filename = canonical_path.join(ORACLE_SOURCE_PATH.as_path());
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
 
         fsx::write(
-            proto_path,
+            filename,
+            indoc! {r#"
+                use starknet::testing::cheatcode;
+                #[derive(Drop, Serde)]
+                struct Request {
+                    n: u64,
+                }
+                #[derive(Drop, Serde)]
+                struct Response {
+                    n: u64,
+                }
+                #[generate_trait]
+                impl SqrtOracle of SqrtOracleTrait {
+                    fn sqrt(arg: super::oracle::Request) -> super::oracle::Response {
+                        let mut serialized = ArrayTrait::new();
+                        arg.serialize(ref serialized);
+                        let mut result = cheatcode::<'sqrt'>(serialized.span());
+                        Serde::deserialize(ref result).unwrap()
+                    }
+                }
+            "#},
+        )?;
+    }
+
+    // Create the `oracle.proto` file.
+    let filename = canonical_path.join(PROTO_SOURCE_PATH.as_path());
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
+
+        fsx::write(
+            filename,
             indoc! {r#"
                 syntax = "proto3";
 
@@ -194,12 +228,12 @@ fn mk(
     }
 
     // Create the `main.rs` file.
-    let server_path = canonical_path.join(SERVER_SOURCE_PATH.as_path());
-    if !server_path.exists() {
-        fsx::create_dir_all(server_path.parent().unwrap())?;
+    let filename = canonical_path.join(SERVER_SOURCE_PATH.as_path());
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
 
         fsx::write(
-            server_path,
+            filename,
             indoc! {r#"
                 use axum::{
                     extract,
@@ -251,12 +285,12 @@ fn mk(
     }
 
     // Create the `cargo.toml` file.
-    let server_manifest_path = canonical_path.join(SERVER_MANIFEST_PATH.as_path());
-    if !server_manifest_path.exists() {
-        fsx::create_dir_all(server_manifest_path.parent().unwrap())?;
+    let filename = canonical_path.join(SERVER_MANIFEST_PATH.as_path());
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
 
         fsx::write(
-            &server_manifest_path,
+            &filename,
             formatdoc! {r#"
                 [package]
                 name = "{name}-rpc-server"
@@ -275,12 +309,25 @@ fn mk(
         )?;
     }
 
-    let readme_path = canonical_path.join("README.md");
-    if !readme_path.exists() {
-        fsx::create_dir_all(readme_path.parent().unwrap())?;
+    // Create the `Oracle.lock` file.
+    let filename = canonical_path.join(ORACLE_LOCK_PATH.as_path());
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
 
         fsx::write(
-            &readme_path,
+            &filename,
+            indoc! {r#"
+                {"enums":{},"messages":{"Request":[{"name":"n","ty":{"primitive":"u64"}}],"Response":[{"name":"n","ty":{"primitive":"u64"}}]},"services":{"SqrtOracle":{"sqrt":{"input":{"message":"Request"},"output":{"message":"Response"}}}}}
+            "#},
+        )?;
+    }
+
+    let filename = canonical_path.join("README.md");
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
+
+        fsx::write(
+            &filename,
             formatdoc! {r#"
                 # Example Project
 
@@ -290,10 +337,9 @@ fn mk(
 
                 1. Follow [installation guide from cairo-hints](https://github.com/reilabs/cairo-hints/tree/main?tab=readme-ov-file#cairo-1-hints).
                 2. `cd {name}/cairo`
-                3. Run `scarb hints-build`
-                4. In a new shell tab
+                3. In a new shell tab
                     * `cd {name}/rust; cargo run`
-                5. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --trace_file lib.trace --memory_file lib.memory --layout all_cairo`
+                4. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --trace_file lib.trace --memory_file lib.memory --layout all_cairo`
 
                 ## Testing
 
