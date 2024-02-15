@@ -142,7 +142,7 @@ impl<'a> Rpc1HintProcessor<'a> {
             .map_err(|_| {
                 formatdoc! {r#"
                     Received {body:?}.
-                    Expected response format from oracle server is {{result: <response_object>}}.
+                    Expected response format from oracle server is {{"result": <response_object>}}.
                 "#}
             })
             .unwrap();
@@ -150,7 +150,7 @@ impl<'a> Rpc1HintProcessor<'a> {
         let output = body.get("result").expect(
             formatdoc! {r#"
                 Received {body:?}.
-                Expected response format from oracle server is {{result: <response_object>}}.
+                Expected response format from oracle server is {{"result": <response_object>}}.
             "#}
             .as_str(),
         );
