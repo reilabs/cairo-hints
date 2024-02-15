@@ -96,11 +96,10 @@ impl<'a> Rpc1HintProcessor<'a> {
 
         let client = reqwest::blocking::Client::new();
 
-        let req = client
-            .post(server_url)
-            .json(&data)
-            .send()
-            .expect(format!("Error sending request to oracle server {server_url}").as_str());
+        let req = client.post(server_url).json(&data).send().expect(
+            format!("Couldn't connect to oracle server {server_url}. Is the server running?")
+                .as_str(),
+        );
 
         let status_code = req.error_for_status_ref().map(|_| ());
         let body = req.text().expect(

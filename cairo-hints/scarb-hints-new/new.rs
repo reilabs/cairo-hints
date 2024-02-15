@@ -276,7 +276,9 @@ fn mk(
                         .route("/", post(root))
                         .layer(TraceLayer::new_for_http());
 
-                    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+                    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+                        .await
+                        .expect("Failed to bind to port 3000, port already in use by another process. Change the port or terminate the other process.");
                     debug!("Server started on http://0.0.0.0:3000");
                     axum::serve(listener, app).await.unwrap();
                 }
@@ -333,13 +335,28 @@ fn mk(
 
                 It calculates `sqrt` using an RPC server implemented in Rust.
 
+                ## Prerequisites
+
+                - `protoc` from [here](https://grpc.io/docs/protoc-installation/)
+                - `scarb-v2.5.1` or greater from [here](https://docs.swmansion.com/scarb/download.html)
+
                 ## Usage
 
-                1. Follow [installation guide from cairo-hints](https://github.com/reilabs/cairo-hints/tree/main?tab=readme-ov-file#cairo-1-hints).
-                2. `cd {name}/cairo`
-                3. In a new shell tab
-                    * `cd {name}/rust; cargo run`
-                4. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --trace_file lib.trace --memory_file lib.memory --layout all_cairo`
+                1. `cd cairo`
+                2. In a new shell tab
+                    * `cd rust; cargo run`
+                3. Run `scarb hints-run --oracle-server http://127.0.0.1:3000`
+
+                ## Extra options
+
+                If the circuit requires built-ins, it's possible to add the flag `--layout <VALUE>`
+
+                It's possible to generate trace and memory files when running the circuit by adding the flags `--trace_file <PATH> --memory_file <PATH>`.
+
+                The proof can be generated and verified using [`lambdaworks/provers/cairo`](https://github.com/lambdaclass/lambdaworks.git).
+                As of February 2024, the tested revision is `fed12d6`. After cloning the repo, `cd provers/cairo`.
+                The command to generate the proof is: `cargo run --release --features=cli,instruments,parallel prove <TRACE_FILE> <MEMORY_FILE> <PROOF_FILE>`.
+                The command to verify a proof is: `cargo run --release --features=cli,instruments,parallel verify <PROOF_FILE>`.
 
                 ## Testing
 
