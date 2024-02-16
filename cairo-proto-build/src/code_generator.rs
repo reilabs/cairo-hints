@@ -281,12 +281,7 @@ impl<'a> CodeGenerator<'a> {
         self.path.pop();
 
         let struct_key = if self.type_path.is_empty() {
-            format!(
-                "{}{}{}",
-                self.type_path.join("::").to_lowercase(),
-                format!("{}::", self.package),
-                struct_name
-            )
+            format!("{}::{}", self.package, struct_name)
         } else {
             format!(
                 "{}::{}::{}",
