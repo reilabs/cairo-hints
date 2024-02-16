@@ -7,12 +7,12 @@ use cairo_lang_casm::{
 use cairo_lang_utils::bigint::BigIntAsHex;
 use cairo_proto_serde::configuration::Configuration;
 use cairo_proto_serde::{deserialize_cairo_serde, serialize_cairo_serde};
-use cairo_vm::felt::Felt252;
 use cairo_vm::hint_processor::cairo_1_hint_processor::hint_processor::Cairo1HintProcessor;
 use cairo_vm::hint_processor::hint_processor_definition::HintProcessorLogic;
 use cairo_vm::hint_processor::hint_processor_definition::HintReference;
 use cairo_vm::vm::errors::vm_errors::VirtualMachineError;
 use cairo_vm::vm::runners::cairo_runner::ResourceTracker;
+use cairo_vm::Felt252;
 use cairo_vm::{
     types::{
         exec_scope::ExecutionScopes,

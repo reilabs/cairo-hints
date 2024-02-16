@@ -1,5 +1,5 @@
 use crate::configuration::{Configuration, FieldType, PrimitiveType};
-use cairo_vm::felt::Felt252;
+use cairo_vm::Felt252;
 use num_traits::One;
 use num_traits::ToPrimitive;
 use num_traits::Zero;
@@ -38,7 +38,7 @@ fn serialize_primitive(ty: &PrimitiveType, value: &Value) -> Vec<Felt252> {
 
             bytes
                 .chunks(31)
-                .for_each(|v| p.push(Felt252::from_bytes_be(v)));
+                .for_each(|v| p.push(Felt252::from_bytes_be_slice(v)));
 
             let last_row_length = bytes.len().to_u32().unwrap() % 31;
             if last_row_length == 0 {
@@ -80,7 +80,7 @@ fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
                 .unwrap()
                 .1
                 .iter()
-                .map(|e| e.to_bytes_be())
+                .map(|e| e.to_bytes_be().to_vec())
                 .collect();
             json!(String::from_utf8(v.concat()).unwrap())
         }
@@ -193,7 +193,7 @@ mod tests {
         Configuration, Field, FieldType, MethodDeclaration, PrimitiveType, Service,
     };
     use crate::{deserialize_cairo_serde, serialize_cairo_serde};
-    use cairo_vm::felt::Felt252;
+    use cairo_vm::Felt252;
     use serde_json::{json, Value};
     use std::collections::{BTreeMap, HashMap};
 

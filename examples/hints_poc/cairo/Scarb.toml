@@ -6,7 +6,7 @@ edition = "2023_10"
 # See more keys and their definitions at https://docs.swmansion.com/scarb/docs/reference/manifest.html
 
 [dependencies]
-alexandria_math = { git = "https://github.com/keep-starknet-strange/alexandria.git" }
+alexandria_math = { git = "https://github.com/keep-starknet-strange/alexandria.git", rev = "f37d73d8a8248e4d8dc65de3949333e30bda022f" }
 
 [tool.hints]
 definitions = "../proto/oracle.proto"  # must be provided

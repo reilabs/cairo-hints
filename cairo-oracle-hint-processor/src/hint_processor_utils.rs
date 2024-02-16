@@ -1,6 +1,7 @@
 use cairo_lang_casm::operand::{CellRef, DerefOrImmediate, Register, ResOperand};
-use cairo_vm::felt::Felt252;
 use cairo_vm::types::{errors::math_errors::MathError, relocatable::Relocatable};
+use cairo_vm::utils::bigint_to_felt;
+use cairo_vm::Felt252;
 
 use cairo_vm::vm::errors::{hint_errors::HintError, vm_errors::VirtualMachineError};
 use cairo_vm::vm::vm_core::VirtualMachine;
@@ -20,7 +21,7 @@ pub fn extract_buffer(buffer: &ResOperand) -> Result<(&CellRef, Felt252), HintEr
         ResOperand::Deref(cell) => (cell, 0.into()),
         ResOperand::BinOp(bin_op) => {
             if let DerefOrImmediate::Immediate(val) = &bin_op.b {
-                (&bin_op.a, val.clone().value.into())
+                (&bin_op.a, bigint_to_felt(&val.value)?)
             } else {
                 return Err(HintError::CustomHint(
                     "Failed to extract buffer, expected ResOperand of BinOp type to have Inmediate b value".to_owned().into_boxed_str()
