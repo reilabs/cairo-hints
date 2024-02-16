@@ -4,21 +4,29 @@ This repository adds RPC hints to Cairo, without modifying the compiler or the V
 
 It uses protocol buffers to define messages shared between Cairo and RPC server, code generator and hint processor implemented in this repository.
 
+
+## Prerequisites
+
+- `protoc` from [here](https://grpc.io/docs/protoc-installation/)
+- `scarb-v2.4.3` from [here](https://github.com/software-mansion/scarb/releases/tag/v2.4.3)
+- `lambdaworks/provers/cairo` from [here](https://github.com/lambdaclass/lambdaworks/tree/fed12d674418e4f09bc843b71bc90008a85b1aed) for proving only. As of February 2024, the tested revision is `fed12d6`.
+
+
 ## Installation
 
-1. Make sure you have `protoc` from [here](https://grpc.io/docs/protoc-installation/)
-2. Make sure you have at least `scarb-v2.5.1` installed from [here](https://docs.swmansion.com/scarb/download.html)
-3. Clone this repo and run:
-    * `cargo install --path cairo-hints --locked`
+Clone this repo and run:
+```bash
+cargo install --path cairo-hints --locked
+```
 
 ## Usage
 
-1. Create new project using `scarb hints-new` (not implemented yet). You can use the example project in `examples/hints_poc` instead.
-2. Define messages in a .proto file
-3. Run `scarb hints-build`
-4. Start RPC server that accepts json requests
-5. Run `scarb hints-run --oracle-server http://0.0.0.0:3000 --layout all_cairo`
-6. Run integration tests using `scarb hints-test --oracle-server http://0.0.0.0:3000`
+1. Create new project using `scarb hints-new --lang rust <PROJ_NAME>`. You can also use the example project in `examples/hints_poc` instead.
+2. Define messages in a `.proto` file
+3. Run `scarb hints-build` in the folder `cairo`
+4. In another tab, `cd rust` and start the RPC server with the command `cargo run`
+5. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --layout all_cairo`
+6. Integration tests can be run with `scarb hints-test --oracle-server http://127.0.0.1:3000  --layout all_cairo`
 
 
 ## Example Project
@@ -26,14 +34,14 @@ It uses protocol buffers to define messages shared between Cairo and RPC server,
 
 
 ## Testing
-Prerequisite for testing is to download the correct version of `corelib`. Execute the following commands for the root folder of this repo:
+Prerequisite for testing is to download `corelib-v2.4.3`. Execute the following commands in the root folder of this repo:
 ```bash
 git clone https://github.com/starkware-libs/cairo.git
 cd cairo
-git checkout v2.5.3
+git checkout v2.4.3
 cd ..
 mv cairo/corelib/ .
 rm -rf cairo
 ```
 
-To run all tests execute the following command `cargo test --workspace --no-fail-fast`.
+To run all tests in this crate execute the following command `cargo test --workspace --no-fail-fast`.
