@@ -24,20 +24,11 @@ struct Args {
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq)]
+#[clap(rename_all = "lower")]
 pub enum Lang {
     Rust,
     Js,
 }
-
-// fn validate_lang(value: &str) -> Result<Lang, String> {
-//     match value {
-//         "rust" => Ok(Lang::Rust),
-//         "js" => todo!("Javascript RPC server is still WIP."),
-//         _ => Err(format!(
-//             "{value} is not a supported language. Choose `rust` or `js`."
-//         )),
-//     }
-// }
 
 /// Arguments accepted by the `init` command.
 #[derive(Parser, Clone, Debug)]
@@ -72,7 +63,7 @@ pub fn run(args: NewArgs, config: &Config) -> Result<()> {
             } else {
                 VersionControl::Git
             },
-            lang: Lang::Rust, //args.lang,
+            lang: args.lang,
         },
         config,
     )?;

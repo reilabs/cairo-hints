@@ -14,6 +14,8 @@ pub const CAIRO_MANIFEST_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["cairo", "Scarb.toml"].iter().collect());
 pub const PROTO_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["proto", "oracle.proto"].iter().collect());
+pub const ORACLE_LOCK_PATH: Lazy<Utf8PathBuf> =
+    Lazy::new(|| ["cairo", "Oracle.lock"].iter().collect());
 
 pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Config) -> Result<()> {
     // Create the `Scarb.toml` file.
@@ -116,6 +118,19 @@ pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Confi
                 service SqrtOracle {
                     rpc Sqrt(Request) returns (Response);
                 }
+            "#},
+        )?;
+    }
+
+    // Create the `Oracle.lock` file.
+    let filename = canonical_path.join(ORACLE_LOCK_PATH.as_path());
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
+
+        fsx::write(
+            &filename,
+            indoc! {r#"
+                {"enums":{},"messages":{"oracle::Request":[{"name":"n","ty":{"primitive":"u64"}}],"oracle::Response":[{"name":"n","ty":{"primitive":"u64"}}]},"services":{"SqrtOracle":{"sqrt":{"input":{"message":"oracle::Request"},"output":{"message":"oracle::Response"}}}}}
             "#},
         )?;
     }
