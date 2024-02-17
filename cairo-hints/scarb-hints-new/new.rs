@@ -18,6 +18,8 @@ pub const PROTO_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["proto", "oracle.proto"].iter().collect());
 pub const SERVER_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["rust", "src", "main.rs"].iter().collect());
+pub const SERVER_BUILD_PATH: Lazy<Utf8PathBuf> =
+    Lazy::new(|| ["rust", "build.rs"].iter().collect());
 pub const SERVER_MANIFEST_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["rust", "Cargo.toml"].iter().collect());
 pub const ORACLE_LOCK_PATH: Lazy<Utf8PathBuf> =
@@ -245,19 +247,11 @@ fn mk(
                 use tracing::debug;
                 use tower_http::trace::TraceLayer;
 
-                #[derive(Debug, Deserialize)]
-                struct Request {
-                    n: u64,
-                }
+                include!("./oracle.rs");
 
-                #[derive(Debug, Serialize)]
+                #[derive(Debug, Serialize, Deserialize)]
                 struct JsonResult {
                     result: Response
-                }
-
-                #[derive(Debug, Serialize)]
-                struct Response {
-                    n: u64,
                 }
 
                 async fn root(extract::Json(payload): extract::Json<Request>) -> Json<JsonResult> {
@@ -286,6 +280,28 @@ fn mk(
         )?;
     }
 
+    // Create the `build.rs` file.
+    let filename = canonical_path.join(SERVER_BUILD_PATH.as_path());
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
+
+        fsx::write(
+            filename,
+            indoc! {r##"
+                extern crate prost_build;
+                use std::io::Result;
+                use std::path::PathBuf;
+
+                fn main() -> Result<()> {
+                    let mut prost_build = prost_build::Config::new();
+                    prost_build.type_attribute(".", "#[derive(serde::Deserialize, serde::Serialize)]");
+                    prost_build.out_dir(PathBuf::from(r"./src"));
+                    prost_build.compile_protos(&["../proto/oracle.proto"], &["../proto"])
+                }
+            "##},
+        )?;
+    }
+
     // Create the `cargo.toml` file.
     let filename = canonical_path.join(SERVER_MANIFEST_PATH.as_path());
     if !filename.exists() {
@@ -307,6 +323,10 @@ fn mk(
                 tower-http = {{ version = "0.5.0", features = ["trace"] }}
                 tracing = "0.1.40"
                 tracing-subscriber = "0.3.18"
+                prost = "0.12.3"
+
+                [build-dependencies]
+                prost-build = "0.12.3"
             "#},
         )?;
     }
@@ -319,7 +339,7 @@ fn mk(
         fsx::write(
             &filename,
             indoc! {r#"
-                {"enums":{},"messages":{"Request":[{"name":"n","ty":{"primitive":"u64"}}],"Response":[{"name":"n","ty":{"primitive":"u64"}}]},"services":{"SqrtOracle":{"sqrt":{"input":{"message":"Request"},"output":{"message":"Response"}}}}}
+                {"enums":{},"messages":{"oracle::Request":[{"name":"n","ty":{"primitive":"u64"}}],"oracle::Response":[{"name":"n","ty":{"primitive":"u64"}}]},"services":{"SqrtOracle":{"sqrt":{"input":{"message":"oracle::Request"},"output":{"message":"oracle::Response"}}}}}
             "#},
         )?;
     }
@@ -346,7 +366,7 @@ fn mk(
                 1. `cd cairo`
                 2. In a new shell tab
                     * `cd rust; cargo run`
-                3. Run `scarb hints-run --oracle-server http://127.0.0.1:3000`
+                3. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --layout all_cairo`
 
                 ## Extra options
 

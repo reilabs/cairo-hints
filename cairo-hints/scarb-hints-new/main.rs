@@ -22,7 +22,8 @@ struct Args {
 
 fn validate_lang(value: &str) -> Result<String, String> {
     match value {
-        "js" | "rust" => Ok(value.to_string()),
+        "rust" => Ok(value.to_string()),
+        "js" => todo!("Javascript RPC server is still WIP."),
         _ => Err(format!(
             "{value} is not a supported language. Choose `rust` or `js`."
         )),

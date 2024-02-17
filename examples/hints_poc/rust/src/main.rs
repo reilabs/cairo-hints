@@ -1,35 +1,13 @@
 use axum::{extract, routing::post, Json, Router};
 use serde::{Deserialize, Serialize};
-use serde_repr::*;
 use tower_http::trace::TraceLayer;
 use tracing::debug;
 
-#[derive(Debug, Copy, Clone, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
-enum Size {
-    Small,
-    Medium,
-    Large,
-}
+include!("./shirts.rs");
 
-#[derive(Debug, Deserialize)]
-struct Inner {
-    color: Size,
-}
-
-#[derive(Debug, Deserialize)]
-struct Request {
-    inner: Option<Inner>,
-}
-
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct JsonResult {
     result: Response,
-}
-
-#[derive(Debug, Serialize)]
-struct Response {
-    color: Size,
 }
 
 async fn root(extract::Json(payload): extract::Json<Request>) -> Json<JsonResult> {
