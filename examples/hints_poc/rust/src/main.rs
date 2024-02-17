@@ -52,7 +52,9 @@ async fn main() {
         .route("/", post(root))
         .layer(TraceLayer::new_for_http());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+        .await
+        .expect("Failed to bind to port 3000, port already in use by another process. Change the port or terminate the other process.");
     debug!("Server started on http://0.0.0.0:3000");
     axum::serve(listener, app).await.unwrap();
 }

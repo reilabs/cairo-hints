@@ -24,14 +24,14 @@ name = "scarb_utils"
 path = "scarb-utils/lib.rs"
 
 [dependencies]
-bincode = { version = "2.0.0-rc.3", default-features = false, features = [
-    "serde",
-] }
+bincode = { workspace = true }
 cairo-proto-build = { workspace = true }
 env_logger = { workspace = true }
 anyhow = { workspace = true }
+dunce = { workspace = true }
 cairo-lang-casm = { workspace = true }
 cairo-lang-compiler = { workspace = true }
+cairo-lang-filesystem = { workspace = true }
 cairo-lang-runner = { workspace = true }
 cairo-lang-sierra = { workspace = true }
 cairo-lang-sierra-to-casm = { workspace = true }
@@ -45,6 +45,8 @@ clap = { workspace = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
 num-bigint = { workspace = true }
+once_cell = { workspace = true }
+scarb = { workspace = true }
 scarb-metadata = { workspace = true }
 scarb-ui = { workspace = true }
 serde = { workspace = true }
