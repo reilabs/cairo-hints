@@ -1,9 +1,35 @@
+use std::vec::IntoIter;
+
+use cairo_felt::Felt252;
+use cairo_lang_runner::casm_run::format_next_item;
 use cairo_lang_utils::byte_array::BYTE_ARRAY_MAGIC;
-use cairo_vm::felt::felt_str;
-use cairo_vm::felt::Felt252;
 use itertools::Itertools;
 
-use crate::{format_for_panic, TestCompilation, TestCompiler};
+use crate::{TestCompilation, TestCompiler};
+
+#[macro_export]
+macro_rules! felt_str {
+    ($val: expr) => {
+        Felt252::parse_bytes($val.as_bytes(), 10_u32).expect("Couldn't parse bytes")
+    };
+    ($val: expr, $opt: expr) => {
+        Felt252::parse_bytes($val.as_bytes(), $opt as u32).expect("Couldn't parse bytes")
+    };
+}
+
+/// Formats the given felts as a panic string.
+fn format_for_panic(mut felts: IntoIter<Felt252>) -> String {
+    let mut items = Vec::new();
+    while let Some(item) = format_next_item(&mut felts) {
+        items.push(item.quote_if_string());
+    }
+    let panic_values_string = if let [item] = &items[..] {
+        item.clone()
+    } else {
+        format!("({})", items.join(", "))
+    };
+    format!("Panicked with {panic_values_string}.")
+}
 
 #[test]
 fn test_compiled_serialization() {

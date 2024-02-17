@@ -107,6 +107,7 @@ fn main() -> Result<(), Error> {
         &args.memory_file,
         &sierra_program,
         "::main",
+        false,
     ) {
         Err(Error::Cli(err)) => err.exit(),
         Ok(return_values) => {
@@ -123,7 +124,7 @@ fn main() -> Result<(), Error> {
                     .iter()
                     .map(|m| {
                         // Try to parse to utf8 string
-                        let msg = String::from_utf8(m.to_be_bytes().to_vec());
+                        let msg = String::from_utf8(m.to_bytes_be().to_vec());
                         if let Ok(msg) = msg {
                             format!("{} ('{}')", m, msg)
                         } else {

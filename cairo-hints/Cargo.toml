@@ -39,6 +39,7 @@ cairo-lang-sierra-type-size = { workspace = true }
 cairo-lang-utils = { workspace = true }
 cairo-oracle-hint-processor = { workspace = true }
 cairo-proto-serde = { workspace = true }
+cairo-felt = { workspace = true }
 cairo-vm = { workspace = true }
 camino = { workspace = true }
 clap = { workspace = true }

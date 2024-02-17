@@ -1,6 +1,5 @@
 use std::path::Path;
 use std::sync::Mutex;
-use std::vec::IntoIter;
 
 use anyhow::{bail, Result};
 use cairo_lang_compiler::db::RootDatabase;
@@ -8,20 +7,14 @@ use cairo_lang_compiler::diagnostics::DiagnosticsReporter;
 use cairo_lang_compiler::project::setup_project;
 use cairo_lang_filesystem::cfg::{Cfg, CfgSet};
 use cairo_lang_filesystem::ids::CrateId;
-use cairo_lang_runner::casm_run::format_next_item;
-use cairo_lang_runner::RunResultValue;
-use cairo_lang_sierra::extensions::gas::CostTokenType;
-use cairo_lang_sierra::ids::FunctionId;
 use cairo_lang_sierra::program::Program;
-use cairo_lang_starknet::contract::ContractInfo;
 use cairo_lang_starknet::starknet_plugin_suite;
 use cairo_lang_test_plugin::{
     compile_test_prepared_db, test_plugin_suite, TestCompilation, TestConfig,
 };
-use cairo_lang_utils::ordered_hash_map::OrderedHashMap;
 use cairo_oracle_hint_processor::{run_1, Error};
 use cairo_proto_serde::configuration::Configuration;
-use cairo_vm::felt::Felt252;
+use cairo_vm::Felt252 as VMFelt;
 use colored::Colorize;
 use itertools::Itertools;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
@@ -99,8 +92,8 @@ impl CompiledTestRunner {
         } = run_tests(
             compiled.named_tests,
             compiled.sierra_program,
-            compiled.function_set_costs,
-            compiled.contracts_info,
+            // compiled.function_set_costs,
+            // compiled.contracts_info,
             oracle_server,
             configuration,
             layout,
@@ -123,8 +116,22 @@ impl CompiledTestRunner {
                     RunResultValue::Success(_) => {
                         println!("expected panic but finished successfully.");
                     }
-                    RunResultValue::Panic(values) => {
-                        println!("{}", format_for_panic(values.into_iter()));
+                    RunResultValue::Panic(panic_data) => {
+                        if !panic_data.is_empty() {
+                            let panic_data_string_list = panic_data
+                                .iter()
+                                .map(|m| {
+                                    // Try to parse to utf8 string
+                                    let msg = String::from_utf8(m.to_bytes_be().to_vec());
+                                    if let Ok(msg) = msg {
+                                        format!("{} ('{}')", m, msg)
+                                    } else {
+                                        m.to_string()
+                                    }
+                                })
+                                .join(", ");
+                            println!("Run panicked with: [{}]", panic_data_string_list);
+                        }
                     }
                 }
             }
@@ -138,20 +145,6 @@ impl CompiledTestRunner {
             );
         }
     }
-}
-
-/// Formats the given felts as a panic string.
-fn format_for_panic(mut felts: IntoIter<Felt252>) -> String {
-    let mut items = Vec::new();
-    while let Some(item) = format_next_item(&mut felts) {
-        items.push(item.quote_if_string());
-    }
-    let panic_values_string = if let [item] = &items[..] {
-        item.clone()
-    } else {
-        format!("({})", items.join(", "))
-    };
-    format!("Panicked with {panic_values_string}.")
 }
 
 /// Configuration of compiled tests runner.
@@ -193,7 +186,7 @@ impl TestCompiler {
         let main_crate_ids = setup_project(db, Path::new(&path))?;
 
         if DiagnosticsReporter::stderr()
-            .with_crates(&main_crate_ids)
+            .with_extra_crates(&main_crate_ids)
             .check(db)
         {
             bail!("failed to compile: {}", path.display());
@@ -256,6 +249,15 @@ pub fn filter_test_cases(
     (tests, filtered_out)
 }
 
+/// The ran function return value.
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum RunResultValue {
+    /// Run ended successfully, returning the memory of the non-implicit returns.
+    Success(Vec<VMFelt>),
+    /// Run panicked, returning the carried error data.
+    Panic(Vec<VMFelt>),
+}
+
 /// The status of a ran test.
 enum TestStatus {
     Success,
@@ -278,12 +280,16 @@ pub struct TestsSummary {
     failed_run_results: Vec<RunResultValue>,
 }
 
+// fn convert_felt(input: cairo_vm::Felt252) -> cairo_felt::lib_bigint_felt::Felt252 {
+//     todo!()
+// }
+
 /// Runs the tests and process the results for a summary.
 pub fn run_tests(
     named_tests: Vec<(String, TestConfig)>,
     sierra_program: Program,
-    _function_set_costs: OrderedHashMap<FunctionId, OrderedHashMap<CostTokenType, i32>>,
-    _contracts_info: OrderedHashMap<Felt252, ContractInfo>,
+    // _function_set_costs: OrderedHashMap<FunctionId, OrderedHashMap<CostTokenType, i32>>,
+    // _contracts_info: OrderedHashMap<Felt252, ContractInfo>,
     oracle_server: &Option<String>,
     configuration: &Configuration,
     layout: &String,
@@ -311,6 +317,7 @@ pub fn run_tests(
                     &None,
                     &sierra_program,
                     &name,
+                    false,
                 );
 
                 Ok((

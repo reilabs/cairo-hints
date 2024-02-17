@@ -14,6 +14,8 @@ cairo-lang-casm = { workspace = true }
 cairo-lang-sierra = { workspace = true }
 cairo-lang-sierra-to-casm = { workspace = true }
 cairo-lang-sierra-type-size = { workspace = true }
+cairo-lang-sierra-ap-change = { workspace = true }
+cairo-lang-sierra-gas = { workspace = true }
 cairo-lang-runner = { workspace = true }
 cairo-lang-utils = { workspace = true }
 cairo-proto-serde = { workspace = true }
