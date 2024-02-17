@@ -34,14 +34,5 @@ cargo install --path cairo-hints --locked
 
 
 ## Testing
-Prerequisite for testing is to download `corelib-v2.4.3`. Execute the following commands in the root folder of this repo:
-```bash
-git clone https://github.com/starkware-libs/cairo.git
-cd cairo
-git checkout v2.4.3
-cd ..
-mv cairo/corelib/ .
-rm -rf cairo
-```
 
 To run all tests in this crate execute the following command `cargo test --workspace --no-fail-fast`.
