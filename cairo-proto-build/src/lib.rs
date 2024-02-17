@@ -408,16 +408,15 @@ impl Config {
                 for (name, v) in &content.1.enums {
                     let k = format!("{}::{}", module.components[0], name);
                     super_enums.insert(k, v.to_owned());
+                    // super_enums.insert(name.clone(), v.to_owned());
                 }
 
                 for (name, v) in &content.1.messages {
-                    let k = format!("{}::{}", module.components[0], name);
-                    super_messages.insert(k, v.to_owned());
+                    super_messages.insert(name.clone(), v.to_owned());
                 }
 
                 for (name, v) in &content.1.services {
-                    let k = format!("{}::{}", module.components[0], name);
-                    super_services.insert(k, v.to_owned());
+                    super_services.insert(name.clone(), v.to_owned());
                 }
             }
 
