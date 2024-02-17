@@ -280,16 +280,17 @@ impl<'a> CodeGenerator<'a> {
         }
         self.path.pop();
 
-        let struct_key = format!(
-            "{}{}{}",
-            self.type_path.join("::").to_lowercase(),
-            if self.type_path.is_empty() {
-                "".to_string()
-            } else {
-                "::".to_string()
-            },
-            struct_name
-        );
+        let struct_key = if self.type_path.is_empty() {
+            format!("{}::{}", self.package, struct_name)
+        } else {
+            format!(
+                "{}::{}::{}",
+                self.package,
+                self.type_path.join("::").to_lowercase(),
+                struct_name
+            )
+        };
+
         self.serde_config.messages.insert(struct_key, fields_def);
 
         self.path.push(8);
@@ -399,8 +400,6 @@ impl<'a> CodeGenerator<'a> {
         }
         if boxed {
             panic!("boxed types not supported?");
-            // self.buf
-            //     .push_str(&format!("{}::alloc::boxed::Box<", prost_path));
         }
         type_name.push_str(&ty);
         if boxed {
