@@ -48,8 +48,8 @@ pub fn new_package(opts: InitOptions, config: &Config) -> Result<NewResult> {
         !opts.path.exists(),
         formatdoc!(
             r#"
-                destination `{}` already exists
-                help: use `scarb init` to initialize the directory
+                destination `{}` already exists.
+                help: use a different project name.
             "#,
             opts.path
         )
