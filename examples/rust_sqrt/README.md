@@ -5,7 +5,7 @@ It calculates `sqrt` using an RPC server implemented in Rust.
 ## Prerequisites
 
 - `protoc` from [here](https://grpc.io/docs/protoc-installation/)
-- `scarb-v2.4.3` from [here](https://github.com/software-mansion/scarb/releases/tag/v2.4.3)
+- `scarb` from [here](https://github.com/software-mansion/scarb/releases)
 - `lambdaworks/provers/cairo` from [here](https://github.com/lambdaclass/lambdaworks/tree/fed12d674418e4f09bc843b71bc90008a85b1aed) for proving only. As of February 2024, the tested revision is `fed12d6`.
 
 ## Usage
@@ -20,8 +20,9 @@ It calculates `sqrt` using an RPC server implemented in Rust.
 If the circuit requires built-ins, it's possible to add the flag `--layout <VALUE>`
 
 It's possible to generate trace and memory files when running the circuit
-by adding the flags `--trace_file <PATH> --memory_file <PATH>`.
+by adding the flags `--trace-file <PATH> --memory-file <PATH>`.
 
+If the intention is to generate and verify a proof, execute `scarb hints-run` with the flag `--proof-mode`.
 The proof can be generated and verified using [`lambdaworks/provers/cairo`](https://github.com/lambdaclass/lambdaworks/tree/fed12d674418e4f09bc843b71bc90008a85b1aed).
 The command to generate the proof is: `platinum-prover prove <TRACE_FILE> <MEMORY_FILE> <PROOF_FILE>`.
 The command to verify a proof is: `platinum-prover verify <PROOF_FILE>`.
@@ -32,7 +33,7 @@ The command for running tests is: `scarb hints-test --oracle-server http://127.0
 
 ## Note
 
-Proof generation and verification has been tested exclusively with `scarb-v2.4.3` in combination with [`lambdaworks-fed12d6`](https://github.com/lambdaclass/lambdaworks/tree/fed12d674418e4f09bc843b71bc90008a85b1aed). Other versions may generate invalid proofs.
+Proof generation and verification has been tested exclusively with [`lambdaworks-fed12d6`](https://github.com/lambdaclass/lambdaworks/tree/fed12d674418e4f09bc843b71bc90008a85b1aed). Other versions may generate invalid proofs.
 
 To install the prover, execute the following commands:
 ```bash

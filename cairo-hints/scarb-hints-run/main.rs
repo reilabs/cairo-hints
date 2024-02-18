@@ -32,17 +32,21 @@ struct Args {
     #[clap(long = "layout", default_value = "plain", value_parser=validate_layout)]
     layout: String,
 
+    #[arg(long, default_value_t = false)]
+    proof_mode: bool,
+
     /// Oracle server URL.
     #[arg(long)]
     oracle_server: Option<String>,
 
+    /// Oracle lock file path.
     #[arg(long)]
     oracle_lock: Option<PathBuf>,
 
-    #[clap(long = "trace_file", value_parser)]
+    #[arg(long)]
     trace_file: Option<PathBuf>,
 
-    #[structopt(long = "memory_file")]
+    #[arg(long)]
     memory_file: Option<PathBuf>,
 }
 
@@ -107,7 +111,7 @@ fn main() -> Result<(), Error> {
         &args.memory_file,
         &sierra_program,
         "::main",
-        false,
+        args.proof_mode,
     ) {
         Err(Error::Cli(err)) => err.exit(),
         Ok(return_values) => {
