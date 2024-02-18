@@ -1,12 +1,15 @@
 use anyhow::{Error, Result};
 use camino::Utf8PathBuf;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use new::{new_package, InitOptions, VersionControl};
 use scarb::core::{Config, PackageName};
 use scarb::ops::{self};
 
 mod fsx;
 mod new;
+mod new_cairo;
+mod new_js;
+mod new_rust;
 mod restricted_names;
 
 #[derive(Parser, Debug)]
@@ -16,18 +19,15 @@ struct Args {
     path: Utf8PathBuf,
     #[clap(long = "name", value_parser)]
     name: Option<PackageName>,
-    #[clap(long = "lang", value_parser=validate_lang)]
-    lang: String,
+    #[clap(long = "lang", value_enum)]
+    lang: Lang,
 }
 
-fn validate_lang(value: &str) -> Result<String, String> {
-    match value {
-        "rust" => Ok(value.to_string()),
-        "js" => todo!("Javascript RPC server is still WIP."),
-        _ => Err(format!(
-            "{value} is not a supported language. Choose `rust` or `js`."
-        )),
-    }
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq)]
+#[clap(rename_all = "lower")]
+pub enum Lang {
+    Rust,
+    Js,
 }
 
 /// Arguments accepted by the `init` command.
@@ -48,6 +48,7 @@ pub struct NewArgs {
     pub path: Utf8PathBuf,
     #[command(flatten)]
     pub init: InitArgs,
+    pub lang: Lang,
 }
 
 pub fn run(args: NewArgs, config: &Config) -> Result<()> {
@@ -62,6 +63,7 @@ pub fn run(args: NewArgs, config: &Config) -> Result<()> {
             } else {
                 VersionControl::Git
             },
+            lang: args.lang,
         },
         config,
     )?;
@@ -85,6 +87,7 @@ fn main() {
             name: args.name,
             no_vcs: true,
         },
+        lang: args.lang,
     };
 
     if let Err(err) = run(new_args, &config) {

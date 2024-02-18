@@ -1,29 +1,14 @@
-use crate::{fsx, restricted_names};
+use crate::new_cairo::mk_cairo;
+use crate::new_js::mk_js;
+use crate::new_rust::mk_rust;
+use crate::{fsx, restricted_names, Lang};
 use anyhow::{bail, ensure, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
-use indoc::{formatdoc, indoc};
+use indoc::formatdoc;
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use scarb::core::{Config, PackageName};
-use scarb::ops;
 
 pub const DEFAULT_TARGET_DIR_NAME: &str = "target";
-pub const CAIRO_SOURCE_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["cairo", "src", "lib.cairo"].iter().collect());
-pub const ORACLE_SOURCE_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["cairo", "src", "oracle.cairo"].iter().collect());
-pub const CAIRO_MANIFEST_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["cairo", "Scarb.toml"].iter().collect());
-pub const PROTO_SOURCE_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["proto", "oracle.proto"].iter().collect());
-pub const SERVER_SOURCE_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["rust", "src", "main.rs"].iter().collect());
-pub const SERVER_BUILD_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["rust", "build.rs"].iter().collect());
-pub const SERVER_MANIFEST_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["rust", "Cargo.toml"].iter().collect());
-pub const ORACLE_LOCK_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["cairo", "Oracle.lock"].iter().collect());
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VersionControl {
@@ -36,6 +21,7 @@ pub struct InitOptions {
     pub path: Utf8PathBuf,
     pub name: Option<PackageName>,
     pub vcs: VersionControl,
+    pub lang: Lang,
 }
 
 #[derive(Debug)]
@@ -62,6 +48,7 @@ pub fn new_package(opts: InitOptions, config: &Config) -> Result<NewResult> {
             path: opts.path.clone(),
             name: name.clone(),
             version_control: opts.vcs,
+            lang: opts.lang,
         },
         config,
     )
@@ -108,6 +95,7 @@ struct MkOpts {
     path: Utf8PathBuf,
     name: PackageName,
     version_control: VersionControl,
+    lang: Lang,
 }
 
 fn mk(
@@ -115,6 +103,7 @@ fn mk(
         path,
         name,
         version_control,
+        lang,
     }: MkOpts,
     config: &Config,
 ) -> Result<()> {
@@ -124,225 +113,6 @@ fn mk(
     let canonical_path = fsx::canonicalize_utf8(&path).unwrap_or(path);
     init_vcs(&canonical_path, version_control)?;
     write_vcs_ignore(&canonical_path, config, version_control)?;
-
-    // Create the `Scarb.toml` file.
-    let manifest_path = canonical_path.join(CAIRO_MANIFEST_PATH.as_path());
-    if !manifest_path.exists() {
-        fsx::create_dir_all(manifest_path.parent().unwrap())?;
-
-        fsx::write(
-            &manifest_path,
-            formatdoc! {r#"
-            [package]
-            name = "{name}"
-            version = "0.1.0"
-            edition = "2023_10"
-
-            # See more keys and their definitions at https://docs.swmansion.com/scarb/docs/reference/manifest.html
-
-            [dependencies]
-
-            [tool.hints]
-            definitions = "../proto/oracle.proto"  # must be provided
-        "#},
-        )?;
-    }
-
-    // Create the `lib.cairo` file.
-    let filename = canonical_path.join(CAIRO_SOURCE_PATH.as_path());
-    if !filename.exists() {
-        fsx::create_dir_all(filename.parent().unwrap())?;
-
-        fsx::write(
-            filename,
-            indoc! {r#"
-                mod oracle;
-
-                use oracle::{Request, SqrtOracle};
-
-                fn main() -> bool {
-                    let num = 1764;
-
-                    let request = Request { n: num };
-                    let result = SqrtOracle::sqrt(request);
-
-                    result.n * result.n == num
-                }
-            "#},
-        )?;
-    }
-
-    // Create the `oracle.cairo` file.
-    let filename = canonical_path.join(ORACLE_SOURCE_PATH.as_path());
-    if !filename.exists() {
-        fsx::create_dir_all(filename.parent().unwrap())?;
-
-        fsx::write(
-            filename,
-            indoc! {r#"
-                use starknet::testing::cheatcode;
-                #[derive(Drop, Serde)]
-                struct Request {
-                    n: u64,
-                }
-                #[derive(Drop, Serde)]
-                struct Response {
-                    n: u64,
-                }
-                #[generate_trait]
-                impl SqrtOracle of SqrtOracleTrait {
-                    fn sqrt(arg: super::oracle::Request) -> super::oracle::Response {
-                        let mut serialized = ArrayTrait::new();
-                        arg.serialize(ref serialized);
-                        let mut result = cheatcode::<'sqrt'>(serialized.span());
-                        Serde::deserialize(ref result).unwrap()
-                    }
-                }
-            "#},
-        )?;
-    }
-
-    // Create the `oracle.proto` file.
-    let filename = canonical_path.join(PROTO_SOURCE_PATH.as_path());
-    if !filename.exists() {
-        fsx::create_dir_all(filename.parent().unwrap())?;
-
-        fsx::write(
-            filename,
-            indoc! {r#"
-                syntax = "proto3";
-
-                package oracle;
-
-                message Request {
-                    uint64 n = 1;
-                }
-
-                message Response {
-                    uint64 n = 1;
-                }
-
-                service SqrtOracle {
-                    rpc Sqrt(Request) returns (Response);
-                }
-            "#},
-        )?;
-    }
-
-    // Create the `main.rs` file.
-    let filename = canonical_path.join(SERVER_SOURCE_PATH.as_path());
-    if !filename.exists() {
-        fsx::create_dir_all(filename.parent().unwrap())?;
-
-        fsx::write(
-            filename,
-            indoc! {r#"
-                use axum::{
-                    extract,
-                    routing::post,
-                    Router,
-                    Json,
-                };
-                use serde::{Serialize, Deserialize};
-                use tracing::debug;
-                use tower_http::trace::TraceLayer;
-
-                include!("./oracle.rs");
-
-                #[derive(Debug, Serialize, Deserialize)]
-                struct JsonResult {
-                    result: Response
-                }
-
-                async fn root(extract::Json(payload): extract::Json<Request>) -> Json<JsonResult> {
-                    debug!("received payload {payload:?}");
-                    let n = (payload.n as f64).sqrt() as u64;
-                    Json(JsonResult { result: Response { n } })
-                }
-
-                #[tokio::main(flavor = "current_thread")]
-                async fn main() {
-                    tracing_subscriber::fmt()
-                        .with_max_level(tracing::Level::DEBUG)
-                        .init();
-
-                    let app = Router::new()
-                        .route("/", post(root))
-                        .layer(TraceLayer::new_for_http());
-
-                    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
-                        .await
-                        .expect("Failed to bind to port 3000, port already in use by another process. Change the port or terminate the other process.");
-                    debug!("Server started on http://0.0.0.0:3000");
-                    axum::serve(listener, app).await.unwrap();
-                }
-            "#},
-        )?;
-    }
-
-    // Create the `build.rs` file.
-    let filename = canonical_path.join(SERVER_BUILD_PATH.as_path());
-    if !filename.exists() {
-        fsx::create_dir_all(filename.parent().unwrap())?;
-
-        fsx::write(
-            filename,
-            indoc! {r##"
-                extern crate prost_build;
-                use std::io::Result;
-                use std::path::PathBuf;
-
-                fn main() -> Result<()> {
-                    let mut prost_build = prost_build::Config::new();
-                    prost_build.type_attribute(".", "#[derive(serde::Deserialize, serde::Serialize)]");
-                    prost_build.out_dir(PathBuf::from(r"./src"));
-                    prost_build.compile_protos(&["../proto/oracle.proto"], &["../proto"])
-                }
-            "##},
-        )?;
-    }
-
-    // Create the `cargo.toml` file.
-    let filename = canonical_path.join(SERVER_MANIFEST_PATH.as_path());
-    if !filename.exists() {
-        fsx::create_dir_all(filename.parent().unwrap())?;
-
-        fsx::write(
-            &filename,
-            formatdoc! {r#"
-                [package]
-                name = "{name}-rpc-server"
-                version = "0.1.0"
-                edition = "2021"
-
-                [dependencies]
-                axum = "0.7.3"
-                serde = {{ version = "1.0.195", features = ["serde_derive"] }}
-                serde_repr = "0.1.18"
-                tokio = "1.35.1"
-                tower-http = {{ version = "0.5.0", features = ["trace"] }}
-                tracing = "0.1.40"
-                tracing-subscriber = "0.3.18"
-                prost = "0.12.3"
-
-                [build-dependencies]
-                prost-build = "0.12.3"
-            "#},
-        )?;
-    }
-
-    // Create the `Oracle.lock` file.
-    let filename = canonical_path.join(ORACLE_LOCK_PATH.as_path());
-    if !filename.exists() {
-        fsx::create_dir_all(filename.parent().unwrap())?;
-
-        fsx::write(
-            &filename,
-            indoc! {r#"
-                {"enums":{},"messages":{"oracle::Request":[{"name":"n","ty":{"primitive":"u64"}}],"oracle::Response":[{"name":"n","ty":{"primitive":"u64"}}]},"services":{"SqrtOracle":{"sqrt":{"input":{"message":"oracle::Request"},"output":{"message":"oracle::Response"}}}}}
-            "#},
-        )?;
-    }
 
     let filename = canonical_path.join("README.md");
     if !filename.exists() {
@@ -365,7 +135,9 @@ fn mk(
 
                 1. `cd cairo`
                 2. In a new shell tab
-                    * `cd rust; cargo run`
+                    `cd rust; cargo run`
+                    or, if Javascript is the chosen server language,
+                    `cd js; npm start`
                 3. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --layout all_cairo`
 
                 ## Extra options
@@ -399,13 +171,11 @@ fn mk(
         )?;
     }
 
-    if let Err(err) = ops::read_workspace(&manifest_path, config) {
-        config.ui().warn(formatdoc! {r#"
-            compiling this new package may not work due to invalid workspace configuration
-
-            {err:?}
-        "#})
+    match lang {
+        Lang::Rust => mk_rust(&canonical_path, &name, &config)?,
+        Lang::Js => mk_js(&canonical_path, &name, &config)?,
     }
+    mk_cairo(&canonical_path, &name, &config)?;
 
     Ok(())
 }
