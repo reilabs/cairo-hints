@@ -32,6 +32,9 @@ struct Args {
     #[clap(long = "layout", default_value = "plain", value_parser=validate_layout)]
     layout: String,
 
+    #[clap(long = "proof_mode", value_parser)]
+    proof_mode: bool,
+
     /// Oracle server URL.
     #[arg(long)]
     oracle_server: Option<String>,
@@ -107,7 +110,7 @@ fn main() -> Result<(), Error> {
         &args.memory_file,
         &sierra_program,
         "::main",
-        false,
+        args.proof_mode,
     ) {
         Err(Error::Cli(err)) => err.exit(),
         Ok(return_values) => {
