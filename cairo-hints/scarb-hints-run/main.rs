@@ -32,7 +32,7 @@ struct Args {
     #[clap(long = "layout", default_value = "plain", value_parser=validate_layout)]
     layout: String,
 
-    #[clap(long = "proof_mode", value_parser)]
+    #[arg(long, default_value_t = false)]
     proof_mode: bool,
 
     /// Oracle server URL.
@@ -42,10 +42,10 @@ struct Args {
     #[arg(long)]
     oracle_lock: Option<PathBuf>,
 
-    #[clap(long = "trace_file", value_parser)]
+    #[arg(long)]
     trace_file: Option<PathBuf>,
 
-    #[structopt(long = "memory_file")]
+    #[arg(long)]
     memory_file: Option<PathBuf>,
 }
 
