@@ -39,6 +39,7 @@ struct Args {
     #[arg(long)]
     oracle_server: Option<String>,
 
+    /// Oracle lock file path.
     #[arg(long)]
     oracle_lock: Option<PathBuf>,
 
