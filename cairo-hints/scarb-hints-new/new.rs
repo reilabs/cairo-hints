@@ -128,7 +128,7 @@ fn mk(
                 ## Prerequisites
 
                 - `protoc` from [here](https://grpc.io/docs/protoc-installation/)
-                - `scarb-v2.4.3` from [here](https://github.com/software-mansion/scarb/releases/tag/v2.4.3)
+                - `scarb` from [here](https://github.com/software-mansion/scarb/releases)
                 - `lambdaworks/provers/cairo` from [here](https://github.com/lambdaclass/lambdaworks/tree/fed12d674418e4f09bc843b71bc90008a85b1aed) for proving only. As of February 2024, the tested revision is `fed12d6`.
 
                 ## Usage
@@ -156,7 +156,7 @@ fn mk(
 
                 ## Note
 
-                Proof generation and verification has been tested exclusively with `scarb-v2.4.3` in combination with [`lambdaworks-fed12d6`](https://github.com/lambdaclass/lambdaworks/tree/fed12d674418e4f09bc843b71bc90008a85b1aed). Other versions may generate invalid proofs.
+                Proof generation and verification has been tested exclusively with [`lambdaworks-fed12d6`](https://github.com/lambdaclass/lambdaworks/tree/fed12d674418e4f09bc843b71bc90008a85b1aed). Other versions may generate invalid proofs.
 
                 To install the prover, execute the following commands:
                 ```bash

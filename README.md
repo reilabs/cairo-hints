@@ -7,7 +7,7 @@ It uses protocol buffers to define messages shared between Cairo and an external
 ## Prerequisites
 
 - `protoc` from [here](https://grpc.io/docs/protoc-installation/)
-- `scarb-v2.4.3` from [here](https://github.com/software-mansion/scarb/releases/tag/v2.4.3)
+- `scarb` from [here](https://github.com/software-mansion/scarb/releases)
 - `lambdaworks/provers/cairo` from [here](https://github.com/lambdaclass/lambdaworks/tree/fed12d674418e4f09bc843b71bc90008a85b1aed) for proving only. As of February 2024, the tested revision is `fed12d6`.
 
 
