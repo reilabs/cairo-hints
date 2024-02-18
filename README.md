@@ -1,9 +1,8 @@
-# Cairo 1 Hints
+# Cairo Hints
 
-This repository adds RPC hints to Cairo, without modifying the compiler or the VM.
+This repository adds external hints to Cairo without modifying the compiler or the VM.
 
-It uses protocol buffers to define messages shared between Cairo and RPC server, code generator and hint processor implemented in this repository.
-
+It uses protocol buffers to define messages shared between Cairo and an external RPC server. Our own code runner (`scarb hints-run`) is used to execute Cairo code with hints.
 
 ## Prerequisites
 
@@ -14,14 +13,14 @@ It uses protocol buffers to define messages shared between Cairo and RPC server,
 
 ## Installation
 
-Clone this repo and run:
+Clone this repository and run:
 ```bash
 cargo install --path cairo-hints --locked
 ```
 
 ## Usage
 
-1. Create new project using `scarb hints-new --lang rust <PROJ_NAME>`. You can also use the example project in `examples/hints_poc` instead.
+1. Create a new project using `scarb hints-new --lang rust <PROJ_NAME>`
 2. Define messages in a `.proto` file
 3. Run `scarb hints-build` in the folder `cairo`
 4. In another tab, `cd rust` and start the RPC server with the command `cargo run`
