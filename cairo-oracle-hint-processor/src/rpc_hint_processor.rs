@@ -23,6 +23,7 @@ use cairo_vm::{
         vm_core::VirtualMachine,
     },
 };
+use reqwest::Url;
 use core::any::Any;
 use indoc::formatdoc;
 use itertools::Itertools;
@@ -86,6 +87,8 @@ impl<'a> Rpc1HintProcessor<'a> {
         let server_url = self.server.as_ref().expect(
             format!("Please provide an --oracle-server argument to execute hints").as_str(),
         );
+        let mut server_url = Url::parse(server_url).expect("oracle-server must be a valid URL");
+        server_url.path_segments_mut().expect("cannot be a base URL").push(selector);
 
         let data = deserialize_cairo_serde(
             self.configuration,
@@ -96,7 +99,7 @@ impl<'a> Rpc1HintProcessor<'a> {
 
         let client = reqwest::blocking::Client::new();
 
-        let req = client.post(server_url).json(&data).send().expect(
+        let req = client.post(server_url.clone()).json(&data).send().expect(
             format!("Couldn't connect to oracle server {server_url}. Is the server running?")
                 .as_str(),
         );

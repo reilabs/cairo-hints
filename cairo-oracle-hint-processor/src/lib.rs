@@ -3,7 +3,7 @@ use std::io;
 use std::io::Write;
 use std::path::PathBuf;
 
-use crate::rpc_1_hint_processor::Rpc1HintProcessor;
+use crate::rpc_hint_processor::Rpc1HintProcessor;
 use anyhow::Result;
 use bincode::enc::write::Writer;
 use cairo_lang_casm::casm;
@@ -63,7 +63,7 @@ use cairo_vm::Felt252;
 use itertools::chain;
 use thiserror::Error;
 
-pub mod rpc_1_hint_processor;
+pub mod rpc_hint_processor;
 
 mod hint_processor_utils;
 

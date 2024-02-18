@@ -1,9 +1,0 @@
-syntax = "proto3";
-
-package oracle;
-
-import "field.proto";
-
-service SqrtOracle {
-    rpc Sqrt(shirts.Request) returns (shirts.Response);
-}

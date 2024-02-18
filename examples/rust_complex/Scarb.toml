@@ -1,14 +1,14 @@
 [package]
-name = "hints_poc"
+name = "rust_sqrt"
 version = "0.1.0"
 edition = "2023_10"
 
 # See more keys and their definitions at https://docs.swmansion.com/scarb/docs/reference/manifest.html
 
 [dependencies]
-alexandria_math = { git = "https://github.com/keep-starknet-strange/alexandria.git", rev = "f37d73d8a8248e4d8dc65de3949333e30bda022f" }
+alexandria_math = { git = "https://github.com/keep-starknet-strange/alexandria.git", rev = "417c5a80ed2fef05ce159d643f3e34a5386ee06c" }
 
 [tool.hints]
-definitions = "../proto/oracle.proto"  # must be provided
+definitions = "proto/oracle.proto"  # must be provided
 # cairo_output = "src"                 # default "src"
 # oracle_lock = "Oracle.lock"          # default "Oracle.lock"

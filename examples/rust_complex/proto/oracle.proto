@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package oracle;
+
+import "field.proto";
+
+service ShirtsOracle {
+    rpc Shirt(shirts.Request) returns (shirts.Response);
+}

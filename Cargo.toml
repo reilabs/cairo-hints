@@ -8,7 +8,7 @@ members = [
     "cairo-hints",
 ]
 exclude = [
-    "examples/hints_poc/rust"
+    "examples/rust_complex/rust"
 ]
 
 [workspace.package]
