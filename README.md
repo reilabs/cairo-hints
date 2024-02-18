@@ -25,7 +25,7 @@ cargo install --path cairo-hints --locked
 3. Run `scarb hints-build`
 4. In another tab, `cd rust` and start the RPC server with the command `cargo run`
 5. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --layout all_cairo`
-6. Integration tests can be run with `scarb hints-test --oracle-server http://127.0.0.1:3000  --layout all_cairo`
+6. Integration tests can be run with `scarb hints-test --oracle-server http://127.0.0.1:3000 --layout all_cairo`
 
 
 ## Example Projects
