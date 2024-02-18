@@ -1,6 +1,6 @@
 # Example Project
 
-It calculates sqrt using an RPC server implemented in Rust.
+It shows how to use `enums` and dependencies with Cairo hints.
 
 ## Usage
 
