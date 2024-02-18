@@ -161,7 +161,7 @@ fn mk(
                 ```bash
                     git clone https://github.com/lambdaclass/lambdaworks.git
                     cd lambdaworks
-                    git reset --hard fed12d674418e4f09bc843b71bc90008a85b1aed
+                    git checkout fed12d674418e4f09bc843b71bc90008a85b1aed
                     cd provers/cairo
                     cargo install --path . --locked --features=cli,instruments,parallel
                 ```
