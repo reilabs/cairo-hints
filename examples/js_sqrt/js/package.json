@@ -1,0 +1,8 @@
+{
+    "name": "js",
+    "version": "0.1.0",
+    "description": "js_sqrt-rpc-server",
+    "dependencies": {
+        "express": "^4.18.2"
+    }
+}

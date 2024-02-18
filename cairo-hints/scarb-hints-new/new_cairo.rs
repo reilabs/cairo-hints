@@ -16,9 +16,6 @@ pub const PROTO_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["proto", "oracle.proto"].iter().collect());
 pub const ORACLE_LOCK_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["Oracle.lock"].iter().collect());
-pub const GITIGNORE_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| [".gitignore"].iter().collect());
-
 
 pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Config) -> Result<()> {
     // Create the `Scarb.toml` file.
@@ -140,20 +137,6 @@ pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Confi
             "#},
         )?;
     }
-
-        // Create the `.gitignore` file.
-        let filename = canonical_path.join(GITIGNORE_PATH.as_path());
-        if !filename.exists() {
-            fsx::create_dir_all(filename.parent().unwrap())?;
-    
-            fsx::write(
-                filename,
-                indoc! {r#"
-                    target
-                "#},
-            )?;
-        }
-    
 
     if let Err(err) = ops::read_workspace(&manifest_path, config) {
         config.ui().warn(formatdoc! {r#"

@@ -133,12 +133,10 @@ fn mk(
 
                 ## Usage
 
-                1. `cd cairo`
-                2. In a new shell tab
-                    `cd rust; cargo run`
-                    or, if Javascript is the chosen server language,
-                    `cd js; npm start`
-                3. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --layout all_cairo`
+                1. Start the hints server:
+                    1. Rust: `cd rust; cargo run`
+                    2. Javascript: `cd js; npm install; npm start`
+                2. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --layout all_cairo`
 
                 ## Extra options
 

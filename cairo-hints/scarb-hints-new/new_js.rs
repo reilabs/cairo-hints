@@ -9,6 +9,8 @@ pub const SERVER_MANIFEST_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["js", "package.json"].iter().collect());
 pub const SERVER_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["js", "server.js"].iter().collect());
+pub const GITIGNORE_PATH: Lazy<Utf8PathBuf> =
+    Lazy::new(|| [".gitignore"].iter().collect());
 
 pub fn mk_js(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Config) -> Result<()> {
     // Create the `package.json` file.
@@ -46,7 +48,7 @@ pub fn mk_js(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Config)
 
                 app.use(express.json());
 
-                app.post('/', (req, res) => {
+                app.post('/sqrt', (req, res) => {
                     console.dir(`received payload ${JSON.stringify(req.body)}`);
                     n = Math.sqrt(req.body.n);
                     res.statusCode = 200;
@@ -57,6 +59,19 @@ pub fn mk_js(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Config)
                 app.listen(port, hostname, () => {
                     console.log(`Example app listening on port ${port}`);
                 });
+            "#},
+        )?;
+    }
+
+    // Create the `.gitignore` file.
+    let filename = canonical_path.join(GITIGNORE_PATH.as_path());
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
+
+        fsx::write(
+            filename,
+            indoc! {r#"
+                node_modules
             "#},
         )?;
     }

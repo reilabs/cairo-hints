@@ -11,6 +11,9 @@ pub const SERVER_BUILD_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["rust", "build.rs"].iter().collect());
 pub const SERVER_MANIFEST_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["rust", "Cargo.toml"].iter().collect());
+pub const GITIGNORE_PATH: Lazy<Utf8PathBuf> =
+    Lazy::new(|| [".gitignore"].iter().collect());
+
 
 pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Config) -> Result<()> {
     // Create the `main.rs` file.
@@ -117,5 +120,18 @@ pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Confi
         )?;
     }
 
+    // Create the `.gitignore` file.
+    let filename = canonical_path.join(GITIGNORE_PATH.as_path());
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
+
+        fsx::write(
+            filename,
+            indoc! {r#"
+                target
+            "#},
+        )?;
+    }
+    
     Ok(())
 }

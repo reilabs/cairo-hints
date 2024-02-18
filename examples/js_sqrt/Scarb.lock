@@ -2,5 +2,5 @@
 version = 1
 
 [[package]]
-name = "rust_sqrt"
+name = "js_sqrt"
 version = "0.1.0"
