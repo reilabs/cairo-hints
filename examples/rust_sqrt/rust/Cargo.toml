@@ -1,0 +1,17 @@
+[package]
+name = "rust_sqrt-rpc-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.7.3"
+serde = { version = "1.0.195", features = ["serde_derive"] }
+serde_repr = "0.1.18"
+tokio = "1.35.1"
+tower-http = { version = "0.5.0", features = ["trace"] }
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+prost = "0.12.3"
+
+[build-dependencies]
+prost-build = "0.12.3"

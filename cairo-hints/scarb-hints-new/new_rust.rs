@@ -21,6 +21,8 @@ pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Confi
         fsx::write(
             filename,
             indoc! {r#"
+                mod oracle;
+
                 use axum::{
                     extract,
                     routing::post,
@@ -30,8 +32,7 @@ pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Confi
                 use serde::{Serialize, Deserialize};
                 use tracing::debug;
                 use tower_http::trace::TraceLayer;
-
-                include!("./oracle.rs");
+                use oracle::*;
 
                 #[derive(Debug, Serialize, Deserialize)]
                 struct JsonResult {
@@ -51,7 +52,7 @@ pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Confi
                         .init();
 
                     let app = Router::new()
-                        .route("/", post(root))
+                        .route("/sqrt", post(root))
                         .layer(TraceLayer::new_for_http());
 
                     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
@@ -77,6 +78,7 @@ pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Confi
                 use std::path::PathBuf;
 
                 fn main() -> Result<()> {
+                    println!("cargo:rerun-if-changed=../proto");
                     let mut prost_build = prost_build::Config::new();
                     prost_build.type_attribute(".", "#[derive(serde::Deserialize, serde::Serialize)]");
                     prost_build.out_dir(PathBuf::from(r"./src"));

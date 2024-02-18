@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package oracle;
+
+message Request {
+    uint64 n = 1;
+}
+
+message Response {
+    uint64 n = 1;
+}
+
+service SqrtOracle {
+    rpc Sqrt(Request) returns (Response);
+}

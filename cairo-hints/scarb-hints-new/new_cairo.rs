@@ -7,15 +7,18 @@ use scarb::core::{Config, PackageName};
 use scarb::ops;
 
 pub const CAIRO_SOURCE_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["cairo", "src", "lib.cairo"].iter().collect());
+    Lazy::new(|| ["src", "lib.cairo"].iter().collect());
 pub const ORACLE_SOURCE_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["cairo", "src", "oracle.cairo"].iter().collect());
+    Lazy::new(|| ["src", "oracle.cairo"].iter().collect());
 pub const CAIRO_MANIFEST_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["cairo", "Scarb.toml"].iter().collect());
+    Lazy::new(|| ["Scarb.toml"].iter().collect());
 pub const PROTO_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["proto", "oracle.proto"].iter().collect());
 pub const ORACLE_LOCK_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["cairo", "Oracle.lock"].iter().collect());
+    Lazy::new(|| ["Oracle.lock"].iter().collect());
+pub const GITIGNORE_PATH: Lazy<Utf8PathBuf> =
+    Lazy::new(|| [".gitignore"].iter().collect());
+
 
 pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Config) -> Result<()> {
     // Create the `Scarb.toml` file.
@@ -36,7 +39,10 @@ pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Confi
             [dependencies]
 
             [tool.hints]
-            definitions = "../proto/oracle.proto"  # must be provided
+            definitions = "proto/oracle.proto"  # required
+            # cairo_output = "src"
+            # oracle_lock = "Oracle.lock"
+
         "#},
         )?;
     }
@@ -134,6 +140,20 @@ pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Confi
             "#},
         )?;
     }
+
+        // Create the `.gitignore` file.
+        let filename = canonical_path.join(GITIGNORE_PATH.as_path());
+        if !filename.exists() {
+            fsx::create_dir_all(filename.parent().unwrap())?;
+    
+            fsx::write(
+                filename,
+                indoc! {r#"
+                    target
+                "#},
+            )?;
+        }
+    
 
     if let Err(err) = ops::read_workspace(&manifest_path, config) {
         config.ui().warn(formatdoc! {r#"
