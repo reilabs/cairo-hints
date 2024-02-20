@@ -2,8 +2,15 @@ syntax = "proto3";
 
 package oracle;
 
-import "field.proto";
+message Request {
+    uint32 n = 1;
+    uint32 len = 2;
+}
 
-service ShirtsOracle {
-    rpc Shirt(shirts.Request) returns (shirts.Response);
+message Response {
+    repeated uint32 nb = 1;
+}
+
+service BinaryOracle {
+    rpc ToBinary(Request) returns (Response);
 }
