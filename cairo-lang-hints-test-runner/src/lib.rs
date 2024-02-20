@@ -2,6 +2,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use anyhow::{bail, Result};
+use cairo_felt::Felt252;
 use cairo_lang_compiler::db::RootDatabase;
 use cairo_lang_compiler::diagnostics::DiagnosticsReporter;
 use cairo_lang_compiler::project::setup_project;
@@ -9,6 +10,7 @@ use cairo_lang_filesystem::cfg::{Cfg, CfgSet};
 use cairo_lang_filesystem::ids::CrateId;
 use cairo_lang_sierra::program::Program;
 use cairo_lang_starknet::starknet_plugin_suite;
+use cairo_lang_test_plugin::test_config::{PanicExpectation, TestExpectation};
 use cairo_lang_test_plugin::{
     compile_test_prepared_db, test_plugin_suite, TestCompilation, TestConfig,
 };
@@ -280,9 +282,10 @@ pub struct TestsSummary {
     failed_run_results: Vec<RunResultValue>,
 }
 
-// fn convert_felt(input: cairo_vm::Felt252) -> cairo_felt::lib_bigint_felt::Felt252 {
-//     todo!()
-// }
+fn is_equal_vec_felt(a: &Vec<VMFelt>, b: &Vec<Felt252>) -> bool {
+    a.iter().map(|f| f.to_biguint()).collect_vec()
+        != b.iter().map(|f: &Felt252| f.to_biguint()).collect_vec()
+}
 
 /// Runs the tests and process the results for a summary.
 pub fn run_tests(
@@ -325,9 +328,21 @@ pub fn run_tests(
                     Some(TestResult {
                         status: match r {
                             Ok(_) => TestStatus::Success,
-                            Err(Error::RunPanic(panic_data)) => {
-                                TestStatus::Fail(RunResultValue::Panic(panic_data))
-                            }
+                            Err(Error::RunPanic(panic_data)) => match test.expectation {
+                                TestExpectation::Success => {
+                                    TestStatus::Fail(RunResultValue::Panic(panic_data))
+                                }
+                                TestExpectation::Panics(panic_expectation) => {
+                                    match panic_expectation {
+                                        PanicExpectation::Exact(expected)
+                                            if !is_equal_vec_felt(&panic_data, &expected) =>
+                                        {
+                                            TestStatus::Fail(RunResultValue::Panic(panic_data))
+                                        }
+                                        _ => TestStatus::Success,
+                                    }
+                                }
+                            },
                             Err(_) => panic!("Error!"),
                         },
                         gas_usage: None,
