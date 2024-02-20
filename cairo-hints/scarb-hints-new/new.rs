@@ -8,7 +8,7 @@ use indoc::formatdoc;
 use itertools::Itertools;
 use scarb::core::{Config, PackageName};
 
-pub const DEFAULT_TARGET_DIR_NAME: &str = "target";
+const DEFAULT_TARGET_DIR_NAME: &str = "target";
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VersionControl {
@@ -29,7 +29,7 @@ pub struct NewResult {
     pub name: PackageName,
 }
 
-pub fn new_package(opts: InitOptions, config: &Config) -> Result<NewResult> {
+pub(crate) fn new_package(opts: InitOptions, config: &Config) -> Result<NewResult> {
     ensure!(
         !opts.path.exists(),
         formatdoc!(

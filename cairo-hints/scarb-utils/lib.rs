@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use scarb_metadata::PackageMetadata;
 
+#[doc(hidden)]
 pub fn absolute_path(
     package: &PackageMetadata,
     arg: Option<PathBuf>,

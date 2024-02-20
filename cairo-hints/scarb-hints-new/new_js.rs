@@ -5,14 +5,16 @@ use indoc::{formatdoc, indoc};
 use once_cell::sync::Lazy;
 use scarb::core::{Config, PackageName};
 
-pub const SERVER_MANIFEST_PATH: Lazy<Utf8PathBuf> =
+const SERVER_MANIFEST_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["js", "package.json"].iter().collect());
-pub const SERVER_SOURCE_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["js", "server.js"].iter().collect());
-pub const GITIGNORE_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| [".gitignore"].iter().collect());
+const SERVER_SOURCE_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["js", "server.js"].iter().collect());
+const GITIGNORE_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| [".gitignore"].iter().collect());
 
-pub fn mk_js(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Config) -> Result<()> {
+pub(crate) fn mk_js(
+    canonical_path: &Utf8PathBuf,
+    name: &PackageName,
+    _config: &Config,
+) -> Result<()> {
     // Create the `package.json` file.
     let filename = canonical_path.join(SERVER_MANIFEST_PATH.as_path());
     if !filename.exists() {

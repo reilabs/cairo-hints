@@ -1,14 +1,12 @@
-//! Mostly [`fs`] extensions with extra error messaging.
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 
-/// Equivalent to [`fs::canonicalize`] with better error messages.
-///
-/// Uses [`dunce`] to generate more familiar paths on Windows.
+// Equivalent to [`fs::canonicalize`] with better error messages.
+//
+// Uses [`dunce`] to generate more familiar paths on Windows.
 pub fn canonicalize(p: impl AsRef<Path>) -> Result<PathBuf> {
     return inner(p.as_ref());
 
@@ -18,12 +16,12 @@ pub fn canonicalize(p: impl AsRef<Path>) -> Result<PathBuf> {
     }
 }
 
-/// Equivalent to [`fs::canonicalize`], but for Utf-8 paths, with better error messages.
+// Equivalent to [`fs::canonicalize`], but for Utf-8 paths, with better error messages.
 pub fn canonicalize_utf8(p: impl AsRef<Path>) -> Result<Utf8PathBuf> {
     canonicalize(p)?.try_into_utf8()
 }
 
-/// Equivalent to [`fs::create_dir_all`] with better error messages.
+// Equivalent to [`fs::create_dir_all`] with better error messages.
 pub fn create_dir_all(p: impl AsRef<Path>) -> Result<()> {
     return inner(p.as_ref());
 
@@ -34,7 +32,7 @@ pub fn create_dir_all(p: impl AsRef<Path>) -> Result<()> {
     }
 }
 
-/// Equivalent to [`fs::write`] with better error messages.
+// Equivalent to [`fs::write`] with better error messages.
 pub fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> Result<()> {
     return inner(path.as_ref(), contents.as_ref());
 

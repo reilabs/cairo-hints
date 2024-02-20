@@ -12,6 +12,7 @@ use scarb_ui::args::PackagesFilter;
 use scarb_utils::absolute_path;
 
 /// Execute all unit tests of a local package.
+#[doc(hidden)]
 #[derive(Parser, Clone, Debug)]
 #[command(author, version)]
 struct Args {
@@ -41,6 +42,7 @@ struct Args {
     layout: String,
 }
 
+#[doc(hidden)]
 fn validate_layout(value: &str) -> Result<String, String> {
     match value {
         "plain"
@@ -56,6 +58,7 @@ fn validate_layout(value: &str) -> Result<String, String> {
     }
 }
 
+#[doc(hidden)]
 fn main() -> Result<()> {
     let args: Args = Args::parse();
 
@@ -108,6 +111,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+#[doc(hidden)]
 fn find_testable_targets(package: &PackageMetadata) -> Vec<&TargetMetadata> {
     package
         .targets

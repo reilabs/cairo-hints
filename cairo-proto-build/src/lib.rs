@@ -351,10 +351,6 @@ impl Config {
 
     /// Processes a set of modules and file descriptors, returning a map of modules to generated
     /// code contents.
-    ///
-    /// This is generally used when control over the output should not be managed by Prost,
-    /// such as in a flow for a `protoc` code generating plugin. When compiling as part of a
-    /// `build.rs` file, instead use [`compile_protos()`].
     pub fn generate(
         &mut self,
         protos: &[impl AsRef<Path>],

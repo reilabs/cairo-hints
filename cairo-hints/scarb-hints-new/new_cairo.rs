@@ -6,18 +6,19 @@ use once_cell::sync::Lazy;
 use scarb::core::{Config, PackageName};
 use scarb::ops;
 
-pub const CAIRO_SOURCE_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["src", "lib.cairo"].iter().collect());
-pub const ORACLE_SOURCE_PATH: Lazy<Utf8PathBuf> =
+const CAIRO_SOURCE_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["src", "lib.cairo"].iter().collect());
+const ORACLE_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["src", "oracle.cairo"].iter().collect());
-pub const CAIRO_MANIFEST_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["Scarb.toml"].iter().collect());
-pub const PROTO_SOURCE_PATH: Lazy<Utf8PathBuf> =
+const CAIRO_MANIFEST_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["Scarb.toml"].iter().collect());
+const PROTO_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["proto", "oracle.proto"].iter().collect());
-pub const ORACLE_LOCK_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["Oracle.lock"].iter().collect());
+const ORACLE_LOCK_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["Oracle.lock"].iter().collect());
 
-pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Config) -> Result<()> {
+pub(crate) fn mk_cairo(
+    canonical_path: &Utf8PathBuf,
+    name: &PackageName,
+    config: &Config,
+) -> Result<()> {
     // Create the `Scarb.toml` file.
     let manifest_path = canonical_path.join(CAIRO_MANIFEST_PATH.as_path());
     if !manifest_path.exists() {

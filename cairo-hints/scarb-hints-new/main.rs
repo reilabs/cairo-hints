@@ -5,59 +5,73 @@ use new::{new_package, InitOptions, VersionControl};
 use scarb::core::{Config, PackageName};
 use scarb::ops::{self};
 
+#[doc(hidden)]
 mod fsx;
+
+#[doc(hidden)]
 mod new;
+
+#[doc(hidden)]
 mod new_cairo;
+
+#[doc(hidden)]
 mod new_js;
+
+#[doc(hidden)]
 mod new_rust;
+
+#[doc(hidden)]
 mod restricted_names;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
+/// Arguments accepted `scarb-hints-new` command.
 struct Args {
+    /// Set the folder of the package name.
     #[clap(value_parser)]
     path: Utf8PathBuf,
+    /// Set the resulting package name, defaults to the directory name.
     #[clap(long = "name", value_parser)]
     name: Option<PackageName>,
+    /// Set the RPC server language, Rust or JavaScript
     #[clap(long = "lang", value_enum)]
     lang: Lang,
 }
 
+#[doc(hidden)]
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq)]
 #[clap(rename_all = "lower")]
-pub enum Lang {
+enum Lang {
     Rust,
     Js,
 }
 
-/// Arguments accepted by the `init` command.
+#[doc(hidden)]
 #[derive(Parser, Clone, Debug)]
-pub struct InitArgs {
-    /// Set the resulting package name, defaults to the directory name.
+struct InitArgs {
     #[arg(long)]
-    pub name: Option<PackageName>,
-
-    /// Do not initialize a new Git repository.
+    name: Option<PackageName>,
     #[arg(long)]
-    pub no_vcs: bool,
+    no_vcs: bool,
 }
 
 /// Arguments accepted by the `new` command.
+#[doc(hidden)]
 #[derive(Parser, Clone, Debug)]
-pub struct NewArgs {
-    pub path: Utf8PathBuf,
+struct NewArgs {
+    path: Utf8PathBuf,
     #[command(flatten)]
-    pub init: InitArgs,
-    pub lang: Lang,
+    init: InitArgs,
+    lang: Lang,
 }
 
-pub fn run(args: NewArgs, config: &Config) -> Result<()> {
+#[doc(hidden)]
+fn run(args: NewArgs, config: &Config) -> Result<()> {
     let _result = new_package(
         InitOptions {
             name: args.init.name,
             path: args.path,
-            // At the moment, we only support Git but ideally, we want to
-            // support more VCS and allow user to explicitly specify which VCS to use.
+            // At the moment, the default is NoVcs
             vcs: if args.init.no_vcs {
                 VersionControl::NoVcs
             } else {
@@ -71,11 +85,13 @@ pub fn run(args: NewArgs, config: &Config) -> Result<()> {
     Ok(())
 }
 
+#[doc(hidden)]
 fn exit_with_error(err: Error) {
     println!("Encountered error {}", err);
     std::process::exit(1);
 }
 
+#[doc(hidden)]
 fn main() {
     let args: Args = Args::parse();
 

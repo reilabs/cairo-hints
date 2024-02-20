@@ -50,6 +50,7 @@ struct Args {
     memory_file: Option<PathBuf>,
 }
 
+#[doc(hidden)]
 fn validate_layout(value: &str) -> Result<String, String> {
     match value {
         "plain"
@@ -65,6 +66,7 @@ fn validate_layout(value: &str) -> Result<String, String> {
     }
 }
 
+#[doc(hidden)]
 fn main() -> Result<(), Error> {
     let args: Args = Args::parse();
     let metadata = MetadataCommand::new().inherit_stderr().exec().unwrap();

@@ -5,17 +5,18 @@ use indoc::{formatdoc, indoc};
 use once_cell::sync::Lazy;
 use scarb::core::{Config, PackageName};
 
-pub const SERVER_SOURCE_PATH: Lazy<Utf8PathBuf> =
+const SERVER_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["rust", "src", "main.rs"].iter().collect());
-pub const SERVER_BUILD_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["rust", "build.rs"].iter().collect());
-pub const SERVER_MANIFEST_PATH: Lazy<Utf8PathBuf> =
+const SERVER_BUILD_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["rust", "build.rs"].iter().collect());
+const SERVER_MANIFEST_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["rust", "Cargo.toml"].iter().collect());
-pub const GITIGNORE_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| [".gitignore"].iter().collect());
+const GITIGNORE_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| [".gitignore"].iter().collect());
 
-
-pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Config) -> Result<()> {
+pub(crate) fn mk_rust(
+    canonical_path: &Utf8PathBuf,
+    name: &PackageName,
+    _config: &Config,
+) -> Result<()> {
     // Create the `main.rs` file.
     let filename = canonical_path.join(SERVER_SOURCE_PATH.as_path());
     if !filename.exists() {
@@ -132,6 +133,6 @@ pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Confi
             "#},
         )?;
     }
-    
+
     Ok(())
 }

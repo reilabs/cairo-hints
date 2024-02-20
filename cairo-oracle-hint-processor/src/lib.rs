@@ -67,22 +67,6 @@ pub mod rpc_hint_processor;
 
 mod hint_processor_utils;
 
-// /// Creates the metadata required for a Sierra program lowering to casm.
-// fn create_metadata(
-//     sierra_program: &cairo_lang_sierra::program::Program,
-//     metadata_config: Option<MetadataComputationConfig>,
-// ) -> Result<cairo_lang_sierra_to_casm::metadata::Metadata, RunnerError> {
-//     if let Some(metadata_config) = metadata_config {
-//         calc_metadata(sierra_program, metadata_config)
-//     } else {
-//         calc_metadata_ap_change_only(sierra_program)
-//     }
-//     .map_err(|err| match err {
-//         MetadataError::ApChangeError(err) => RunnerError::ApChangeError(err),
-//         MetadataError::CostError(_) => RunnerError::FailedGasCalculation,
-//     })
-// }
-
 /// Creates the metadata required for a Sierra program lowering to casm.
 fn create_metadata(
     sierra_program: &cairo_lang_sierra::program::Program,
@@ -231,6 +215,7 @@ impl FileWriter {
     }
 }
 
+/// Start the `cairo1-vm` to execute the program.
 pub fn run_1(
     service_config: &Configuration,
     oracle_server: &Option<String>,

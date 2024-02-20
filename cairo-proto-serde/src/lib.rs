@@ -96,6 +96,7 @@ fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
     }
 }
 
+/// Deserialise `value` from JSON format to `Vec<Felt252>` for use by cairo1 VM.
 pub fn serialize_cairo_serde(
     config: &Configuration,
     ty: &FieldType,
@@ -143,6 +144,7 @@ pub fn serialize_cairo_serde(
     result
 }
 
+/// Deserialise `value` to JSON format for transmission through HTTP request.
 pub fn deserialize_cairo_serde(
     config: &Configuration,
     ty: &FieldType,
