@@ -488,7 +488,7 @@ dependencies = [
 
 [[package]]
 name = "cairo-hints"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "bincode",
@@ -739,7 +739,7 @@ dependencies = [
 
 [[package]]
 name = "cairo-lang-hints-test-runner"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "cairo-felt 0.8.7",

@@ -1,15 +1,13 @@
 [package]
 name = "cairo-oracle-hint-processor"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = { workspace = true }
-bincode = { version = "2.0.0-rc.3", default-features = false, features = [
-    "serde",
-] }
+bincode = { workspace = true }
 cairo-lang-casm = { workspace = true }
 cairo-lang-sierra = { workspace = true }
 cairo-lang-sierra-to-casm = { workspace = true }

@@ -1,13 +1,14 @@
 [package]
 name = "cairo-proto-serde"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license-file.workspace = true
+description = "Definitions of Protocol Buffer types supported by Cairo."
 
 [dependencies]
+cairo-lang-runner = { workspace = true }
 cairo-vm = { workspace = true }
+num-traits = "0.2"
 serde = { workspace = true }
 serde_json = { workspace = true }
-num-traits = "0.2"
-cairo-lang-runner = { workspace = true }

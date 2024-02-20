@@ -13,8 +13,11 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.0.1"
+version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/reilabs/cairo-hints/"
+license = "Apache-2.0"
+license-file = "LICENSE"
 
 [workspace.dependencies]
 anyhow = "1.0.79"
@@ -32,12 +35,12 @@ cairo-lang-sierra-gas = { version = "2.3.1", default-features = false }
 cairo-lang-sierra-to-casm = { version = "=2.4.2" }
 cairo-lang-sierra-type-size = { version = "=2.4.2", default-features = false }
 cairo-lang-starknet = { version = "=2.4.2" }
-cairo-lang-hints-test-runner = { path = "./cairo-lang-hints-test-runner" }
+cairo-lang-hints-test-runner = { path = "./cairo-lang-hints-test-runner", version = "0.1.0" }
 cairo-lang-test-plugin = { version = "=2.4.2" }
 cairo-lang-utils = { version = "=2.4.2" }
-cairo-oracle-hint-processor = { path = "./cairo-oracle-hint-processor" }
-cairo-proto-build = { path = "./cairo-proto-build", default-features = false }
-cairo-proto-serde = { path = "./cairo-proto-serde" }
+cairo-oracle-hint-processor = { path = "./cairo-oracle-hint-processor", version = "0.1.0" }
+cairo-proto-build = { path = "./cairo-proto-build", default-features = false, version = "0.1.0" }
+cairo-proto-serde = { path = "./cairo-proto-serde", version = "0.1.0" }
 # cairo-vm = { version = "0.9.1", features = ["cairo-1-hints"] }
 cairo-felt = "=0.8.7"
 cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm", rev = "1a78237b32c9489e120c4c920bff548bf2a83b89", features = ["cairo-1-hints"] }

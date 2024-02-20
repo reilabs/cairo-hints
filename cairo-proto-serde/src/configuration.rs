@@ -9,7 +9,6 @@ pub struct Configuration {
 }
 
 // primitive types supported by both Protocol Buffers and Cairo
-// TODO: currently it only covers types in the example project
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PrimitiveType {
