@@ -4,8 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [[bin]]
-name = "scarb-hints-build"
-path = "scarb-hints-build/main.rs"
+name = "scarb-hints-generate"
+path = "scarb-hints-generate/main.rs"
 
 [[bin]]
 name = "scarb-hints-new"
