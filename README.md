@@ -27,6 +27,8 @@ cargo install --path cairo-hints --locked
 5. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --layout all_cairo`
 6. Integration tests can be run with `scarb hints-test --oracle-server http://127.0.0.1:3000 --layout all_cairo`
 
+## Documentation
+* [Tutorial](https://github.com/reilabs/cairo-hints/tree/main/documentation/Tutorial.md)
 
 ## Example Projects
 * [Basic Rust sqrt hint](https://github.com/reilabs/cairo-hints/tree/main/examples/rust_sqrt)
