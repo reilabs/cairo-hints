@@ -28,6 +28,7 @@ cargo install --path cairo-hints --locked
 6. Integration tests can be run with `scarb hints-test --oracle-server http://127.0.0.1:3000 --layout all_cairo`
 
 ## Documentation
+* [Command Reference](https://github.com/reilabs/cairo-hints/tree/main/documentation/Reference.md)
 * [Tutorial](https://github.com/reilabs/cairo-hints/tree/main/documentation/Tutorial.md)
 
 ## Example Projects
