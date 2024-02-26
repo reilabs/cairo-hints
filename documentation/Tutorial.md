@@ -1,4 +1,4 @@
-Cairo Hints is an extension to Cairo ≥ 1 language that enables operations difficult to implement inside arithmetic circuits (which are limited to addition and multiplication). Thanks to hints, it’s possible to e.g. cost effectively perform operations like square roots or binary decomposition.
+Cairo Hints is an extension to Cairo language that enables operations difficult to implement inside arithmetic circuits (which are limited to addition and multiplication). Thanks to hints, it’s possible to e.g. cost effectively perform operations like square roots or binary decomposition.
 
 Cairo Hints leverages Protocol Buffers and JSON-RPC to offload computations to an external process and feed results back to the Cairo Virtual Machine.
 
@@ -63,7 +63,7 @@ To define objects and services available via JSON-RPC interface, Cairo Hints use
 
 Each time a change to `.proto` file is made, Cairo code can be generated using the command `scarb hints-generate`.
 
-Users are free to use `.proto` files to generate corresponding definitions on the JSON-RPC side. Rust example projects uses `[build.rs](http://build.rs)` file to generate Rust definitions of Request and Result objects. By contrast, the JavaScript example project operates on untyped JSON objects and does not rely on code generation at all.
+Users are free to use `.proto` files to generate corresponding definitions on the JSON-RPC side. Rust example projects uses `build.rs` file to generate Rust definitions of Request and Result objects. By contrast, the JavaScript example project operates on untyped JSON objects and does not rely on code generation at all.
 
 ### Running Cairo projects with hints
 
