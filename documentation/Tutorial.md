@@ -63,7 +63,7 @@ To define objects and services available via JSON-RPC interface, Cairo Hints use
 
 Each time a change to `.proto` file is made, Cairo code can be generated using the command `scarb hints-generate`.
 
-Users are free to use `.proto` files to generate corresponding definitions on the JSON-RPC side. Rust example projects uses `build.rs` file to generate Rust definitions of Request and Result objects. By contrast, the JavaScript example project operates on untyped JSON objects and does not rely on code generation at all.
+Users are free to use `.proto` files to generate corresponding definitions on the JSON-RPC side. Rust example projects use `build.rs` file to generate Rust definitions of Request and Result objects. By contrast, the JavaScript example project operates on untyped JSON objects and does not rely on code generation at all.
 
 ### Running Cairo projects with hints
 
