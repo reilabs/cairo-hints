@@ -1,6 +1,5 @@
 use cairo_lang_casm::operand::{CellRef, DerefOrImmediate, Register, ResOperand};
 use cairo_vm::types::{errors::math_errors::MathError, relocatable::Relocatable};
-// use cairo_vm::utils::bigint_to_felt;
 use cairo_vm::Felt252;
 
 use cairo_vm::vm::errors::{hint_errors::HintError, vm_errors::VirtualMachineError};
