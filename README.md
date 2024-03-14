@@ -1,8 +1,36 @@
 # Cairo Hints
 
-This repository adds external hints to Cairo without modifying the compiler or the VM.
+Cairo Hints is an extension to Cairo language that makes programs easier to implement and cheaper to execute. They allow supplementing programs with data that is difficult to obtain in ZK circuits.
 
-It uses protocol buffers to define messages shared between Cairo and an external RPC server. Our own code runner (`scarb hints-run`) is used to execute Cairo code with hints.
+For example, calculating a square root in circuit is difficult, but verifying the result requires only a single multiplication. Therefore, it's a good candidate to be optimized by Cairo Hints. We can offload `sqrt` calculation to an external server, and only assert that `result * result == input`.
+
+Cairo Hints uses protocol buffers to define messages shared between Cairo and an external RPC server. Our `scarb hints-run` code runner is used to execute Cairo code with hints.
+
+## Example
+
+```rust
+// Oracle definition using Protocol Buffers 3
+
+message Request {
+    uint64 n = 1;
+}
+
+message Response {
+    uint64 n = 1;
+}
+
+service SqrtOracle {
+    rpc Sqrt(Request) returns (Response);
+}
+
+// Using the oracle in Cairo code
+
+let result = SqrtOracle::sqrt(Request { n: input });
+
+// Constraining the result of SqrtOracle in Cairo
+
+result.n * result.n == input
+```
 
 ## Prerequisites
 
