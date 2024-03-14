@@ -188,7 +188,7 @@ impl TestCompiler {
         let main_crate_ids = setup_project(db, Path::new(&path))?;
 
         if DiagnosticsReporter::stderr()
-            .with_extra_crates(&main_crate_ids)
+            .with_crates(&main_crate_ids)
             .check(db)
         {
             bail!("failed to compile: {}", path.display());
@@ -327,7 +327,12 @@ pub fn run_tests(
                     name,
                     Some(TestResult {
                         status: match r {
-                            Ok(_) => TestStatus::Success,
+                            Ok(_) => match test.expectation {
+                                TestExpectation::Success => TestStatus::Success,
+                                TestExpectation::Panics(_) => TestStatus::Fail(
+                                    RunResultValue::Panic([VMFelt::default()].to_vec()),
+                                ),
+                            },
                             Err(Error::RunPanic(panic_data)) => match test.expectation {
                                 TestExpectation::Success => {
                                     TestStatus::Fail(RunResultValue::Panic(panic_data))

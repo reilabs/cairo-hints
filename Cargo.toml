@@ -25,25 +25,25 @@ bincode = { version = "2.0.0-rc.3", default-features = false, features = [
     "serde",
 ] }
 bytes = "1.5.0"
-cairo-lang-casm = "=2.4.2"
-cairo-lang-compiler = { version = "=2.4.2" }
-cairo-lang-filesystem = { version = "=2.4.2" }
-cairo-lang-runner = { version = "=2.4.2" }
-cairo-lang-sierra = { version = "=2.4.2" }
-cairo-lang-sierra-ap-change = { version = "2.3.1", default-features = false }
-cairo-lang-sierra-gas = { version = "2.3.1", default-features = false }
-cairo-lang-sierra-to-casm = { version = "=2.4.2" }
-cairo-lang-sierra-type-size = { version = "=2.4.2", default-features = false }
-cairo-lang-starknet = { version = "=2.4.2" }
+cairo-lang-casm = { version = "=2.5.4" }
+cairo-lang-compiler = { version = "=2.5.4" }
+cairo-lang-filesystem = { version = "=2.5.4" }
+cairo-lang-runner = { version = "=2.5.4" }
+cairo-lang-sierra = { version = "=2.5.4" }
+cairo-lang-sierra-ap-change = { version = "=2.5.4", default-features = false }
+cairo-lang-sierra-gas = { version = "=2.5.4", default-features = false }
+cairo-lang-sierra-to-casm = { version = "=2.5.4" }
+cairo-lang-sierra-type-size = { version = "=2.5.4", default-features = false }
+cairo-lang-starknet = { version = "=2.5.4" }
 cairo-lang-hints-test-runner = { path = "./cairo-lang-hints-test-runner", version = "0.1.0" }
-cairo-lang-test-plugin = { version = "=2.4.2" }
-cairo-lang-utils = { version = "=2.4.2" }
+cairo-lang-test-plugin = { version = "=2.5.4" }
+cairo-lang-utils = { version = "=2.5.4" }
 cairo-oracle-hint-processor = { path = "./cairo-oracle-hint-processor", version = "0.1.0" }
 cairo-proto-build = { path = "./cairo-proto-build", default-features = false, version = "0.1.0" }
 cairo-proto-serde = { path = "./cairo-proto-serde", version = "0.1.0" }
 # cairo-vm = { version = "0.9.1", features = ["cairo-1-hints"] }
-cairo-felt = "=0.8.7"
-cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm", rev = "1a78237b32c9489e120c4c920bff548bf2a83b89", features = ["cairo-1-hints"] }
+cairo-felt = "0.9.1"
+cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm", rev = "v1.0.0-rc1", features = ["std", "cairo-1-hints"] }
 camino = "1.1.6"
 clap = "4.4.18"
 colored = "2.1.0"
@@ -70,5 +70,5 @@ serde = { version = "1.0.195", features = ["derive"] }
 serde_json = "1.0.111"
 starknet-types-core = "0.0.7"
 tempfile = "3.9.0"
-thiserror = "1.0.56"
+thiserror = "1.0.40"
 which = "6.0.0"
