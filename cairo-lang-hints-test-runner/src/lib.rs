@@ -14,7 +14,7 @@ use cairo_lang_test_plugin::test_config::{PanicExpectation, TestExpectation};
 use cairo_lang_test_plugin::{
     compile_test_prepared_db, test_plugin_suite, TestCompilation, TestConfig,
 };
-use cairo_oracle_hint_processor::{run_1, Error};
+use cairo_oracle_hint_processor::{run_1, Error, FuncArgs};
 use cairo_proto_serde::configuration::Configuration;
 use cairo_vm::Felt252 as VMFelt;
 use colored::Colorize;
@@ -318,6 +318,7 @@ pub fn run_tests(
                     layout,
                     &None,
                     &None,
+                    &FuncArgs::default(),
                     &sierra_program,
                     &name,
                     false,

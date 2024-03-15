@@ -78,13 +78,13 @@ pub enum Error {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-enum FuncArg {
+pub enum FuncArg {
     Array(Vec<Felt252>),
     Single(Felt252),
 }
 
 #[derive(Debug, Clone, Default)]
-struct FuncArgs(Vec<FuncArg>);
+pub struct FuncArgs(pub Vec<FuncArg>);
 
 pub struct FileWriter {
     buf_writer: io::BufWriter<std::fs::File>,
@@ -125,6 +125,7 @@ pub fn run_1(
     layout: &str,
     trace_file: &Option<PathBuf>,
     memory_file: &Option<PathBuf>,
+    args: &FuncArgs,
     sierra_program: &SierraProgram,
     entry_func_name: &str,
     proof_mode: bool,
@@ -143,7 +144,7 @@ pub fn run_1(
         relocate_mem: memory_file.is_some(), //|| air_public_input.is_some(),
         layout: layout,
         trace_enabled: trace_file.is_some(), //|| args.air_public_input.is_some(),
-        args: &[],
+        args: &args.0,
         finalize_builtins: false, //args.air_private_input.is_some() || args.cairo_pie_output.is_some(),
     };
 
