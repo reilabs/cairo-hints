@@ -71,6 +71,7 @@ Options:
       --oracle-lock <ORACLE_LOCK>
       --trace-file <TRACE_FILE>
       --memory-file <MEMORY_FILE>
+      --args <ARGS>                    [default: ]
   -h, --help                           Print help
   -V, --version                        Print version
 ```
@@ -105,6 +106,8 @@ Other choices are:
 `--trace-file` is the filepath of the trace file generated when executing `scarb hints-run`. If flag is missing, no trace file is generated. Needed if using `--proof-mode`.
 
 `--memory-file` is the filepath of the memory file generated when executing `scarb hints-run`. If flag is missing, no memory file is generated. Needed if using `--proof-mode`.
+
+`--args` flag needed if the Cairo function has arguments. Arguments should be spaced, with array elements placed between brackets. For example " --args '1 2 [1 2 3]'" will yield 3 arguments, with the last one being an array of 3 elements
 
 ## `scarb hints-test`
 

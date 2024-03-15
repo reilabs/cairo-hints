@@ -50,6 +50,7 @@ struct Args {
     #[arg(long)]
     memory_file: Option<PathBuf>,
 
+    /// Arguments of the Cairo function.
     #[arg(long = "args", default_value = "", value_parser=process_args)]
     args: FuncArgs,
 }
