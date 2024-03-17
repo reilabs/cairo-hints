@@ -7,7 +7,8 @@ use std::{
 
 use anyhow::{Context, Result};
 use cairo_lang_sierra::program::VersionedProgram;
-use cairo_oracle_hint_processor::{run_1, Error};
+use cairo_oracle_hint_processor::{run_1, Error, FuncArg, FuncArgs};
+use cairo_vm::Felt252;
 use camino::Utf8PathBuf;
 use clap::Parser;
 use itertools::Itertools;
@@ -48,6 +49,45 @@ struct Args {
 
     #[arg(long)]
     memory_file: Option<PathBuf>,
+
+    /// Arguments of the Cairo function.
+    #[arg(long = "args", default_value = "", value_parser=process_args)]
+    args: FuncArgs,
+}
+
+fn process_args(value: &str) -> Result<FuncArgs, String> {
+    if value.is_empty() {
+        return Ok(FuncArgs::default());
+    }
+    let mut args = Vec::new();
+    let mut input = value.split(' ');
+    while let Some(value) = input.next() {
+        // First argument in an array
+        if value.starts_with('[') {
+            let mut array_arg =
+                vec![Felt252::from_dec_str(value.strip_prefix('[').unwrap()).unwrap()];
+            // Process following args in array
+            let mut array_end = false;
+            while !array_end {
+                if let Some(value) = input.next() {
+                    // Last arg in array
+                    if value.ends_with(']') {
+                        array_arg
+                            .push(Felt252::from_dec_str(value.strip_suffix(']').unwrap()).unwrap());
+                        array_end = true;
+                    } else {
+                        array_arg.push(Felt252::from_dec_str(value).unwrap())
+                    }
+                }
+            }
+            // Finalize array
+            args.push(FuncArg::Array(array_arg))
+        } else {
+            // Single argument
+            args.push(FuncArg::Single(Felt252::from_dec_str(value).unwrap()))
+        }
+    }
+    Ok(FuncArgs(args))
 }
 
 fn validate_layout(value: &str) -> Result<String, String> {
@@ -109,6 +149,7 @@ fn main() -> Result<(), Error> {
         &args.layout,
         &args.trace_file,
         &args.memory_file,
+        &args.args,
         &sierra_program,
         "::main",
         args.proof_mode,
