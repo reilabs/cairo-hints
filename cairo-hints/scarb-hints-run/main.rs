@@ -8,6 +8,7 @@ use std::{
 use anyhow::{Context, Result};
 use cairo_lang_sierra::program::VersionedProgram;
 use cairo_oracle_hint_processor::{run_1, Error, FuncArg, FuncArgs};
+use cairo_vm::types::layout_name::LayoutName;
 use cairo_vm::Felt252;
 use camino::Utf8PathBuf;
 use clap::Parser;
@@ -105,6 +106,23 @@ fn validate_layout(value: &str) -> Result<String, String> {
     }
 }
 
+fn str_into_layout(value: &str) -> LayoutName {
+    match value {
+        "plain" => LayoutName::plain,
+        "small" => LayoutName::small,
+        "dex" => LayoutName::dex,
+        "recursive" => LayoutName::recursive,
+        "starknet" => LayoutName::starknet,
+        "starknet_with_keccak" => LayoutName::starknet_with_keccak,
+        "recursive_large_output" => LayoutName::recursive_large_output,
+        "recursive_with_poseidon" => LayoutName::recursive_with_poseidon,
+        "all_solidity" => LayoutName::all_solidity,
+        "all_cairo" => LayoutName::all_cairo,
+        "dynamic" => LayoutName::dynamic,
+        _ => LayoutName::all_cairo,
+    }
+}
+
 fn main() -> Result<(), Error> {
     let args: Args = Args::parse();
     let metadata = MetadataCommand::new().inherit_stderr().exec().unwrap();
@@ -146,7 +164,7 @@ fn main() -> Result<(), Error> {
     match run_1(
         &service_configuration,
         &args.oracle_server,
-        &args.layout,
+        &str_into_layout(&args.layout),
         &args.trace_file,
         &args.memory_file,
         &args.args,

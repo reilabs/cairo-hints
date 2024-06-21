@@ -16,6 +16,7 @@ use cairo_lang_test_plugin::{
 };
 use cairo_oracle_hint_processor::{run_1, Error, FuncArgs};
 use cairo_proto_serde::configuration::Configuration;
+use cairo_vm::types::layout_name::LayoutName;
 use cairo_vm::Felt252 as VMFelt;
 use colored::Colorize;
 use itertools::Itertools;
@@ -50,7 +51,7 @@ impl TestRunner {
         &self,
         oracle_server: &Option<String>,
         configuration: &Configuration,
-        layout: &String,
+        layout: &LayoutName,
     ) -> Result<Option<TestsSummary>> {
         let runner = CompiledTestRunner::new(self.compiler.build()?, self.config.clone());
         runner.run(oracle_server, configuration, layout)
@@ -78,7 +79,7 @@ impl CompiledTestRunner {
         self,
         oracle_server: &Option<String>,
         configuration: &Configuration,
-        layout: &String,
+        layout: &LayoutName,
     ) -> Result<Option<TestsSummary>> {
         let (compiled, filtered_out) = filter_test_cases(
             self.compiled,
@@ -295,7 +296,7 @@ pub fn run_tests(
     // _contracts_info: OrderedHashMap<Felt252, ContractInfo>,
     oracle_server: &Option<String>,
     configuration: &Configuration,
-    layout: &String,
+    layout: &LayoutName,
 ) -> Result<TestsSummary> {
     println!("running {} tests", named_tests.len());
     let wrapped_summary = Mutex::new(Ok(TestsSummary {
