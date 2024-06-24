@@ -1,6 +1,7 @@
 use crate::new_cairo::mk_cairo;
 use crate::new_js::mk_js;
 use crate::new_rust::mk_rust;
+use crate::new_ts::mk_ts;
 use crate::{fsx, restricted_names, Lang};
 use anyhow::{bail, ensure, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -173,6 +174,7 @@ fn mk(
     match lang {
         Lang::Rust => mk_rust(&canonical_path, &name, &config)?,
         Lang::Js => mk_js(&canonical_path, &name, &config)?,
+        Lang::Ts => mk_ts(&canonical_path, &name, config)?,
     }
     mk_cairo(&canonical_path, &name, &config)?;
 
