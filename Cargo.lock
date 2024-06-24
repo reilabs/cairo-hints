@@ -512,7 +512,7 @@ dependencies = [
  "cairo-oracle-hint-processor",
  "cairo-proto-build",
  "cairo-proto-serde",
- "cairo-vm 1.0.0-rc2",
+ "cairo-vm 1.0.0-rc3",
  "camino",
  "clap",
  "dunce",
@@ -665,7 +665,7 @@ dependencies = [
  "cairo-lang-utils",
  "cairo-oracle-hint-processor",
  "cairo-proto-serde",
- "cairo-vm 1.0.0-rc2",
+ "cairo-vm 1.0.0-rc3",
  "colored",
  "itertools 0.12.1",
  "num-traits 0.2.19",
@@ -1097,7 +1097,7 @@ dependencies = [
  "cairo-lang-sierra-type-size",
  "cairo-lang-utils",
  "cairo-proto-serde",
- "cairo-vm 1.0.0-rc2",
+ "cairo-vm 1.0.0-rc3",
  "camino",
  "clap",
  "indoc",
@@ -1137,7 +1137,7 @@ name = "cairo-proto-serde"
 version = "0.1.0"
 dependencies = [
  "cairo-lang-runner",
- "cairo-vm 1.0.0-rc2",
+ "cairo-vm 1.0.0-rc3",
  "num-traits 0.2.19",
  "serde",
  "serde_json",
@@ -1177,8 +1177,8 @@ dependencies = [
 
 [[package]]
 name = "cairo-vm"
-version = "1.0.0-rc2"
-source = "git+https://github.com/lambdaclass/cairo-vm?rev=v1.0.0-rc2#f3161e3e07a16afbc2ccfd03f33197674e223d50"
+version = "1.0.0-rc3"
+source = "git+https://github.com/lambdaclass/cairo-vm?rev=v1.0.0-rc3#aecbb3f01dacb6d3f90256c808466c2c37606252"
 dependencies = [
  "anyhow",
  "ark-ff",

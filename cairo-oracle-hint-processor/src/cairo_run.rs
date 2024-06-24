@@ -183,14 +183,14 @@ pub fn cairo_run_program(
         RunnerMode::ExecutionMode
     };
 
-    let mut runner = CairoRunner::new_v2(&program, *cairo_run_config.layout, runner_mode)?;
+    let mut runner = CairoRunner::new_v2(&program, *cairo_run_config.layout, runner_mode, cairo_run_config.trace_enabled)?;
     let mut vm = VirtualMachine::new(cairo_run_config.trace_enabled);
-    let end = runner.initialize(&mut vm, cairo_run_config.proof_mode)?;
+    let end = runner.initialize(cairo_run_config.proof_mode)?;
 
     additional_initialization(&mut vm, data_len)?;
 
     // Run it until the end / infinite loop in proof_mode
-    runner.run_until_pc(end, &mut vm, &mut hint_processor)?;
+    runner.run_until_pc(end, &mut hint_processor)?;
     if cairo_run_config.proof_mode {
         // As we will be inserting the return values into the output segment after running the main program (right before the infinite loop) the computed size for the output builtin will be 0
         // We need to manually set the segment size for the output builtin's segment so memory hole counting doesn't fail due to having a higher accessed address count than the segment's size
@@ -198,7 +198,7 @@ pub fn cairo_run_program(
             .segment_sizes
             .insert(2, return_type_size as usize);
     }
-    runner.end_run(false, false, &mut vm, &mut hint_processor)?;
+    runner.end_run(false, false, &mut hint_processor)?;
 
     // Fetch return values
     let return_values = fetch_return_values(return_type_size, return_type_id, &vm)?;
@@ -217,11 +217,11 @@ pub fn cairo_run_program(
             // As the output builtin is not used by the program we need to compute it's stop ptr manually
             vm.set_output_stop_ptr_offset(return_type_size as usize);
 
-            runner.finalize_segments(&mut vm)?;
+            runner.finalize_segments()?;
         }
     }
 
-    runner.relocate(&mut vm, true)?;
+    runner.relocate(true)?;
 
     Ok((runner, vm, return_values))
 }
