@@ -6,6 +6,7 @@ use std::{env, fs};
 use anyhow::{Context, Result};
 use cairo_lang_hints_test_runner::{CompiledTestRunner, TestRunConfig};
 use cairo_lang_test_plugin::TestCompilation;
+use cairo_vm::types::layout_name::LayoutName;
 use clap::Parser;
 use scarb_metadata::{Metadata, MetadataCommand, PackageMetadata, ScarbCommand, TargetMetadata};
 use scarb_ui::args::PackagesFilter;
@@ -13,7 +14,7 @@ use scarb_utils::absolute_path;
 
 /// Execute all unit tests of a local package.
 #[derive(Parser, Clone, Debug)]
-#[command(author, version)]
+#[clap(author, version, about, long_about = None)]
 struct Args {
     #[command(flatten)]
     packages_filter: PackagesFilter,
@@ -53,6 +54,23 @@ fn validate_layout(value: &str) -> Result<String, String> {
         | "all_solidity"
         | "dynamic" => Ok(value.to_string()),
         _ => Err(format!("{value} is not a valid layout")),
+    }
+}
+
+fn str_into_layout(value: &str) -> LayoutName {
+    match value {
+        "plain" => LayoutName::plain,
+        "small" => LayoutName::small,
+        "dex" => LayoutName::dex,
+        "recursive" => LayoutName::recursive,
+        "starknet" => LayoutName::starknet,
+        "starknet_with_keccak" => LayoutName::starknet_with_keccak,
+        "recursive_large_output" => LayoutName::recursive_large_output,
+        "recursive_with_poseidon" => LayoutName::recursive_with_poseidon,
+        "all_solidity" => LayoutName::all_solidity,
+        "all_cairo" => LayoutName::all_cairo,
+        "dynamic" => LayoutName::dynamic,
+        _ => LayoutName::all_cairo,
     }
 }
 
@@ -100,7 +118,11 @@ fn main() -> Result<()> {
                 ignored: args.ignored,
             };
             let runner = CompiledTestRunner::new(test_compilation, config);
-            runner.run(&args.oracle_server, &service_config, &args.layout)?;
+            runner.run(
+                &args.oracle_server,
+                &service_config,
+                &str_into_layout(&args.layout),
+            )?;
             println!();
         }
     }
