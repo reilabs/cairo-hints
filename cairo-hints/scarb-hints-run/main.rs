@@ -65,24 +65,36 @@ fn process_args(value: &str) -> Result<FuncArgs, String> {
     while let Some(value) = input.next() {
         // First argument in an array
         if value.starts_with('[') {
-            let mut array_arg =
-                vec![Felt252::from_dec_str(value.strip_prefix('[').unwrap()).unwrap()];
-            // Process following args in array
-            let mut array_end = false;
-            while !array_end {
-                if let Some(value) = input.next() {
-                    // Last arg in array
-                    if value.ends_with(']') {
-                        array_arg
-                            .push(Felt252::from_dec_str(value.strip_suffix(']').unwrap()).unwrap());
-                        array_end = true;
-                    } else {
-                        array_arg.push(Felt252::from_dec_str(value).unwrap())
+            if value.ends_with(']') {
+                if value.len() == 2 {
+                    args.push(FuncArg::Array(Vec::new()));
+                } else {
+                    args.push(FuncArg::Array(vec![Felt252::from_dec_str(
+                        value.strip_prefix('[').unwrap().strip_suffix(']').unwrap(),
+                    )
+                    .unwrap()]));
+                }
+            } else {
+                let mut array_arg =
+                    vec![Felt252::from_dec_str(value.strip_prefix('[').unwrap()).unwrap()];
+                // Process following args in array
+                let mut array_end = false;
+                while !array_end {
+                    if let Some(value) = input.next() {
+                        // Last arg in array
+                        if value.ends_with(']') {
+                            array_arg.push(
+                                Felt252::from_dec_str(value.strip_suffix(']').unwrap()).unwrap(),
+                            );
+                            array_end = true;
+                        } else {
+                            array_arg.push(Felt252::from_dec_str(value).unwrap())
+                        }
                     }
                 }
+                // Finalize array
+                args.push(FuncArg::Array(array_arg))
             }
-            // Finalize array
-            args.push(FuncArg::Array(array_arg))
         } else {
             // Single argument
             args.push(FuncArg::Single(Felt252::from_dec_str(value).unwrap()))
@@ -174,7 +186,7 @@ fn main() -> Result<(), Error> {
     ) {
         Err(Error::Cli(err)) => err.exit(),
         Ok(return_values) => {
-            if !return_values.is_empty() {
+            if !return_values.is_none() {
                 let return_values_string_list =
                     return_values.iter().map(|m| m.to_string()).join(", ");
                 println!("Return values : [{}]", return_values_string_list);
