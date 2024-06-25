@@ -56,7 +56,7 @@ struct Args {
     args: FuncArgs,
 }
 
-fn process_args(value: &str) -> Result<FuncArgs, String> {
+pub fn process_args(value: &str) -> Result<FuncArgs, String> {
     if value.is_empty() {
         return Ok(FuncArgs::default());
     }
