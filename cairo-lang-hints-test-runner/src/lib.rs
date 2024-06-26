@@ -29,6 +29,7 @@ mod test;
 pub struct TestRunner {
     compiler: TestCompiler,
     config: TestRunConfig,
+    config_file: String,
 }
 
 impl TestRunner {
@@ -41,26 +42,39 @@ impl TestRunner {
     /// * `include_ignored` - Include ignored tests as well
     /// * `ignored` - Run ignored tests only
     /// * `starknet` - Add the starknet plugin to run the tests
-    pub fn new(path: &Path, starknet: bool, config: TestRunConfig) -> Result<Self> {
+    pub fn new(
+        path: &Path,
+        starknet: bool,
+        config: TestRunConfig,
+        config_file: String,
+    ) -> Result<Self> {
         let compiler = TestCompiler::try_new(path, starknet)?;
-        Ok(Self { compiler, config })
+        Ok(Self {
+            compiler,
+            config,
+            config_file,
+        })
     }
 
     /// Runs the tests and process the results for a summary.
     pub fn run(
         &self,
-        oracle_server: &Option<String>,
         configuration: &Configuration,
         layout: &LayoutName,
     ) -> Result<Option<TestsSummary>> {
-        let runner = CompiledTestRunner::new(self.compiler.build()?, self.config.clone());
-        runner.run(oracle_server, configuration, layout)
+        let runner = CompiledTestRunner::new(
+            self.compiler.build()?,
+            self.config.clone(),
+            self.config_file.clone(),
+        );
+        runner.run(configuration, layout)
     }
 }
 
 pub struct CompiledTestRunner {
     pub compiled: TestCompilation,
     pub config: TestRunConfig,
+    pub config_file: String,
 }
 
 impl CompiledTestRunner {
@@ -70,14 +84,17 @@ impl CompiledTestRunner {
     ///
     /// * `compiled` - The compiled tests to run
     /// * `config` - Test run configuration
-    pub fn new(compiled: TestCompilation, config: TestRunConfig) -> Self {
-        Self { compiled, config }
+    pub fn new(compiled: TestCompilation, config: TestRunConfig, config_file: String) -> Self {
+        Self {
+            compiled,
+            config,
+            config_file,
+        }
     }
 
     /// Execute preconfigured test execution.
     pub fn run(
         self,
-        oracle_server: &Option<String>,
         configuration: &Configuration,
         layout: &LayoutName,
     ) -> Result<Option<TestsSummary>> {
@@ -95,9 +112,7 @@ impl CompiledTestRunner {
         } = run_tests(
             compiled.named_tests,
             compiled.sierra_program,
-            // compiled.function_set_costs,
-            // compiled.contracts_info,
-            oracle_server,
+            &self.config_file,
             configuration,
             layout,
         )?;
@@ -294,7 +309,7 @@ pub fn run_tests(
     sierra_program: Program,
     // _function_set_costs: OrderedHashMap<FunctionId, OrderedHashMap<CostTokenType, i32>>,
     // _contracts_info: OrderedHashMap<Felt252, ContractInfo>,
-    oracle_server: &Option<String>,
+    config_file: &str,
     configuration: &Configuration,
     layout: &LayoutName,
 ) -> Result<TestsSummary> {
@@ -315,7 +330,7 @@ pub fn run_tests(
 
                 let r = run_1(
                     configuration,
-                    oracle_server,
+                    config_file,
                     layout,
                     &None,
                     &None,

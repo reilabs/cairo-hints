@@ -1,3 +1,4 @@
+use super::Error;
 use crate::hint_processor_utils::{cell_ref_to_relocatable, extract_buffer, get_ptr};
 use crate::insert_value_to_cellref;
 use cairo_lang_casm::{
@@ -23,31 +24,36 @@ use cairo_vm::{
         vm_core::VirtualMachine,
     },
 };
-use reqwest::Url;
 use core::any::Any;
 use indoc::formatdoc;
 use itertools::Itertools;
+use reqwest::Url;
 use serde_json::Value;
 use std::collections::HashMap;
 
 /// HintProcessor for Cairo 1 compiler hints.
 pub struct Rpc1HintProcessor<'a> {
     inner_processor: Cairo1HintProcessor,
-    server: Option<String>,
+    server_config: HashMap<String, String>,
     configuration: &'a Configuration,
 }
 
 impl<'a> Rpc1HintProcessor<'a> {
     pub fn new(
         inner_processor: Cairo1HintProcessor,
-        server: &Option<String>,
+        config_file: &str,
         configuration: &'a Configuration,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, Error> {
+        let config_content = std::fs::read_to_string(config_file)
+            .map_err(|e| Error::ConfigError(format!("Failed to read config file: {}", e)))?;
+        let server_config: HashMap<String, String> = serde_json::from_str(&config_content)
+            .map_err(|e| Error::ConfigError(format!("Failed to parse config file: {}", e)))?;
+
+        Ok(Self {
             inner_processor,
-            server: server.clone(),
+            server_config,
             configuration,
-        }
+        })
     }
 
     /// Executes a cheatcode.
@@ -84,11 +90,21 @@ impl<'a> Rpc1HintProcessor<'a> {
             ))));
         };
 
-        let server_url = self.server.as_ref().expect(
-            format!("Please provide an --oracle-server argument to execute hints").as_str(),
-        );
-        let mut server_url = Url::parse(server_url).expect("oracle-server must be a valid URL");
-        server_url.path_segments_mut().expect("cannot be a base URL").push(selector);
+        let server_url = self.server_config.get(selector).ok_or_else(|| {
+            HintError::CustomHint(Box::from(format!(
+                "No server URL configured for selector: {selector}"
+            )))
+        })?;
+
+        let mut server_url = Url::parse(server_url).map_err(|e| {
+            HintError::CustomHint(Box::from(format!(
+                "Invalid URL for selector {selector}: {e}"
+            )))
+        })?;
+        server_url
+            .path_segments_mut()
+            .expect("cannot be a base URL")
+            .push(selector);
 
         let data = deserialize_cairo_serde(
             self.configuration,

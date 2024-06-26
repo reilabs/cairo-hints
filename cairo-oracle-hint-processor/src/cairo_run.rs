@@ -97,7 +97,7 @@ pub fn cairo_run_program(
     sierra_program: &SierraProgram,
     cairo_run_config: Cairo1RunConfig,
     service_config: &Configuration,
-    oracle_server: &Option<String>,
+    config_file: &str,
     entry_func_name: &str,
 ) -> Result<(CairoRunner, Vec<MaybeRelocatable>, Option<String>), Error> {
     let metadata = calc_metadata_ap_change_only(sierra_program)
@@ -148,7 +148,7 @@ pub fn cairo_run_program(
     let (processor_hints, program_hints) = build_hints_vec(instructions.clone());
 
     let hint_processor = Cairo1HintProcessor::new(&processor_hints, RunResources::default());
-    let mut hint_processor = Rpc1HintProcessor::new(hint_processor, oracle_server, service_config);
+    let mut hint_processor = Rpc1HintProcessor::new(hint_processor, config_file, service_config)?;
 
     let data: Vec<MaybeRelocatable> = instructions
         .flat_map(|inst| inst.assemble().encode())

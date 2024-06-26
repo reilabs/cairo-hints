@@ -31,9 +31,9 @@ struct Args {
     #[arg(long, default_value_t = false)]
     ignored: bool,
 
-    /// Oracle server URL.
+    /// Configuration file for oracle servers.
     #[arg(long)]
-    oracle_server: Option<String>,
+    config_file: PathBuf,
 
     #[arg(long)]
     oracle_lock: Option<PathBuf>,
@@ -104,6 +104,10 @@ fn main() -> Result<()> {
         let reader = BufReader::new(lock_file);
         let service_config = serde_json::from_reader(reader)?;
 
+        let config_file = fs::read_to_string(&args.config_file).with_context(|| {
+            format!("failed to read config file: {}", args.config_file.display())
+        })?;
+
         for target in find_testable_targets(&package) {
             let file_path = target_dir.join(format!("{}.test.json", target.name.clone()));
             let test_compilation = serde_json::from_str::<TestCompilation>(
@@ -117,12 +121,8 @@ fn main() -> Result<()> {
                 include_ignored: args.include_ignored,
                 ignored: args.ignored,
             };
-            let runner = CompiledTestRunner::new(test_compilation, config);
-            runner.run(
-                &args.oracle_server,
-                &service_config,
-                &str_into_layout(&args.layout),
-            )?;
+            let runner = CompiledTestRunner::new(test_compilation, config, config_file.clone());
+            runner.run(&service_config, &str_into_layout(&args.layout))?;
             println!();
         }
     }

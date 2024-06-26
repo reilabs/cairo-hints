@@ -37,9 +37,9 @@ struct Args {
     #[arg(long, default_value_t = false)]
     proof_mode: bool,
 
-    /// Oracle server URL.
+    /// Configuration file for oracle servers.
     #[arg(long)]
-    oracle_server: Option<String>,
+    config_file: PathBuf,
 
     /// Oracle lock file path.
     #[arg(long)]
@@ -173,9 +173,13 @@ fn main() -> Result<(), Error> {
 
     let sierra_program = sierra_program.program;
 
+    let config_file = fs::read_to_string(&args.config_file)
+        .with_context(|| format!("failed to read config file: {}", args.config_file.display()))
+        .unwrap();
+
     match run_1(
         &service_configuration,
-        &args.oracle_server,
+        &config_file,
         &str_into_layout(&args.layout),
         &args.trace_file,
         &args.memory_file,
