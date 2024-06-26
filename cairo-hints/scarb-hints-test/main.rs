@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -6,6 +7,7 @@ use std::{env, fs};
 use anyhow::{Context, Result};
 use cairo_lang_hints_test_runner::{CompiledTestRunner, TestRunConfig};
 use cairo_lang_test_plugin::TestCompilation;
+use cairo_proto_serde::configuration::Configuration;
 use cairo_vm::types::layout_name::LayoutName;
 use clap::Parser;
 use scarb_metadata::{Metadata, MetadataCommand, PackageMetadata, ScarbCommand, TargetMetadata};
@@ -102,11 +104,20 @@ fn main() -> Result<()> {
             .expect("lock path must be provided either as an argument (--oracle-lock src) or in the Scarb.toml file in the [tool.hints] section.");
         let lock_file = File::open(lock_output)?;
         let reader = BufReader::new(lock_file);
-        let service_config = serde_json::from_reader(reader)?;
+        let mut service_config: Configuration = serde_json::from_reader(reader)?;
 
-        let config_file = fs::read_to_string(&args.config_file).with_context(|| {
-            format!("failed to read config file: {}", args.config_file.display())
-        })?;
+        // Get the servers config path
+        let servers_config_path = absolute_path(&package, None, "servers_config", Some(PathBuf::from("Servers.json")))
+            .expect("servers config path must be provided either in the Scarb.toml file in the [tool.hints] section or default to Servers.json in the project root.");
+
+        // Read and parse the servers config file
+        let config_content = fs::read_to_string(&servers_config_path)
+            .with_context(|| format!("failed to read servers config file: {}", servers_config_path.display()))?;
+        let servers_config: HashMap<String, String> = serde_json::from_str(&config_content)
+            .with_context(|| format!("failed to parse servers config file: {}", servers_config_path.display()))?;
+
+        // Add the server_config to the Configuration
+        service_config.servers_config = servers_config;
 
         for target in find_testable_targets(&package) {
             let file_path = target_dir.join(format!("{}.test.json", target.name.clone()));
@@ -121,7 +132,7 @@ fn main() -> Result<()> {
                 include_ignored: args.include_ignored,
                 ignored: args.ignored,
             };
-            let runner = CompiledTestRunner::new(test_compilation, config, config_file.clone());
+            let runner = CompiledTestRunner::new(test_compilation, config);
             runner.run(&service_config, &str_into_layout(&args.layout))?;
             println!();
         }
@@ -129,7 +140,6 @@ fn main() -> Result<()> {
 
     Ok(())
 }
-
 fn find_testable_targets(package: &PackageMetadata) -> Vec<&TargetMetadata> {
     package
         .targets

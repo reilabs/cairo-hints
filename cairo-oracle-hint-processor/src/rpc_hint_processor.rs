@@ -34,24 +34,16 @@ use std::collections::HashMap;
 /// HintProcessor for Cairo 1 compiler hints.
 pub struct Rpc1HintProcessor<'a> {
     inner_processor: Cairo1HintProcessor,
-    server_config: HashMap<String, String>,
     configuration: &'a Configuration,
 }
 
 impl<'a> Rpc1HintProcessor<'a> {
     pub fn new(
         inner_processor: Cairo1HintProcessor,
-        config_file: &str,
         configuration: &'a Configuration,
     ) -> Result<Self, Error> {
-        let config_content = std::fs::read_to_string(config_file)
-            .map_err(|e| Error::ConfigError(format!("Failed to read config file: {}", e)))?;
-        let server_config: HashMap<String, String> = serde_json::from_str(&config_content)
-            .map_err(|e| Error::ConfigError(format!("Failed to parse config file: {}", e)))?;
-
         Ok(Self {
             inner_processor,
-            server_config,
             configuration,
         })
     }
@@ -90,11 +82,15 @@ impl<'a> Rpc1HintProcessor<'a> {
             ))));
         };
 
-        let server_url = self.server_config.get(selector).ok_or_else(|| {
-            HintError::CustomHint(Box::from(format!(
-                "No server URL configured for selector: {selector}"
-            )))
-        })?;
+        let server_url = self
+            .configuration
+            .servers_config
+            .get(selector)
+            .ok_or_else(|| {
+                HintError::CustomHint(Box::from(format!(
+                    "No server URL configured for selector: {selector}"
+                )))
+            })?;
 
         let mut server_url = Url::parse(server_url).map_err(|e| {
             HintError::CustomHint(Box::from(format!(

@@ -29,7 +29,6 @@ mod test;
 pub struct TestRunner {
     compiler: TestCompiler,
     config: TestRunConfig,
-    config_file: String,
 }
 
 impl TestRunner {
@@ -42,18 +41,9 @@ impl TestRunner {
     /// * `include_ignored` - Include ignored tests as well
     /// * `ignored` - Run ignored tests only
     /// * `starknet` - Add the starknet plugin to run the tests
-    pub fn new(
-        path: &Path,
-        starknet: bool,
-        config: TestRunConfig,
-        config_file: String,
-    ) -> Result<Self> {
+    pub fn new(path: &Path, starknet: bool, config: TestRunConfig) -> Result<Self> {
         let compiler = TestCompiler::try_new(path, starknet)?;
-        Ok(Self {
-            compiler,
-            config,
-            config_file,
-        })
+        Ok(Self { compiler, config })
     }
 
     /// Runs the tests and process the results for a summary.
@@ -62,11 +52,7 @@ impl TestRunner {
         configuration: &Configuration,
         layout: &LayoutName,
     ) -> Result<Option<TestsSummary>> {
-        let runner = CompiledTestRunner::new(
-            self.compiler.build()?,
-            self.config.clone(),
-            self.config_file.clone(),
-        );
+        let runner = CompiledTestRunner::new(self.compiler.build()?, self.config.clone());
         runner.run(configuration, layout)
     }
 }
@@ -74,9 +60,7 @@ impl TestRunner {
 pub struct CompiledTestRunner {
     pub compiled: TestCompilation,
     pub config: TestRunConfig,
-    pub config_file: String,
 }
-
 impl CompiledTestRunner {
     /// Configure a new compiled test runner
     ///
@@ -84,12 +68,8 @@ impl CompiledTestRunner {
     ///
     /// * `compiled` - The compiled tests to run
     /// * `config` - Test run configuration
-    pub fn new(compiled: TestCompilation, config: TestRunConfig, config_file: String) -> Self {
-        Self {
-            compiled,
-            config,
-            config_file,
-        }
+    pub fn new(compiled: TestCompilation, config: TestRunConfig) -> Self {
+        Self { compiled, config }
     }
 
     /// Execute preconfigured test execution.
@@ -112,7 +92,6 @@ impl CompiledTestRunner {
         } = run_tests(
             compiled.named_tests,
             compiled.sierra_program,
-            &self.config_file,
             configuration,
             layout,
         )?;
@@ -309,7 +288,6 @@ pub fn run_tests(
     sierra_program: Program,
     // _function_set_costs: OrderedHashMap<FunctionId, OrderedHashMap<CostTokenType, i32>>,
     // _contracts_info: OrderedHashMap<Felt252, ContractInfo>,
-    config_file: &str,
     configuration: &Configuration,
     layout: &LayoutName,
 ) -> Result<TestsSummary> {
@@ -330,7 +308,6 @@ pub fn run_tests(
 
                 let r = run_1(
                     configuration,
-                    config_file,
                     layout,
                     &None,
                     &None,

@@ -240,8 +240,17 @@ mod tests {
     fn it_saves_configuration() {
         let configuration = test_configuration();
         let json_string = serde_json::to_string(&configuration).unwrap();
-        // let new_configuration = serde_json::from_str::<Configuration>(&json_string).unwrap();
-        println!("JSON {json_string:?} -> {configuration:?}");
+        let new_configuration = serde_json::from_str::<Configuration>(&json_string).unwrap();
+
+        assert_eq!(
+            configuration.servers_config,
+            new_configuration.servers_config
+        );
+        assert_eq!(configuration.messages, new_configuration.messages);
+        assert_eq!(configuration.services, new_configuration.services);
+        assert_eq!(configuration.enums, new_configuration.enums);
+
+        println!("JSON {json_string:?} -> {new_configuration:?}");
     }
 
     fn test_configuration() -> Configuration {
@@ -291,10 +300,32 @@ mod tests {
         services.insert(String::from("SqrtOracle"), Service { methods });
 
         let enums = BTreeMap::new();
+
+        let mut servers_config = HashMap::new();
+        servers_config.insert("sqrt".to_string(), "http://localhost:3000".to_string());
+
         Configuration {
             enums,
             messages,
             services,
+            servers_config,
         }
+    }
+
+    #[test]
+    fn it_handles_servers_config() {
+        let configuration = test_configuration();
+        assert_eq!(
+            configuration.servers_config.get("sqrt"),
+            Some(&"http://localhost:3000".to_string())
+        );
+
+        let json_string = serde_json::to_string(&configuration).unwrap();
+        let new_configuration: Configuration = serde_json::from_str(&json_string).unwrap();
+
+        assert_eq!(
+            new_configuration.servers_config.get("sqrt"),
+            Some(&"http://localhost:3000".to_string())
+        );
     }
 }

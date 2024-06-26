@@ -124,8 +124,7 @@ impl FileWriter {
 }
 
 pub fn run_1(
-    service_config: &Configuration,
-    config_file: &str,
+    configuration: &Configuration,
     layout: &LayoutName,
     trace_file: &Option<PathBuf>,
     memory_file: &Option<PathBuf>,
@@ -157,8 +156,7 @@ pub fn run_1(
     let (runner, _, serialized_output) = cairo_run::cairo_run_program(
         &sierra_program,
         cairo_run_config,
-        service_config,
-        config_file,
+        configuration,
         entry_func_name,
     )?;
 
