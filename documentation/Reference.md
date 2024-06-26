@@ -65,9 +65,9 @@ Options:
   -p, --package <SPEC>
   -w, --workspace
       --no-build
-      --layout <LAYOUT>                [default: plain]
+      --layout <LAYOUT>                [default: all_cairo]
       --proof-mode
-      --oracle-server <ORACLE_SERVER>
+      --servers-config-file <SERVERS_CONFIG_FILE>
       --oracle-lock <ORACLE_LOCK>
       --trace-file <TRACE_FILE>
       --memory-file <MEMORY_FILE>
@@ -82,7 +82,7 @@ Options:
 
 `--no-build` skips building the cairo program.
 
-`--layout` defines which builtins are included when executing the cairo program. Default is `plain`.
+`--layout` defines which builtins are included when executing the cairo program. Default is `all_cairo`.
 
 Other choices are:
 
@@ -99,7 +99,7 @@ Other choices are:
 
 `--proof-mode` flag needed if the intention is to generate a proof with `platinum-prover`.
 
-`--oracle-server` is the ip:port of the oracle server.
+`--servers-config-file` the filename of the generated `servers.json` file which contains the ip:port for each oracle server. Default is `servers.json`.
 
 `--oracle-lock` the filename of the generated `Oracle.lock` file which contains the JSON representation of the protobuf interface. Default is `Oracle.lock`
 
@@ -123,9 +123,9 @@ Options:
   -f, --filter <FILTER>                
       --include-ignored                
       --ignored                        
-      --oracle-server <ORACLE_SERVER>  
+      --servers-config-file <SERVERS_CONFIG_FILE>
       --oracle-lock <ORACLE_LOCK>
-      --layout <LAYOUT>                [default: plain]
+      --layout <LAYOUT>                [default: all_cairo]
   -h, --help                           Print help
   -V, --version                        Print version
 ```
@@ -140,11 +140,11 @@ Options:
 
 `--include-ignored` is to run both ignored and not ignored tests.
 
-`--oracle-server` is the ip:port of the oracle server.
+`--servers-config-file` the filename of the generated `servers.json` file which contains the ip:port for each oracle server. Default is `servers.json`.
 
 `--oracle-lock` the filename of the generated `Oracle.lock` file which contains the JSON representation of the protobuf interface. Default is `Oracle.lock`
 
-`--layout` defines which builtins are included when executing the cairo program. Default is `plain`.
+`--layout` defines which builtins are included when executing the cairo program. Default is `all_cairo`.
 
 ```
 | "small"
@@ -166,7 +166,7 @@ In addition to the existing `Scarb.toml` configuration flags described in the [o
 definitions = "proto/oracle.proto"  # mandatory
 cairo_output = "src"                # optional - default "src"
 oracle_lock = "Oracle.lock"         # optional - default "Oracle.lock"
-
+servers_config = "servers.json"         # optional - default "servers.json"
 ```
 
 The variable `definition` indicates the path of the `proto` file which is used by `scarb-hints-generate` to autogenerate Cairo code for the hint structs.

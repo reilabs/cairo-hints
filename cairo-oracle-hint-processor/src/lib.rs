@@ -74,6 +74,10 @@ pub enum Error {
         param_index: usize,
         arg_index: usize,
     },
+    #[error("Configuration error: {0}")]
+    ConfigError(String),
+    #[error("Servers configuration file error: {0}")]
+    ServersConfigFileError(String),
 }
 
 #[allow(dead_code)]
@@ -120,8 +124,7 @@ impl FileWriter {
 }
 
 pub fn run_1(
-    service_config: &Configuration,
-    oracle_server: &Option<String>,
+    configuration: &Configuration,
     layout: &LayoutName,
     trace_file: &Option<PathBuf>,
     memory_file: &Option<PathBuf>,
@@ -153,8 +156,7 @@ pub fn run_1(
     let (runner, _, serialized_output) = cairo_run::cairo_run_program(
         &sierra_program,
         cairo_run_config,
-        service_config,
-        oracle_server,
+        configuration,
         entry_func_name,
     )?;
 

@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     env,
     fs::{self, File},
     io::BufReader,
@@ -8,6 +9,7 @@ use std::{
 use anyhow::{Context, Result};
 use cairo_lang_sierra::program::VersionedProgram;
 use cairo_oracle_hint_processor::{run_1, Error, FuncArg, FuncArgs};
+use cairo_proto_serde::configuration::Configuration;
 use cairo_vm::types::layout_name::LayoutName;
 use cairo_vm::Felt252;
 use camino::Utf8PathBuf;
@@ -31,15 +33,15 @@ struct Args {
     #[arg(long, default_value_t = false)]
     no_build: bool,
 
-    #[clap(long = "layout", default_value = "plain", value_parser=validate_layout)]
+    #[clap(long = "layout", default_value = "all_cairo", value_parser=validate_layout)]
     layout: String,
 
     #[arg(long, default_value_t = false)]
     proof_mode: bool,
 
-    /// Oracle server URL.
+    /// Configuration file for oracle servers.
     #[arg(long)]
-    oracle_server: Option<String>,
+    servers_config_file: Option<PathBuf>,
 
     /// Oracle lock file path.
     #[arg(long)]
@@ -158,7 +160,20 @@ fn main() -> Result<(), Error> {
         .expect("lock path must be provided either as an argument (--oracle-lock src) or in the Scarb.toml file in the [tool.hints] section.");
     let lock_file = File::open(lock_output).map_err(|e| Error::IO(e))?;
     let reader = BufReader::new(lock_file);
-    let service_configuration = serde_json::from_reader(reader).map_err(|e| Error::IO(e.into()))?;
+    let mut service_configuration: Configuration =
+        serde_json::from_reader(reader).map_err(|e| Error::IO(e.into()))?;
+
+    // Get the servers config path using absolute_path
+    let servers_config_path = absolute_path(&package, None, "servers_config", Some(PathBuf::from("servers.json")))
+        .expect("servers config path must be provided either in the Scarb.toml file in the [tool.hints] section or default to servers.json in the project root.");
+
+    // Read and parse the servers config file
+    let config_content = fs::read_to_string(&servers_config_path).map_err(|e| Error::IO(e))?;
+    let servers_config: HashMap<String, String> = serde_json::from_str(&config_content)
+        .map_err(|e| Error::ServersConfigFileError(format!("Failed to parse servers config: {}", e)))?;
+
+    // Add the servers_config to the Configuration
+    service_configuration.servers_config = servers_config;
 
     let sierra_program = serde_json::from_str::<VersionedProgram>(
         &fs::read_to_string(path.clone())
@@ -175,7 +190,6 @@ fn main() -> Result<(), Error> {
 
     match run_1(
         &service_configuration,
-        &args.oracle_server,
         &str_into_layout(&args.layout),
         &args.trace_file,
         &args.memory_file,

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -6,6 +7,7 @@ use std::{env, fs};
 use anyhow::{Context, Result};
 use cairo_lang_hints_test_runner::{CompiledTestRunner, TestRunConfig};
 use cairo_lang_test_plugin::TestCompilation;
+use cairo_proto_serde::configuration::Configuration;
 use cairo_vm::types::layout_name::LayoutName;
 use clap::Parser;
 use scarb_metadata::{Metadata, MetadataCommand, PackageMetadata, ScarbCommand, TargetMetadata};
@@ -31,14 +33,14 @@ struct Args {
     #[arg(long, default_value_t = false)]
     ignored: bool,
 
-    /// Oracle server URL.
+    /// Configuration file for oracle servers.
     #[arg(long)]
-    oracle_server: Option<String>,
+    servers_config_file: Option<PathBuf>,
 
     #[arg(long)]
     oracle_lock: Option<PathBuf>,
 
-    #[clap(long = "layout", default_value = "plain", value_parser=validate_layout)]
+    #[clap(long = "layout", default_value = "all_cairo", value_parser=validate_layout)]
     layout: String,
 }
 
@@ -102,7 +104,20 @@ fn main() -> Result<()> {
             .expect("lock path must be provided either as an argument (--oracle-lock src) or in the Scarb.toml file in the [tool.hints] section.");
         let lock_file = File::open(lock_output)?;
         let reader = BufReader::new(lock_file);
-        let service_config = serde_json::from_reader(reader)?;
+        let mut service_config: Configuration = serde_json::from_reader(reader)?;
+
+        // Get the servers config path
+        let servers_config_path = absolute_path(&package, None, "servers_config", Some(PathBuf::from("servers.json")))
+            .expect("servers config path must be provided either in the Scarb.toml file in the [tool.hints] section or default to servers.json in the project root.");
+
+        // Read and parse the servers config file
+        let config_content = fs::read_to_string(&servers_config_path)
+            .with_context(|| format!("failed to read servers config file: {}", servers_config_path.display()))?;
+        let servers_config: HashMap<String, String> = serde_json::from_str(&config_content)
+            .with_context(|| format!("failed to parse servers config file: {}", servers_config_path.display()))?;
+
+        // Add the server_config to the Configuration
+        service_config.servers_config = servers_config;
 
         for target in find_testable_targets(&package) {
             let file_path = target_dir.join(format!("{}.test.json", target.name.clone()));
@@ -118,18 +133,13 @@ fn main() -> Result<()> {
                 ignored: args.ignored,
             };
             let runner = CompiledTestRunner::new(test_compilation, config);
-            runner.run(
-                &args.oracle_server,
-                &service_config,
-                &str_into_layout(&args.layout),
-            )?;
+            runner.run(&service_config, &str_into_layout(&args.layout))?;
             println!();
         }
     }
 
     Ok(())
 }
-
 fn find_testable_targets(package: &PackageMetadata) -> Vec<&TargetMetadata> {
     package
         .targets

@@ -12,3 +12,7 @@ alexandria_math = { git = "https://github.com/keep-starknet-strange/alexandria.g
 definitions = "proto/oracle.proto"  # must be provided
 # cairo_output = "src"                 # default "src"
 # oracle_lock = "Oracle.lock"          # default "Oracle.lock"
+# servers_config = "servers.json"      # default "servers.json"
+
+[cairo]
+enable-gas = true

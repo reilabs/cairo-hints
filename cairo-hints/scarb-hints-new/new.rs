@@ -138,7 +138,7 @@ fn mk(
                     1. Rust: `cd rust; cargo run`
                     2. Javascript: `cd js; npm install; npm start`
                     3. Typescript: `cd ts; npm install; npm start`
-                2. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --layout all_cairo`
+                2. Run `scarb hints-run --layout all_cairo`
 
                 ## Extra options
 
@@ -154,7 +154,7 @@ fn mk(
 
                 ## Testing
 
-                The command for running tests is: `scarb hints-test --oracle-server http://127.0.0.1:3000 --layout all_cairo`
+                The command for running tests is: `scarb hints-test --layout all_cairo`
 
                 ## Note
 
