@@ -41,7 +41,7 @@ struct Args {
 
     /// Configuration file for oracle servers.
     #[arg(long)]
-    config_file: PathBuf,
+    config_file: Option<PathBuf>,
 
     /// Oracle lock file path.
     #[arg(long)]
