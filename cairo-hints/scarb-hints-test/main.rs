@@ -107,8 +107,8 @@ fn main() -> Result<()> {
         let mut service_config: Configuration = serde_json::from_reader(reader)?;
 
         // Get the servers config path
-        let servers_config_path = absolute_path(&package, None, "servers_config", Some(PathBuf::from("Servers.json")))
-            .expect("servers config path must be provided either in the Scarb.toml file in the [tool.hints] section or default to Servers.json in the project root.");
+        let servers_config_path = absolute_path(&package, None, "servers_config", Some(PathBuf::from("servers.json")))
+            .expect("servers config path must be provided either in the Scarb.toml file in the [tool.hints] section or default to servers.json in the project root.");
 
         // Read and parse the servers config file
         let config_content = fs::read_to_string(&servers_config_path)
