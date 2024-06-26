@@ -147,7 +147,7 @@ pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Confi
             &filename,
             indoc! {r#"
             {
-                "sqrt": "http://localhost:3000"
+                "sqrt": "http://127.0.0.1:3000"
             }
         "#},
         )?;

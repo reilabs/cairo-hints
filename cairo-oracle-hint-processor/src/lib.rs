@@ -76,8 +76,8 @@ pub enum Error {
     },
     #[error("Configuration error: {0}")]
     ConfigError(String),
-    #[error("Configuration file error: {0}")]
-    ConfigFileError(String),
+    #[error("Servers configuration file error: {0}")]
+    ServersConfigFileError(String),
 }
 
 #[allow(dead_code)]

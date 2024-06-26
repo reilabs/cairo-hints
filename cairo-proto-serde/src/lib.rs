@@ -302,7 +302,7 @@ mod tests {
         let enums = BTreeMap::new();
 
         let mut servers_config = HashMap::new();
-        servers_config.insert("sqrt".to_string(), "http://localhost:3000".to_string());
+        servers_config.insert("sqrt".to_string(), "http://127.0.0.1:3000".to_string());
 
         Configuration {
             enums,
@@ -317,7 +317,7 @@ mod tests {
         let configuration = test_configuration();
         assert_eq!(
             configuration.servers_config.get("sqrt"),
-            Some(&"http://localhost:3000".to_string())
+            Some(&"http://127.0.0.1:3000".to_string())
         );
 
         let json_string = serde_json::to_string(&configuration).unwrap();
@@ -325,7 +325,7 @@ mod tests {
 
         assert_eq!(
             new_configuration.servers_config.get("sqrt"),
-            Some(&"http://localhost:3000".to_string())
+            Some(&"http://127.0.0.1:3000".to_string())
         );
     }
 }

@@ -41,7 +41,7 @@ struct Args {
 
     /// Configuration file for oracle servers.
     #[arg(long)]
-    config_file: Option<PathBuf>,
+    servers_config_file: Option<PathBuf>,
 
     /// Oracle lock file path.
     #[arg(long)]
@@ -170,7 +170,7 @@ fn main() -> Result<(), Error> {
     // Read and parse the servers config file
     let config_content = fs::read_to_string(&servers_config_path).map_err(|e| Error::IO(e))?;
     let servers_config: HashMap<String, String> = serde_json::from_str(&config_content)
-        .map_err(|e| Error::ConfigFileError(format!("Failed to parse servers config: {}", e)))?;
+        .map_err(|e| Error::ServersConfigFileError(format!("Failed to parse servers config: {}", e)))?;
 
     // Add the servers_config to the Configuration
     service_configuration.servers_config = servers_config;
