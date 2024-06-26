@@ -40,7 +40,7 @@ struct Args {
     #[arg(long)]
     oracle_lock: Option<PathBuf>,
 
-    #[clap(long = "layout", default_value = "plain", value_parser=validate_layout)]
+    #[clap(long = "layout", default_value = "all_cairo", value_parser=validate_layout)]
     layout: String,
 }
 

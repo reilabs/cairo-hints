@@ -83,7 +83,7 @@ impl Default for Cairo1RunConfig<'_> {
             serialize_output: false,
             trace_enabled: false,
             relocate_mem: false,
-            layout: LayoutName::plain,
+            layout: LayoutName::all_cairo,
             proof_mode: false,
             finalize_builtins: false,
             append_return_values: false,
