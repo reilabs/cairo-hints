@@ -342,7 +342,7 @@ pub fn run_tests(
                                     }
                                 }
                             },
-                            Err(_) => panic!("Error!"),
+                            Err(e) => panic!("Error: {:?}", e),
                         },
                         gas_usage: None,
                     }),
