@@ -166,7 +166,7 @@ In addition to the existing `Scarb.toml` configuration flags described in the [o
 definitions = "proto/oracle.proto"  # mandatory
 cairo_output = "src"                # optional - default "src"
 oracle_lock = "Oracle.lock"         # optional - default "Oracle.lock"
-
+servers_config = "servers.json"         # optional - default "servers.json"
 ```
 
 The variable `definition` indicates the path of the `proto` file which is used by `scarb-hints-generate` to autogenerate Cairo code for the hint structs.
