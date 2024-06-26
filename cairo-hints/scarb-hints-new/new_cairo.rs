@@ -40,6 +40,9 @@ pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Confi
             # cairo_output = "src"
             # oracle_lock = "Oracle.lock"
             # servers_config = "servers.json"
+
+            [cairo]
+            enable-gas = true
         "#},
         )?;
     }

@@ -11,4 +11,7 @@ edition = "2023_10"
 definitions = "proto/oracle.proto"  # required
 # cairo_output = "src"
 # oracle_lock = "Oracle.lock"
+# servers_config = "servers.json"
 
+[cairo]
+enable-gas = true
