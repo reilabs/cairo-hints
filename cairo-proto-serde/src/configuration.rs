@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Configuration {
     pub enums: BTreeMap<String, Vec<Mapping>>,
     pub messages: BTreeMap<String, Vec<Field>>,

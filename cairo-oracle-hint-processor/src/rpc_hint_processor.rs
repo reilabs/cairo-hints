@@ -5,8 +5,8 @@ use cairo_lang_casm::{
     operand::{CellRef, ResOperand},
 };
 use cairo_lang_utils::bigint::BigIntAsHex;
+use cairo_oracle::CairoOracle;
 use cairo_proto_serde::configuration::Configuration;
-use cairo_proto_serde::{deserialize_cairo_serde, serialize_cairo_serde};
 use cairo_vm::hint_processor::cairo_1_hint_processor::hint_processor::Cairo1HintProcessor;
 use cairo_vm::hint_processor::hint_processor_definition::HintProcessorLogic;
 use cairo_vm::hint_processor::hint_processor_definition::HintReference;
@@ -23,11 +23,7 @@ use cairo_vm::{
         vm_core::VirtualMachine,
     },
 };
-use reqwest::Url;
 use core::any::Any;
-use indoc::formatdoc;
-use itertools::Itertools;
-use serde_json::Value;
 use std::collections::HashMap;
 
 /// HintProcessor for Cairo 1 compiler hints.
@@ -73,92 +69,13 @@ impl<'a> Rpc1HintProcessor<'a> {
         let mut res_segment = MemBuffer::new_segment(vm);
         let res_segment_start = res_segment.ptr;
 
-        let Some(configuration) = self
-            .configuration
-            .services
-            .iter()
-            .find_map(|(_, methods)| methods.methods.get(selector))
-        else {
-            return Err(HintError::CustomHint(Box::from(format!(
-                "Unknown cheatcode selector: {selector}"
-            ))));
-        };
 
-        let server_url = self.server.as_ref().expect(
+        let oracle_url = self.server.as_ref().expect(
             format!("Please provide an --oracle-server argument to execute hints").as_str(),
         );
-        let mut server_url = Url::parse(server_url).expect("oracle-server must be a valid URL");
-        server_url.path_segments_mut().expect("cannot be a base URL").push(selector);
+        let oracle = CairoOracle::new(oracle_url.clone(), self.configuration.clone());
+        let data = oracle.execute_hint(selector, inputs.as_ref()).map_err(|err| HintError::CustomHint(err))?;
 
-        let data = deserialize_cairo_serde(
-            self.configuration,
-            &configuration.input,
-            &mut inputs.as_ref(),
-        );
-        println!("let the oracle decide... Inputs: {data:?}");
-
-        let client = reqwest::blocking::Client::new();
-
-        let req = client.post(server_url.clone()).json(&data).send().expect(
-            format!("Couldn't connect to oracle server {server_url}. Is the server running?")
-                .as_str(),
-        );
-
-        let status_code = req.error_for_status_ref().map(|_| ());
-        let body = req.text().expect(
-            formatdoc! {
-                r#"
-                Response from oracle server can't be parsed as string."#
-            }
-            .as_str(),
-        );
-
-        status_code.expect(
-            formatdoc! {
-                r#"
-                Received {body:?}.
-                Response status from oracle server not successful."#
-            }
-            .as_str(),
-        );
-
-        let body = serde_json::from_str::<Value>(body.as_str()).expect(
-            formatdoc! {
-                r#"
-                Received {body:?}.
-                Error converting response from oracle server {server_url} to JSON."#
-            }
-            .as_str(),
-        );
-
-        let body = body.as_object().expect(
-            formatdoc! {r#"
-                Received {body:?}.
-                Error serialising response as object from oracle server.
-            "#}
-            .as_str(),
-        );
-
-        body.keys()
-            .exactly_one()
-            .map_err(|_| {
-                formatdoc! {r#"
-                    Received {body:?}.
-                    Expected response format from oracle server is {{"result": <response_object>}}.
-                "#}
-            })
-            .unwrap();
-
-        let output = body.get("result").expect(
-            formatdoc! {r#"
-                Received {body:?}.
-                Expected response format from oracle server is {{"result": <response_object>}}.
-            "#}
-            .as_str(),
-        );
-
-        let data = serialize_cairo_serde(self.configuration, &configuration.output, output);
-        println!("Output: {output}");
         res_segment.write_data(data.iter())?;
 
         let res_segment_end = res_segment.ptr;
