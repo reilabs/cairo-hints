@@ -1,3 +1,6 @@
+use std::fs::File;
+use std::io::BufReader;
+
 use cairo_proto_serde::configuration::{Configuration, MethodDeclaration};
 use cairo_proto_serde::{deserialize_cairo_serde, serialize_cairo_serde};
 use indoc::formatdoc;
@@ -17,7 +20,17 @@ impl CairoOracle {
     }
 
     pub fn new_from_env() -> Self {
-        Self { server: "".to_string(), configuration: Default::default() }
+        // TODO: throw an error if only one present
+        let server = std::env::var("CAIRO_ORACLE_SERVER").ok().unwrap_or_default();
+        let Some(configuration) = std::env::var("CAIRO_ORACLE_CONFIG").ok() else {
+            return Self { server: server, configuration: Default::default() };
+        };
+
+        let lock_file = File::open(configuration).expect("CAIRO_ORACLE_CONFIG exists");
+        let reader = BufReader::new(lock_file);
+        let configuration = serde_json::from_reader(reader).expect("CAIRO_ORACLE_CONFIG is a JSON file with oracle configuration");
+    
+        return Self { server, configuration };
     }
 
     fn method_declaration(&self, selector: &str) -> Option<&MethodDeclaration> {
