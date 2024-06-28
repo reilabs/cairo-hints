@@ -9,6 +9,22 @@ pub mod configuration;
 
 fn serialize_primitive(ty: &PrimitiveType, value: &Value) -> Vec<Felt252> {
     let element = match ty {
+        PrimitiveType::FELT252 => {
+            match value {
+                Value::String(s) => {
+                    if s.starts_with("0x") {
+                        Felt252::from_hex(s).expect("Invalid FELT252 hex string")
+                    } else {
+                        Felt252::from_dec_str(s).expect("Invalid FELT252 decimal string")
+                    }
+                }
+                Value::Number(n) => {
+                    let s = format!("{}", n);
+                    Felt252::from_dec_str(&s).expect("Invalid FELT252 number")
+                }
+                _ => panic!("FELT252 must be a string or number"),
+            }
+        }
         PrimitiveType::U64 => Felt252::from(
             value
                 .as_u64()
@@ -61,6 +77,11 @@ fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
     *value = &value[1..];
 
     match ty {
+        PrimitiveType::FELT252 => {
+            let hex_string = format!("0x{}", num.to_str_radix(16));
+            json!(hex_string)
+        }
+
         PrimitiveType::U64 => {
             json!(u64::try_from(num).expect(format!("Error converting {value:?} to u64").as_str()))
         }

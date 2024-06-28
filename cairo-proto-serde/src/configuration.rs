@@ -19,6 +19,7 @@ pub enum PrimitiveType {
     I64,
     BOOL,
     BYTEARRAY,
+    FELT252,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -64,6 +65,7 @@ impl From<String> for FieldType {
             "i64" => FieldType::Primitive(PrimitiveType::I64),
             "bool" => FieldType::Primitive(PrimitiveType::BOOL),
             "ByteArray" => FieldType::Primitive(PrimitiveType::BYTEARRAY),
+            "felt252" => FieldType::Primitive(PrimitiveType::FELT252),
             _ => FieldType::Message(value),
         }
     }

@@ -601,6 +601,7 @@ impl<'a> CodeGenerator<'a> {
             Type::Int32 | Type::Sfixed32 | Type::Sint32 => String::from("i32"),
             Type::Int64 | Type::Sfixed64 | Type::Sint64 => String::from("i64"),
             Type::Bool => String::from("bool"),
+            Type::String if field.name().contains("felt252_") => String::from("felt252"),
             Type::String => String::from("ByteArray"),
             Type::Bytes => String::from("ByteArray"),
             Type::Group | Type::Message | Type::Enum => self.resolve_ident(field.type_name()),
