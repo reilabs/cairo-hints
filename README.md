@@ -52,8 +52,8 @@ cargo install --path cairo-hints --locked
 2. Define messages in a `.proto` file
 3. Run `scarb hints-generate`
 4. In another tab, `cd rust` and start the RPC server with the command `cargo run`
-5. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --layout all_cairo`
-6. Integration tests can be run with `scarb hints-test --oracle-server http://127.0.0.1:3000 --layout all_cairo`
+5. Run `scarb hints-run --layout all_cairo`
+6. Integration tests can be run with `scarb hints-test --layout all_cairo`
 
 ## Documentation
 * [Command Reference](https://github.com/reilabs/cairo-hints/tree/main/documentation/Reference.md)

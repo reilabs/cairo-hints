@@ -69,7 +69,7 @@ Users are free to use `.proto` files to generate corresponding definitions on th
 
 Assuming you have generated the `hello_hints` project, open the terminal and `cd` into `hello_hints/rust` folder. To start the JSON-RPC server, enter `cargo run`. This will start a local RPC server on port :3000 that receives hint requests from your Cairo code and sends back a computed output. This template uses an `axum` library to provide a HTTP server.
 
-With JSON-RPC server running, open another terminal window and execute `scarb hints-run --oracle-server http://127.0.0.1:3000 --layout "all_cairo"`. This command executes the `main` function of the Cairo program contained in `src/lib.cairo`.  The expected output is:
+With JSON-RPC server running, open another terminal window and execute `scarb hints-run --layout "all_cairo"`. This command executes the `main` function of the Cairo program contained in `src/lib.cairo`.  The expected output is:
 
 ```
 let the oracle decide... Inputs: Object {"n": Number(1764)}
@@ -161,7 +161,7 @@ cargo install --path . --locked --features=cli,instruments,parallel
 Before we can generate the proof, we need to obtain memory and trace files from Cairo execution. These can be generated using the following command:
 
 ```bash
-scarb hints-run --oracle-server http://127.0.0.1:3000 --layout "all_cairo" --trace-file sqrt.trace --memory-file sqrt.memory --proof-mode
+scarb hints-run --layout "all_cairo" --trace-file sqrt.trace --memory-file sqrt.memory --proof-mode
 ```
 
 Then we use `platinum-prover` to generate and verify proofs:

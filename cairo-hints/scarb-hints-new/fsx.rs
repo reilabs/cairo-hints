@@ -46,6 +46,7 @@ pub fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> Result<()> {
 pub trait PathUtf8Ext {
     fn try_as_utf8(&'_ self) -> Result<&'_ Utf8Path>;
 
+    #[allow(dead_code)]
     fn try_to_utf8(&self) -> Result<Utf8PathBuf> {
         self.try_as_utf8().map(|p| p.to_path_buf())
     }

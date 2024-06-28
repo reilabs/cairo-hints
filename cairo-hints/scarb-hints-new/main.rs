@@ -10,6 +10,7 @@ mod new;
 mod new_cairo;
 mod new_js;
 mod new_rust;
+mod new_ts;
 mod restricted_names;
 
 #[derive(Parser, Debug)]
@@ -28,6 +29,7 @@ struct Args {
 pub enum Lang {
     Rust,
     Js,
+    Ts,
 }
 
 /// Arguments accepted by the `init` command.

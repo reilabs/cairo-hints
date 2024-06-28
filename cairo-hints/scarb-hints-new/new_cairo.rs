@@ -10,12 +10,12 @@ pub const CAIRO_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["src", "lib.cairo"].iter().collect());
 pub const ORACLE_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["src", "oracle.cairo"].iter().collect());
-pub const CAIRO_MANIFEST_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["Scarb.toml"].iter().collect());
+pub const CAIRO_MANIFEST_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["Scarb.toml"].iter().collect());
 pub const PROTO_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["proto", "oracle.proto"].iter().collect());
-pub const ORACLE_LOCK_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| ["Oracle.lock"].iter().collect());
+pub const ORACLE_LOCK_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["Oracle.lock"].iter().collect());
+pub const SERVERS_JSON_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["servers.json"].iter().collect());
+pub const TOOL_VERSIONS_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| [".tool-versions"].iter().collect());
 
 pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Config) -> Result<()> {
     // Create the `Scarb.toml` file.
@@ -39,7 +39,10 @@ pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Confi
             definitions = "proto/oracle.proto"  # required
             # cairo_output = "src"
             # oracle_lock = "Oracle.lock"
+            # servers_config = "servers.json"
 
+            [cairo]
+            enable-gas = true
         "#},
         )?;
     }
@@ -135,6 +138,34 @@ pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Confi
             indoc! {r#"
                 {"enums":{},"messages":{"oracle::Request":[{"name":"n","ty":{"primitive":"u64"}}],"oracle::Response":[{"name":"n","ty":{"primitive":"u64"}}]},"services":{"SqrtOracle":{"sqrt":{"input":{"message":"oracle::Request"},"output":{"message":"oracle::Response"}}}}}
             "#},
+        )?;
+    }
+
+    // Create the `servers.json` file.
+    let filename: Utf8PathBuf = canonical_path.join(SERVERS_JSON_PATH.as_path());
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
+
+        fsx::write(
+            &filename,
+            indoc! {r#"
+            {
+                "sqrt": "http://127.0.0.1:3000"
+            }
+        "#},
+        )?;
+    }
+
+    // Create the `tool-versions` file.
+    let filename: Utf8PathBuf = canonical_path.join(TOOL_VERSIONS_PATH.as_path());
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
+
+        fsx::write(
+            &filename,
+            indoc! {r#"
+            scarb 2.6.5
+        "#},
         )?;
     }
 

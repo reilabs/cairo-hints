@@ -1,8 +1,8 @@
 use core::{
     integer,
     integer::{
-        BoundedInt, u128_as_non_zero, u128_sqrt, u128_wrapping_sub, u16_sqrt, u256_as_non_zero,
-        u256_sqrt, u256_wide_mul, u32_sqrt, u512_safe_div_rem_by_u256, u512, u64_sqrt, u8_sqrt
+        BoundedInt, u128_sqrt, u128_wrapping_sub, u16_sqrt, u256_sqrt, u256_wide_mul, u32_sqrt,
+        u512_safe_div_rem_by_u256, u512, u64_sqrt, u8_sqrt
     }
 };
 use core::test::test_utils::{assert_eq, assert_ne, assert_le, assert_lt, assert_gt, assert_ge};
@@ -100,7 +100,7 @@ fn test_u8_mul_overflow_3() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected: ('Division by 0',))]
 fn test_u8_div_by_0() {
     2_u8 / 0_u8;
 }
@@ -203,7 +203,7 @@ fn test_u16_mul_overflow_3() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected: ('Division by 0',))]
 fn test_u16_div_by_0() {
     2_u16 / 0_u16;
 }
@@ -306,7 +306,7 @@ fn test_u32_mul_overflow_3() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected: ('Division by 0',))]
 fn test_u32_div_by_0() {
     2_u32 / 0_u32;
 }
@@ -411,7 +411,7 @@ fn test_u64_mul_overflow_3() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected: ('Division by 0',))]
 fn test_u64_div_by_0() {
     2_u64 / 0_u64;
 }
@@ -561,7 +561,7 @@ fn test_u128_mul_overflow_3() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected: ('Division by 0',))]
 fn test_u128_div_by_0() {
     2_u128 / 0_u128;
 }
@@ -796,6 +796,17 @@ fn test_u512_safe_div_rem_by_u256() {
 }
 
 #[test]
+fn test_u512_try_into_u256() {
+    assert!(
+        u512 { limb0: 1, limb1: 2, limb2: 0, limb3: 0 }
+            .try_into() == Option::Some(0x200000000000000000000000000000001_u256)
+    );
+    assert!(u512 { limb0: 1, limb1: 2, limb2: 3, limb3: 0 }.try_into() == Option::<u256>::None);
+    assert!(u512 { limb0: 1, limb1: 2, limb2: 0, limb3: 4 }.try_into() == Option::<u256>::None);
+    assert!(u512 { limb0: 1, limb1: 2, limb2: 3, limb3: 4 }.try_into() == Option::<u256>::None);
+}
+
+#[test]
 fn test_min() {
     let min_u8: u8 = BoundedInt::min();
     let min_u16: u16 = BoundedInt::min();
@@ -911,7 +922,6 @@ fn test_u256_sqrt() {
 
 #[test]
 fn test_u256_try_into_felt252() {
-    let FELT252_PRIME = 0x800000000000011000000000000000000000000000000000000000000000001_u256;
     assert_eq(@1_u256.try_into().unwrap(), @1_felt252, '1 == 1'_felt252);
     assert_eq(
         @0x800000000000011000000000000000000000000000000000000000000000000_u256.try_into().unwrap(),
@@ -1027,7 +1037,6 @@ fn validate_cast_bounds_strictly_contained<
     +PartialEq<SubType>,
     +PartialEq<SuperType>,
     +Into<SubType, SuperType>,
-    +TryInto<SubType, SuperType>,
     +TryInto<SuperType, SubType>,
     +TryInto<felt252, SuperType>
 >(
@@ -1054,7 +1063,6 @@ fn validate_cast_bounds_contained_same_min<
     +PartialEq<SubType>,
     +PartialEq<SuperType>,
     +Into<SubType, SuperType>,
-    +TryInto<SubType, SuperType>,
     +TryInto<SuperType, SubType>,
     +TryInto<felt252, SuperType>
 >(
@@ -1165,124 +1173,124 @@ fn test_into_self_type() {
 #[test]
 #[should_panic]
 fn panic_u16_u8_1() {
-    let out: u8 = (0xFF_u16 + 1_u16).try_into().unwrap();
+    let _out: u8 = (0xFF_u16 + 1_u16).try_into().unwrap();
 }
 
 #[test]
 #[should_panic]
 fn panic_u16_u8_2() {
     let max_u16: u16 = 0xFFFF;
-    let out: u8 = max_u16.try_into().unwrap();
+    let _out: u8 = max_u16.try_into().unwrap();
 }
 #[test]
 #[should_panic]
 fn panic_u32_u8_1() {
-    let out: u8 = (0xFF_u32 + 1_u32).try_into().unwrap();
+    let _out: u8 = (0xFF_u32 + 1_u32).try_into().unwrap();
 }
 
 #[test]
 #[should_panic]
 fn panic_u32_u8_2() {
     let max_u32: u32 = 0xFFFFFFFF;
-    let out: u8 = max_u32.try_into().unwrap();
+    let _out: u8 = max_u32.try_into().unwrap();
 }
 #[test]
 #[should_panic]
 fn panic_u64_u8_1() {
-    let out: u8 = (0xFF_u64 + 1_u64).try_into().unwrap();
+    let _out: u8 = (0xFF_u64 + 1_u64).try_into().unwrap();
 }
 
 #[test]
 #[should_panic]
 fn panic_u64_u8_2() {
     let max_u64: u64 = 0xFFFFFFFFFFFFFFFF;
-    let out: u8 = max_u64.try_into().unwrap();
+    let _out: u8 = max_u64.try_into().unwrap();
 }
 #[test]
 #[should_panic]
 fn panic_u128_u8_1() {
-    let out: u8 = (0xFF_u128 + 1_u128).try_into().unwrap();
+    let _out: u8 = (0xFF_u128 + 1_u128).try_into().unwrap();
 }
 
 #[test]
 #[should_panic]
 fn panic_u128_u8_2() {
     let max_u128: u128 = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-    let out: u8 = max_u128.try_into().unwrap();
+    let _out: u8 = max_u128.try_into().unwrap();
 }
 #[test]
 #[should_panic]
 fn panic_u32_u16_1() {
-    let out: u16 = (0xFFFF_u32 + 1_u32).try_into().unwrap();
+    let _out: u16 = (0xFFFF_u32 + 1_u32).try_into().unwrap();
 }
 
 #[test]
 #[should_panic]
 fn panic_u32_u16_2() {
     let max_u32: u32 = 0xFFFFFFFF;
-    let out: u16 = max_u32.try_into().unwrap();
+    let _out: u16 = max_u32.try_into().unwrap();
 }
 #[test]
 #[should_panic]
 fn panic_u64_u16_1() {
-    let out: u16 = (0xFFFF_u64 + 1_u64).try_into().unwrap();
+    let _out: u16 = (0xFFFF_u64 + 1_u64).try_into().unwrap();
 }
 
 #[test]
 #[should_panic]
 fn panic_u64_u16_2() {
     let max_u64: u64 = 0xFFFFFFFFFFFFFFFF;
-    let out: u16 = max_u64.try_into().unwrap();
+    let _out: u16 = max_u64.try_into().unwrap();
 }
 #[test]
 #[should_panic]
 fn panic_u128_u16_1() {
-    let out: u16 = (0xFFFF_u128 + 1_u128).try_into().unwrap();
+    let _out: u16 = (0xFFFF_u128 + 1_u128).try_into().unwrap();
 }
 
 #[test]
 #[should_panic]
 fn panic_u128_u16_2() {
     let max_u128: u128 = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-    let out: u16 = max_u128.try_into().unwrap();
+    let _out: u16 = max_u128.try_into().unwrap();
 }
 #[test]
 #[should_panic]
 fn panic_u64_u32_1() {
-    let out: u32 = (0xFFFFFFFF_u64 + 1_u64).try_into().unwrap();
+    let _out: u32 = (0xFFFFFFFF_u64 + 1_u64).try_into().unwrap();
 }
 
 #[test]
 #[should_panic]
 fn panic_u64_u32_2() {
     let max_u64: u64 = 0xFFFFFFFFFFFFFFFF;
-    let out: u32 = max_u64.try_into().unwrap();
+    let _out: u32 = max_u64.try_into().unwrap();
 }
 
 #[test]
 #[should_panic]
 fn panic_u128_u32_1() {
-    let out: u32 = (0xFFFFFFFF_u128 + 1_u128).try_into().unwrap();
+    let _out: u32 = (0xFFFFFFFF_u128 + 1_u128).try_into().unwrap();
 }
 
 #[test]
 #[should_panic]
 fn panic_u128_u32_2() {
     let max_u128: u128 = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-    let out: u32 = max_u128.try_into().unwrap();
+    let _out: u32 = max_u128.try_into().unwrap();
 }
 
 #[test]
 #[should_panic]
 fn panic_u128_u64_1() {
-    let out: u64 = (0xFFFFFFFFFFFFFFFF_u128 + 1_u128).try_into().unwrap();
+    let _out: u64 = (0xFFFFFFFFFFFFFFFF_u128 + 1_u128).try_into().unwrap();
 }
 
 #[test]
 #[should_panic]
 fn panic_u128_u64_2() {
     let max_u128: u128 = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-    let out: u64 = max_u128.try_into().unwrap();
+    let _out: u64 = max_u128.try_into().unwrap();
 }
 
 #[test]
@@ -1848,4 +1856,95 @@ fn test_signed_int_diff() {
     assert_eq(@integer::i128_diff(3, 3).unwrap(), @0, 'i128: 3 - 3 == 0');
     assert_eq(@integer::i128_diff(4, 3).unwrap(), @1, 'i128: 4 - 3 == 1');
     assert_eq(@integer::i128_diff(3, 5).unwrap_err(), @~(2 - 1), 'i128: 3 - 5 == -2');
+}
+
+mod special_casts {
+    extern type BoundedInt<const MIN: felt252, const MAX: felt252>;
+    extern fn downcast<T, S>(index: T) -> Option<S> implicits(RangeCheck) nopanic;
+    extern fn upcast<T, S>(index: T) -> S nopanic;
+
+    impl DropBoundedInt120_180 of Drop<BoundedInt<120, 180>>;
+    const U128_UPPER: felt252 = 0x100000000000000000000000000000000;
+    type BoundedIntU128Upper =
+        BoundedInt<0x100000000000000000000000000000000, 0x100000000000000000000000000000000>;
+    const U128_MAX: felt252 = 0xffffffffffffffffffffffffffffffff;
+    type BoundedIntU128Max =
+        BoundedInt<0xffffffffffffffffffffffffffffffff, 0xffffffffffffffffffffffffffffffff>;
+
+    /// Is `value` the equivalent value of `expected` in `T` type.
+    fn is_some_of<T>(value: Option<T>, expected: felt252) -> bool {
+        match value {
+            Option::Some(v) => upcast(v) == expected,
+            Option::None => false,
+        }
+    }
+
+    /// Is `value` the equivalent value (as `felt252`) of `expected` in `T` type.
+    fn felt252_downcast_valid<T>(value: felt252) -> bool {
+        is_some_of(downcast::<felt252, T>(value), value)
+    }
+
+    /// Is `value` the equivalent value (as `felt252`) of `expected` in `T` type.
+    fn downcast_invalid<T, S>(value: T) -> bool {
+        match downcast::<T, S>(value) {
+            Option::Some(v) => {
+                // Just as a drop for `v`.
+                upcast::<_, felt252>(v);
+                false
+            },
+            Option::None => true,
+        }
+    }
+
+    #[test]
+    fn test_felt252_downcasts() {
+        assert!(downcast_invalid::<felt252, BoundedInt<0, 0>>(1));
+        assert!(felt252_downcast_valid::<BoundedInt<0, 0>>(0));
+        assert!(downcast_invalid::<felt252, BoundedInt<0, 0>>(-1));
+        assert!(downcast_invalid::<felt252, BoundedInt<-1, -1>>(-2));
+        assert!(felt252_downcast_valid::<BoundedInt<-1, -1>>(-1));
+        assert!(downcast_invalid::<felt252, BoundedInt<-1, -1>>(0));
+        assert!(downcast_invalid::<felt252, BoundedInt<120, 180>>(119));
+        assert!(felt252_downcast_valid::<BoundedInt<120, 180>>(120));
+        assert!(felt252_downcast_valid::<BoundedInt<120, 180>>(180));
+        assert!(downcast_invalid::<felt252, BoundedInt<120, 180>>(181));
+        assert!(downcast_invalid::<felt252, BoundedIntU128Max>(U128_MAX - 1));
+        assert!(felt252_downcast_valid::<BoundedIntU128Max>(U128_MAX));
+        assert!(downcast_invalid::<felt252, BoundedIntU128Max>(U128_MAX + 1));
+        assert!(downcast_invalid::<felt252, BoundedIntU128Upper>(U128_UPPER - 1));
+        assert!(felt252_downcast_valid::<BoundedIntU128Upper>(U128_UPPER));
+        assert!(downcast_invalid::<felt252, BoundedIntU128Upper>(U128_UPPER + 1));
+    }
+
+    // Full prime range, but where the max element is 0.
+    type OneMinusPToZero =
+        BoundedInt<-0x800000000000011000000000000000000000000000000000000000000000000, 0>;
+
+    type OneMinusPOnly =
+        BoundedInt<
+            -0x800000000000011000000000000000000000000000000000000000000000000,
+            -0x800000000000011000000000000000000000000000000000000000000000000
+        >;
+
+    #[test]
+    fn test_bounded_int_casts() {
+        let minus_1 = downcast::<felt252, BoundedInt<-1, -1>>(-1).unwrap();
+        assert!(downcast::<OneMinusPToZero, u8>(upcast(minus_1)).is_none());
+        let zero = downcast::<felt252, BoundedInt<0, 0>>(0).unwrap();
+        assert!(downcast::<OneMinusPToZero, u8>(upcast(zero)) == Option::Some(0));
+        let one_minus_p = downcast::<felt252, OneMinusPOnly>(1).unwrap();
+        assert!(downcast::<OneMinusPToZero, u8>(upcast(one_minus_p)).is_none());
+        let v119 = downcast::<felt252, BoundedInt<119, 119>>(119).unwrap();
+        assert!(downcast::<BoundedInt<100, 200>, BoundedInt<120, 180>>(upcast(v119)).is_none());
+        let v120 = downcast::<felt252, BoundedInt<120, 120>>(120).unwrap();
+        assert!(
+            is_some_of(downcast::<BoundedInt<100, 200>, BoundedInt<120, 180>>(upcast(v120)), 120)
+        );
+        let v180 = downcast::<felt252, BoundedInt<180, 180>>(180).unwrap();
+        assert!(
+            is_some_of(downcast::<BoundedInt<100, 200>, BoundedInt<120, 180>>(upcast(v180)), 180)
+        );
+        let v181 = downcast::<felt252, BoundedInt<181, 181>>(181).unwrap();
+        assert!(downcast::<BoundedInt<100, 200>, BoundedInt<120, 180>>(upcast(v181)).is_none());
+    }
 }

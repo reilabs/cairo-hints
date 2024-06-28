@@ -13,7 +13,7 @@ It calculates `sqrt` using an RPC server implemented in Rust.
 1. Start the hints server:
     1. Rust: `cd rust; cargo run`
     2. Javascript: `cd js; npm install; npm start`
-2. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --layout all_cairo`
+2. Run `scarb hints-run --layout all_cairo`
 
 ## Extra options
 
@@ -29,7 +29,7 @@ The command to verify a proof is: `platinum-prover verify <PROOF_FILE>`.
 
 ## Testing
 
-The command for running tests is: `scarb hints-test --oracle-server http://127.0.0.1:3000 --layout all_cairo`
+The command for running tests is: `scarb hints-test --layout all_cairo`
 
 ## Note
 

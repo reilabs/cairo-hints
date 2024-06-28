@@ -16,6 +16,7 @@ use cairo_lang_test_plugin::{
 };
 use cairo_oracle_hint_processor::{run_1, Error, FuncArgs};
 use cairo_proto_serde::configuration::Configuration;
+use cairo_vm::types::layout_name::LayoutName;
 use cairo_vm::Felt252 as VMFelt;
 use colored::Colorize;
 use itertools::Itertools;
@@ -48,12 +49,11 @@ impl TestRunner {
     /// Runs the tests and process the results for a summary.
     pub fn run(
         &self,
-        oracle_server: &Option<String>,
         configuration: &Configuration,
-        layout: &String,
+        layout: &LayoutName,
     ) -> Result<Option<TestsSummary>> {
         let runner = CompiledTestRunner::new(self.compiler.build()?, self.config.clone());
-        runner.run(oracle_server, configuration, layout)
+        runner.run(configuration, layout)
     }
 }
 
@@ -61,7 +61,6 @@ pub struct CompiledTestRunner {
     pub compiled: TestCompilation,
     pub config: TestRunConfig,
 }
-
 impl CompiledTestRunner {
     /// Configure a new compiled test runner
     ///
@@ -76,9 +75,8 @@ impl CompiledTestRunner {
     /// Execute preconfigured test execution.
     pub fn run(
         self,
-        oracle_server: &Option<String>,
         configuration: &Configuration,
-        layout: &String,
+        layout: &LayoutName,
     ) -> Result<Option<TestsSummary>> {
         let (compiled, filtered_out) = filter_test_cases(
             self.compiled,
@@ -94,9 +92,6 @@ impl CompiledTestRunner {
         } = run_tests(
             compiled.named_tests,
             compiled.sierra_program,
-            // compiled.function_set_costs,
-            // compiled.contracts_info,
-            oracle_server,
             configuration,
             layout,
         )?;
@@ -293,9 +288,8 @@ pub fn run_tests(
     sierra_program: Program,
     // _function_set_costs: OrderedHashMap<FunctionId, OrderedHashMap<CostTokenType, i32>>,
     // _contracts_info: OrderedHashMap<Felt252, ContractInfo>,
-    oracle_server: &Option<String>,
     configuration: &Configuration,
-    layout: &String,
+    layout: &LayoutName,
 ) -> Result<TestsSummary> {
     println!("running {} tests", named_tests.len());
     let wrapped_summary = Mutex::new(Ok(TestsSummary {
@@ -314,7 +308,6 @@ pub fn run_tests(
 
                 let r = run_1(
                     configuration,
-                    oracle_server,
                     layout,
                     &None,
                     &None,
@@ -349,7 +342,7 @@ pub fn run_tests(
                                     }
                                 }
                             },
-                            Err(_) => panic!("Error!"),
+                            Err(e) => panic!("Error: {:?}", e),
                         },
                         gas_usage: None,
                     }),

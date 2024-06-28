@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     env,
     fs::{self, File},
     io::BufReader,
@@ -8,6 +9,8 @@ use std::{
 use anyhow::{Context, Result};
 use cairo_lang_sierra::program::VersionedProgram;
 use cairo_oracle_hint_processor::{run_1, Error, FuncArg, FuncArgs};
+use cairo_proto_serde::configuration::Configuration;
+use cairo_vm::types::layout_name::LayoutName;
 use cairo_vm::Felt252;
 use camino::Utf8PathBuf;
 use clap::Parser;
@@ -30,15 +33,15 @@ struct Args {
     #[arg(long, default_value_t = false)]
     no_build: bool,
 
-    #[clap(long = "layout", default_value = "plain", value_parser=validate_layout)]
+    #[clap(long = "layout", default_value = "all_cairo", value_parser=validate_layout)]
     layout: String,
 
     #[arg(long, default_value_t = false)]
     proof_mode: bool,
 
-    /// Oracle server URL.
+    /// Configuration file for oracle servers.
     #[arg(long)]
-    oracle_server: Option<String>,
+    servers_config_file: Option<PathBuf>,
 
     /// Oracle lock file path.
     #[arg(long)]
@@ -55,7 +58,7 @@ struct Args {
     args: FuncArgs,
 }
 
-fn process_args(value: &str) -> Result<FuncArgs, String> {
+pub fn process_args(value: &str) -> Result<FuncArgs, String> {
     if value.is_empty() {
         return Ok(FuncArgs::default());
     }
@@ -64,24 +67,36 @@ fn process_args(value: &str) -> Result<FuncArgs, String> {
     while let Some(value) = input.next() {
         // First argument in an array
         if value.starts_with('[') {
-            let mut array_arg =
-                vec![Felt252::from_dec_str(value.strip_prefix('[').unwrap()).unwrap()];
-            // Process following args in array
-            let mut array_end = false;
-            while !array_end {
-                if let Some(value) = input.next() {
-                    // Last arg in array
-                    if value.ends_with(']') {
-                        array_arg
-                            .push(Felt252::from_dec_str(value.strip_suffix(']').unwrap()).unwrap());
-                        array_end = true;
-                    } else {
-                        array_arg.push(Felt252::from_dec_str(value).unwrap())
+            if value.ends_with(']') {
+                if value.len() == 2 {
+                    args.push(FuncArg::Array(Vec::new()));
+                } else {
+                    args.push(FuncArg::Array(vec![Felt252::from_dec_str(
+                        value.strip_prefix('[').unwrap().strip_suffix(']').unwrap(),
+                    )
+                    .unwrap()]));
+                }
+            } else {
+                let mut array_arg =
+                    vec![Felt252::from_dec_str(value.strip_prefix('[').unwrap()).unwrap()];
+                // Process following args in array
+                let mut array_end = false;
+                while !array_end {
+                    if let Some(value) = input.next() {
+                        // Last arg in array
+                        if value.ends_with(']') {
+                            array_arg.push(
+                                Felt252::from_dec_str(value.strip_suffix(']').unwrap()).unwrap(),
+                            );
+                            array_end = true;
+                        } else {
+                            array_arg.push(Felt252::from_dec_str(value).unwrap())
+                        }
                     }
                 }
+                // Finalize array
+                args.push(FuncArg::Array(array_arg))
             }
-            // Finalize array
-            args.push(FuncArg::Array(array_arg))
         } else {
             // Single argument
             args.push(FuncArg::Single(Felt252::from_dec_str(value).unwrap()))
@@ -102,6 +117,23 @@ fn validate_layout(value: &str) -> Result<String, String> {
         | "all_solidity"
         | "dynamic" => Ok(value.to_string()),
         _ => Err(format!("{value} is not a valid layout")),
+    }
+}
+
+fn str_into_layout(value: &str) -> LayoutName {
+    match value {
+        "plain" => LayoutName::plain,
+        "small" => LayoutName::small,
+        "dex" => LayoutName::dex,
+        "recursive" => LayoutName::recursive,
+        "starknet" => LayoutName::starknet,
+        "starknet_with_keccak" => LayoutName::starknet_with_keccak,
+        "recursive_large_output" => LayoutName::recursive_large_output,
+        "recursive_with_poseidon" => LayoutName::recursive_with_poseidon,
+        "all_solidity" => LayoutName::all_solidity,
+        "all_cairo" => LayoutName::all_cairo,
+        "dynamic" => LayoutName::dynamic,
+        _ => LayoutName::all_cairo,
     }
 }
 
@@ -128,7 +160,20 @@ fn main() -> Result<(), Error> {
         .expect("lock path must be provided either as an argument (--oracle-lock src) or in the Scarb.toml file in the [tool.hints] section.");
     let lock_file = File::open(lock_output).map_err(|e| Error::IO(e))?;
     let reader = BufReader::new(lock_file);
-    let service_configuration = serde_json::from_reader(reader).map_err(|e| Error::IO(e.into()))?;
+    let mut service_configuration: Configuration =
+        serde_json::from_reader(reader).map_err(|e| Error::IO(e.into()))?;
+
+    // Get the servers config path using absolute_path
+    let servers_config_path = absolute_path(&package, None, "servers_config", Some(PathBuf::from("servers.json")))
+        .expect("servers config path must be provided either in the Scarb.toml file in the [tool.hints] section or default to servers.json in the project root.");
+
+    // Read and parse the servers config file
+    let config_content = fs::read_to_string(&servers_config_path).map_err(|e| Error::IO(e))?;
+    let servers_config: HashMap<String, String> = serde_json::from_str(&config_content)
+        .map_err(|e| Error::ServersConfigFileError(format!("Failed to parse servers config: {}", e)))?;
+
+    // Add the servers_config to the Configuration
+    service_configuration.servers_config = servers_config;
 
     let sierra_program = serde_json::from_str::<VersionedProgram>(
         &fs::read_to_string(path.clone())
@@ -145,8 +190,7 @@ fn main() -> Result<(), Error> {
 
     match run_1(
         &service_configuration,
-        &args.oracle_server,
-        &args.layout,
+        &str_into_layout(&args.layout),
         &args.trace_file,
         &args.memory_file,
         &args.args,

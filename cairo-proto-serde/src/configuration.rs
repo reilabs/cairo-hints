@@ -1,15 +1,16 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct Configuration {
     pub enums: BTreeMap<String, Vec<Mapping>>,
     pub messages: BTreeMap<String, Vec<Field>>,
     pub services: BTreeMap<String, Service>,
+    pub servers_config: HashMap<String, String>,
 }
 
 // primitive types supported by both Protocol Buffers and Cairo
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum PrimitiveType {
     U64,
@@ -20,7 +21,7 @@ pub enum PrimitiveType {
     BYTEARRAY,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum FieldType {
     Primitive(PrimitiveType),
@@ -30,25 +31,25 @@ pub enum FieldType {
     Array(Box<FieldType>),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Field {
     pub name: String,
     pub ty: FieldType,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Mapping {
     pub name: String,
     pub nb: i32,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(transparent)]
 pub struct Service {
     pub methods: HashMap<String, MethodDeclaration>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct MethodDeclaration {
     pub input: FieldType,
     pub output: FieldType,

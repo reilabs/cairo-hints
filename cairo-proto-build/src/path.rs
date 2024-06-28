@@ -61,6 +61,7 @@ impl<T> PathMap<T> {
 }
 
 /// Iterator inside a PathMap that only returns values that matches a given path
+#[allow(dead_code)]
 pub(crate) struct Iter<'a, T> {
     iter: std::slice::Iter<'a, (String, T)>,
     path: String,
@@ -75,6 +76,7 @@ impl<'a, T> Iter<'a, T> {
         }
     }
 
+    #[allow(dead_code)]
     fn is_match(&self, path: &str) -> bool {
         sub_path_iter(self.path.as_str()).any(|p| p == path)
     }

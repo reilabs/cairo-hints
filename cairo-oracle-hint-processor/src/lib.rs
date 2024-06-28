@@ -14,6 +14,7 @@ use cairo_run::Cairo1RunConfig;
 use cairo_vm::air_public_input::PublicInputError;
 use cairo_vm::cairo_run::EncodeTraceError;
 use cairo_vm::types::errors::program_errors::ProgramError;
+use cairo_vm::types::layout_name::LayoutName;
 use cairo_vm::types::relocatable::MaybeRelocatable;
 use cairo_vm::vm::errors::memory_errors::MemoryError;
 use cairo_vm::vm::errors::runner_errors::RunnerError;
@@ -74,6 +75,10 @@ pub enum Error {
         param_index: usize,
         arg_index: usize,
     },
+    #[error("Configuration error: {0}")]
+    ConfigError(String),
+    #[error("Servers configuration file error: {0}")]
+    ServersConfigFileError(String),
 }
 
 #[allow(dead_code)]
@@ -120,9 +125,8 @@ impl FileWriter {
 }
 
 pub fn run_1(
-    service_config: &Configuration,
-    oracle_server: &Option<String>,
-    layout: &str,
+    configuration: &Configuration,
+    layout: &LayoutName,
     trace_file: &Option<PathBuf>,
     memory_file: &Option<PathBuf>,
     args: &FuncArgs,
@@ -151,8 +155,7 @@ pub fn run_1(
     let (runner, _vm, return_values) = cairo_run::cairo_run_program(
         &sierra_program,
         cairo_run_config,
-        service_config,
-        oracle_server,
+        configuration,
         entry_func_name,
     )?;
 

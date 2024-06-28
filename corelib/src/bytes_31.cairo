@@ -1,25 +1,25 @@
 use core::traits::{Into, TryInto};
 use core::option::OptionTrait;
-use core::integer::{u256_from_felt252, u128_safe_divmod, u128_to_felt252};
+use core::integer::{u128_safe_divmod, u128_to_felt252};
 
-const BYTES_IN_BYTES31: usize = 31;
+pub(crate) const BYTES_IN_BYTES31: usize = 31;
 const BYTES_IN_U128: usize = 16;
-const POW_2_128: felt252 = 0x100000000000000000000000000000000;
-const POW_2_8: u128 = 0x100;
+pub(crate) const POW_2_128: felt252 = 0x100000000000000000000000000000000;
+pub(crate) const POW_2_8: u128 = 0x100;
 
 #[derive(Copy, Drop)]
-extern type bytes31;
+pub extern type bytes31;
 
-extern fn bytes31_const<const value: felt252>() -> bytes31 nopanic;
+pub(crate) extern fn bytes31_const<const value: felt252>() -> bytes31 nopanic;
 extern fn bytes31_try_from_felt252(value: felt252) -> Option<bytes31> implicits(RangeCheck) nopanic;
 extern fn bytes31_to_felt252(value: bytes31) -> felt252 nopanic;
 
 #[generate_trait]
-impl Bytes31Impl of Bytes31Trait {
+pub impl Bytes31Impl of Bytes31Trait {
     // Gets the byte at the given index (LSB's index is 0), assuming that
     // `index < BYTES_IN_BYTES31`. If the assumption is not met, the behavior is undefined.
     fn at(self: @bytes31, index: usize) -> u8 {
-        let u256{low, high } = (*self).into();
+        let u256 { low, high } = (*self).into();
         let res_u128 = if index < BYTES_IN_U128 {
             (low / one_shift_left_bytes_u128(index)) % POW_2_8
         } else {
@@ -29,26 +29,32 @@ impl Bytes31Impl of Bytes31Trait {
     }
 }
 
-impl Bytes31IndexView of IndexView<bytes31, usize, u8> {
+pub(crate) impl Bytes31IndexView of IndexView<bytes31, usize, u8> {
     fn index(self: @bytes31, index: usize) -> u8 {
         self.at(index)
     }
 }
 
-impl Bytes31IntoFelt252 of Into<bytes31, felt252> {
+impl Bytes31BitSize of core::num::traits::BitSize<bytes31> {
+    fn bits() -> usize {
+        248
+    }
+}
+
+pub(crate) impl Bytes31IntoFelt252 of Into<bytes31, felt252> {
     fn into(self: bytes31) -> felt252 {
         bytes31_to_felt252(self)
     }
 }
 
-impl Bytes31IntoU256 of Into<bytes31, u256> {
+pub(crate) impl Bytes31IntoU256 of Into<bytes31, u256> {
     fn into(self: bytes31) -> u256 {
         let as_felt: felt252 = self.into();
         as_felt.into()
     }
 }
 
-impl Felt252TryIntoBytes31 of TryInto<felt252, bytes31> {
+pub(crate) impl Felt252TryIntoBytes31 of TryInto<felt252, bytes31> {
     fn try_into(self: felt252) -> Option<bytes31> {
         bytes31_try_from_felt252(self)
     }
@@ -56,7 +62,7 @@ impl Felt252TryIntoBytes31 of TryInto<felt252, bytes31> {
 
 impl Bytes31Serde = core::serde::into_felt252_based::SerdeImpl<bytes31>;
 
-impl U8IntoBytes31 of Into<u8, bytes31> {
+pub(crate) impl U8IntoBytes31 of Into<u8, bytes31> {
     fn into(self: u8) -> bytes31 {
         core::integer::upcast(self)
     }
@@ -76,7 +82,7 @@ impl U64IntoBytes31 of Into<u64, bytes31> {
         core::integer::upcast(self)
     }
 }
-impl U128IntoBytes31 of Into<u128, bytes31> {
+pub(crate) impl U128IntoBytes31 of Into<u128, bytes31> {
     fn into(self: u128) -> bytes31 {
         core::integer::upcast(self)
     }
@@ -90,7 +96,7 @@ impl U128IntoBytes31 of Into<u128, bytes31> {
 // 3. len <= BYTES_IN_BYTES31.
 // If these assumptions are not met, it can corrupt the ByteArray. Thus, this should be a
 // private function. We could add masking/assertions but it would be more expansive.
-fn split_bytes31(word: felt252, len: usize, index: usize) -> (felt252, felt252) {
+pub(crate) fn split_bytes31(word: felt252, len: usize, index: usize) -> (felt252, felt252) {
     if index == 0 {
         return (0, word);
     }
@@ -98,7 +104,7 @@ fn split_bytes31(word: felt252, len: usize, index: usize) -> (felt252, felt252) 
         return (word, 0);
     }
 
-    let u256{low, high } = word.into();
+    let u256 { low, high } = word.into();
 
     if index == BYTES_IN_U128 {
         return (low.into(), high.into());
@@ -135,7 +141,7 @@ fn split_bytes31(word: felt252, len: usize, index: usize) -> (felt252, felt252) 
 // Note: if `n_bytes >= BYTES_IN_BYTES31`, the behavior is undefined. If one wants to assert that in
 // the callsite, it's sufficient to assert that `n_bytes != BYTES_IN_BYTES31` because if
 // `n_bytes > 31` then `n_bytes - 16 > 15` and `one_shift_left_bytes_u128` would panic.
-fn one_shift_left_bytes_felt252(n_bytes: usize) -> felt252 {
+pub(crate) fn one_shift_left_bytes_felt252(n_bytes: usize) -> felt252 {
     if n_bytes < BYTES_IN_U128 {
         one_shift_left_bytes_u128(n_bytes).into()
     } else {
@@ -146,42 +152,25 @@ fn one_shift_left_bytes_felt252(n_bytes: usize) -> felt252 {
 // Returns 1 << (8 * `n_bytes`) as u128, where `n_bytes` must be < BYTES_IN_U128.
 //
 // Panics if `n_bytes >= BYTES_IN_U128`.
-fn one_shift_left_bytes_u128(n_bytes: usize) -> u128 {
-    // TODO(yuval): change to match once it's supported for integers.
-    if n_bytes == 0 {
-        0x1_u128
-    } else if n_bytes == 1 {
-        0x100_u128
-    } else if n_bytes == 2 {
-        0x10000_u128
-    } else if n_bytes == 3 {
-        0x1000000_u128
-    } else if n_bytes == 4 {
-        0x100000000_u128
-    } else if n_bytes == 5 {
-        0x10000000000_u128
-    } else if n_bytes == 6 {
-        0x1000000000000_u128
-    } else if n_bytes == 7 {
-        0x100000000000000_u128
-    } else if n_bytes == 8 {
-        0x10000000000000000_u128
-    } else if n_bytes == 9 {
-        0x1000000000000000000_u128
-    } else if n_bytes == 10 {
-        0x100000000000000000000_u128
-    } else if n_bytes == 11 {
-        0x10000000000000000000000_u128
-    } else if n_bytes == 12 {
-        0x1000000000000000000000000_u128
-    } else if n_bytes == 13 {
-        0x100000000000000000000000000_u128
-    } else if n_bytes == 14 {
-        0x10000000000000000000000000000_u128
-    } else if n_bytes == 15 {
-        0x1000000000000000000000000000000_u128
-    } else {
-        core::panic_with_felt252('n_bytes too big')
+pub(crate) fn one_shift_left_bytes_u128(n_bytes: usize) -> u128 {
+    match n_bytes {
+        0 => 0x1,
+        1 => 0x100,
+        2 => 0x10000,
+        3 => 0x1000000,
+        4 => 0x100000000,
+        5 => 0x10000000000,
+        6 => 0x1000000000000,
+        7 => 0x100000000000000,
+        8 => 0x10000000000000000,
+        9 => 0x1000000000000000000,
+        10 => 0x100000000000000000000,
+        11 => 0x10000000000000000000000,
+        12 => 0x1000000000000000000000000,
+        13 => 0x100000000000000000000000000,
+        14 => 0x10000000000000000000000000000,
+        15 => 0x1000000000000000000000000000000,
+        _ => core::panic_with_felt252('n_bytes too big'),
     }
 }
 
