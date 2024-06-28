@@ -19,7 +19,7 @@ use cairo_lang_sierra::{
 use cairo_lang_sierra_ap_change::calc_ap_changes;
 use cairo_lang_sierra_gas::gas_info::GasInfo;
 use cairo_lang_sierra_to_casm::{
-    compiler::CairoProgram,
+    compiler::{CairoProgram, SierraToCasmConfig},
     metadata::{calc_metadata, Metadata, MetadataComputationConfig, MetadataError},
 };
 use cairo_lang_sierra_type_size::get_type_size_map;
@@ -27,19 +27,11 @@ use cairo_lang_utils::unordered_hash_map::UnorderedHashMap;
 use cairo_proto_serde::configuration::Configuration;
 use cairo_vm::{
     hint_processor::cairo_1_hint_processor::hint_processor::Cairo1HintProcessor,
-    serde::deserialize_program::{
-        ApTracking, BuiltinName, FlowTrackingData, HintParams, ReferenceManager,
-    },
-    types::{program::Program, relocatable::MaybeRelocatable},
+    serde::deserialize_program::{ApTracking, FlowTrackingData, HintParams, ReferenceManager},
+    types::{builtin_name::BuiltinName, program::Program, relocatable::MaybeRelocatable, layout_name::LayoutName},
     vm::{
         errors::{runner_errors::RunnerError, vm_errors::VirtualMachineError},
-        runners::{
-            builtin_runner::{
-                BITWISE_BUILTIN_NAME, EC_OP_BUILTIN_NAME, HASH_BUILTIN_NAME, OUTPUT_BUILTIN_NAME,
-                POSEIDON_BUILTIN_NAME, RANGE_CHECK_BUILTIN_NAME, SIGNATURE_BUILTIN_NAME,
-            },
-            cairo_runner::{CairoRunner, RunResources, RunnerMode},
-        },
+        runners::cairo_runner::{CairoRunner, RunResources, RunnerMode},
         vm_core::VirtualMachine,
     },
     Felt252,
@@ -54,7 +46,7 @@ pub struct Cairo1RunConfig<'a> {
     pub args: &'a [FuncArg],
     pub trace_enabled: bool,
     pub relocate_mem: bool,
-    pub layout: &'a str,
+    pub layout: &'a LayoutName,
     pub proof_mode: bool,
     // Should be true if either air_public_input or cairo_pie_output are needed
     // Sets builtins stop_ptr by calling `final_stack` on each builtin
@@ -67,7 +59,7 @@ impl Default for Cairo1RunConfig<'_> {
             args: Default::default(),
             trace_enabled: false,
             relocate_mem: false,
-            layout: "plain",
+            layout: &LayoutName::plain,
             proof_mode: false,
             finalize_builtins: false,
         }
@@ -87,8 +79,12 @@ pub fn cairo_run_program(
     let sierra_program_registry = ProgramRegistry::<CoreType, CoreLibfunc>::new(sierra_program)?;
     let type_sizes =
         get_type_size_map(sierra_program, &sierra_program_registry).unwrap_or_default();
+    let config = SierraToCasmConfig {
+        gas_usage_check: false,
+        max_bytecode_size: usize::MAX,
+    };
     let casm_program =
-        cairo_lang_sierra_to_casm::compiler::compile(sierra_program, &metadata, true)?;
+        cairo_lang_sierra_to_casm::compiler::compile(sierra_program, &metadata, config)?;
 
     let main_func = find_function(sierra_program, entry_func_name)?;
 
@@ -187,7 +183,7 @@ pub fn cairo_run_program(
         RunnerMode::ExecutionMode
     };
 
-    let mut runner = CairoRunner::new_v2(&program, cairo_run_config.layout, runner_mode)?;
+    let mut runner = CairoRunner::new_v2(&program, *cairo_run_config.layout, runner_mode)?;
     let mut vm = VirtualMachine::new(cairo_run_config.trace_enabled);
     let end = runner.initialize(&mut vm, cairo_run_config.proof_mode)?;
 
@@ -665,13 +661,13 @@ fn finalize_builtins(
     for (id, size) in ret_types_and_sizes {
         if let Some(ref name) = id.debug_name {
             let builtin_name = match &*name.to_string() {
-                "RangeCheck" => RANGE_CHECK_BUILTIN_NAME,
-                "Poseidon" => POSEIDON_BUILTIN_NAME,
-                "EcOp" => EC_OP_BUILTIN_NAME,
-                "Bitwise" => BITWISE_BUILTIN_NAME,
-                "Pedersen" => HASH_BUILTIN_NAME,
-                "Output" => OUTPUT_BUILTIN_NAME,
-                "Ecdsa" => SIGNATURE_BUILTIN_NAME,
+                "RangeCheck" => BuiltinName::range_check,
+                "Poseidon" => BuiltinName::poseidon,
+                "EcOp" => BuiltinName::ec_op,
+                "Bitwise" => BuiltinName::bitwise,
+                "Pedersen" => BuiltinName::pedersen,
+                "Output" => BuiltinName::output,
+                "Ecdsa" => BuiltinName::ecdsa,
                 _ => {
                     stack_pointer.offset += size as usize;
                     continue;

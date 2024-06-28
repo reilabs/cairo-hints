@@ -14,6 +14,7 @@ use cairo_run::Cairo1RunConfig;
 use cairo_vm::air_public_input::PublicInputError;
 use cairo_vm::cairo_run::EncodeTraceError;
 use cairo_vm::types::errors::program_errors::ProgramError;
+use cairo_vm::types::layout_name::LayoutName;
 use cairo_vm::types::relocatable::MaybeRelocatable;
 use cairo_vm::vm::errors::memory_errors::MemoryError;
 use cairo_vm::vm::errors::runner_errors::RunnerError;
@@ -122,7 +123,7 @@ impl FileWriter {
 pub fn run_1(
     service_config: &Configuration,
     oracle_server: &Option<String>,
-    layout: &str,
+    layout: &LayoutName,
     trace_file: &Option<PathBuf>,
     memory_file: &Option<PathBuf>,
     args: &FuncArgs,

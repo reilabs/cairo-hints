@@ -8,6 +8,7 @@ use std::{
 use anyhow::{Context, Result};
 use cairo_lang_sierra::program::VersionedProgram;
 use cairo_oracle_hint_processor::{run_1, Error, FuncArg, FuncArgs};
+use cairo_vm::types::layout_name::LayoutName;
 use cairo_vm::Felt252;
 use camino::Utf8PathBuf;
 use clap::Parser;
@@ -64,24 +65,36 @@ fn process_args(value: &str) -> Result<FuncArgs, String> {
     while let Some(value) = input.next() {
         // First argument in an array
         if value.starts_with('[') {
-            let mut array_arg =
-                vec![Felt252::from_dec_str(value.strip_prefix('[').unwrap()).unwrap()];
-            // Process following args in array
-            let mut array_end = false;
-            while !array_end {
-                if let Some(value) = input.next() {
-                    // Last arg in array
-                    if value.ends_with(']') {
-                        array_arg
-                            .push(Felt252::from_dec_str(value.strip_suffix(']').unwrap()).unwrap());
-                        array_end = true;
-                    } else {
-                        array_arg.push(Felt252::from_dec_str(value).unwrap())
+            if value.ends_with(']') {
+                if value.len() == 2 {
+                    args.push(FuncArg::Array(Vec::new()));
+                } else {
+                    args.push(FuncArg::Array(vec![Felt252::from_dec_str(
+                        value.strip_prefix('[').unwrap().strip_suffix(']').unwrap(),
+                    )
+                    .unwrap()]));
+                }
+            } else {
+                let mut array_arg =
+                    vec![Felt252::from_dec_str(value.strip_prefix('[').unwrap()).unwrap()];
+                // Process following args in array
+                let mut array_end = false;
+                while !array_end {
+                    if let Some(value) = input.next() {
+                        // Last arg in array
+                        if value.ends_with(']') {
+                            array_arg.push(
+                                Felt252::from_dec_str(value.strip_suffix(']').unwrap()).unwrap(),
+                            );
+                            array_end = true;
+                        } else {
+                            array_arg.push(Felt252::from_dec_str(value).unwrap())
+                        }
                     }
                 }
+                // Finalize array
+                args.push(FuncArg::Array(array_arg))
             }
-            // Finalize array
-            args.push(FuncArg::Array(array_arg))
         } else {
             // Single argument
             args.push(FuncArg::Single(Felt252::from_dec_str(value).unwrap()))
@@ -102,6 +115,23 @@ fn validate_layout(value: &str) -> Result<String, String> {
         | "all_solidity"
         | "dynamic" => Ok(value.to_string()),
         _ => Err(format!("{value} is not a valid layout")),
+    }
+}
+
+fn str_into_layout(value: &str) -> LayoutName {
+    match value {
+        "plain" => LayoutName::plain,
+        "small" => LayoutName::small,
+        "dex" => LayoutName::dex,
+        "recursive" => LayoutName::recursive,
+        "starknet" => LayoutName::starknet,
+        "starknet_with_keccak" => LayoutName::starknet_with_keccak,
+        "recursive_large_output" => LayoutName::recursive_large_output,
+        "recursive_with_poseidon" => LayoutName::recursive_with_poseidon,
+        "all_solidity" => LayoutName::all_solidity,
+        "all_cairo" => LayoutName::all_cairo,
+        "dynamic" => LayoutName::dynamic,
+        _ => LayoutName::all_cairo,
     }
 }
 
@@ -146,7 +176,7 @@ fn main() -> Result<(), Error> {
     match run_1(
         &service_configuration,
         &args.oracle_server,
-        &args.layout,
+        &str_into_layout(&args.layout),
         &args.trace_file,
         &args.memory_file,
         &args.args,
