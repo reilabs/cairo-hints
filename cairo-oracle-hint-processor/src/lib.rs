@@ -15,6 +15,7 @@ use cairo_vm::air_public_input::PublicInputError;
 use cairo_vm::cairo_run::EncodeTraceError;
 use cairo_vm::types::errors::program_errors::ProgramError;
 use cairo_vm::types::layout_name::LayoutName;
+use cairo_vm::types::relocatable::MaybeRelocatable;
 use cairo_vm::vm::errors::memory_errors::MemoryError;
 use cairo_vm::vm::errors::runner_errors::RunnerError;
 use cairo_vm::vm::errors::trace_errors::TraceError;
@@ -132,7 +133,7 @@ pub fn run_1(
     sierra_program: &SierraProgram,
     entry_func_name: &str,
     proof_mode: bool,
-) -> Result<Option<String>, Error> {
+) -> Result<Vec<MaybeRelocatable>, Error> {
     // let compiler_config = CompilerConfig {
     //     replace_ids: true,
     //     ..CompilerConfig::default()
@@ -145,15 +146,13 @@ pub fn run_1(
     let cairo_run_config = Cairo1RunConfig {
         proof_mode: proof_mode,
         relocate_mem: memory_file.is_some(), //|| air_public_input.is_some(),
-        layout: *layout,
+        layout: layout,
         trace_enabled: trace_file.is_some(), //|| args.air_public_input.is_some(),
         args: &args.0,
         finalize_builtins: false, //args.air_private_input.is_some() || args.cairo_pie_output.is_some(),
-        append_return_values: proof_mode,
-        serialize_output: true,
     };
 
-    let (runner, _, serialized_output) = cairo_run::cairo_run_program(
+    let (runner, _vm, return_values) = cairo_run::cairo_run_program(
         &sierra_program,
         cairo_run_config,
         configuration,
@@ -180,5 +179,5 @@ pub fn run_1(
         memory_writer.flush()?;
     }
 
-    Ok(serialized_output)
+    Ok(return_values)
 }
