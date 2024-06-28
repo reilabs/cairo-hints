@@ -59,7 +59,7 @@ impl Default for Cairo1RunConfig<'_> {
             args: Default::default(),
             trace_enabled: false,
             relocate_mem: false,
-            layout: LayoutName::all_cairo,
+            layout: &LayoutName::all_cairo,
             proof_mode: false,
             finalize_builtins: false,
         }
