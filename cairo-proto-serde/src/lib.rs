@@ -9,22 +9,16 @@ pub mod configuration;
 
 fn serialize_primitive(ty: &PrimitiveType, value: &Value) -> Vec<Felt252> {
     let element = match ty {
-        PrimitiveType::FELT252 => {
-            match value {
-                Value::String(s) => {
-                    if s.starts_with("0x") {
-                        Felt252::from_hex(s).expect("Invalid FELT252 hex string")
-                    } else {
-                        Felt252::from_dec_str(s).expect("Invalid FELT252 decimal string")
-                    }
+        PrimitiveType::FELT252 => match value {
+            Value::String(s) => {
+                if s.starts_with("0x") {
+                    Felt252::from_hex(s).expect("Invalid FELT252 hex string")
+                } else {
+                    Felt252::from_dec_str(s).expect("Invalid FELT252 decimal string")
                 }
-                Value::Number(n) => {
-                    let s = format!("{}", n);
-                    Felt252::from_dec_str(&s).expect("Invalid FELT252 number")
-                }
-                _ => panic!("FELT252 must be a string or number"),
             }
-        }
+            _ => panic!("FELT252 must be a string"),
+        },
         PrimitiveType::U64 => Felt252::from(
             value
                 .as_u64()
@@ -81,7 +75,6 @@ fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
             let hex_string = format!("0x{}", num.to_str_radix(16));
             json!(hex_string)
         }
-
         PrimitiveType::U64 => {
             json!(u64::try_from(num).expect(format!("Error converting {value:?} to u64").as_str()))
         }
@@ -133,11 +126,16 @@ pub fn serialize_cairo_serde(
                 .as_object()
                 .expect(format!("must be an object to serialize as message {message_ty}").as_str());
             for field in message_config {
-                result.append(&mut serialize_cairo_serde(
-                    config,
-                    &field.ty,
-                    &value[&field.name],
-                ));
+                if let Some(field_value) = value.get(&field.name) {
+                    result.append(&mut serialize_cairo_serde(config, &field.ty, field_value));
+                } else if let Some(field_value) =
+                    value.get(field.name.trim_start_matches("felt252_"))
+                {
+                    // Try without the "felt252_" prefix
+                    result.append(&mut serialize_cairo_serde(config, &field.ty, field_value));
+                } else {
+                    panic!("Field {} not found in value object", field.name);
+                }
             }
         }
         FieldType::Enum(_) => result.append(&mut serialize_primitive(&PrimitiveType::I32, value)),
@@ -156,7 +154,11 @@ pub fn serialize_cairo_serde(
                 &json!(value.len()),
             ));
             for element in value {
-                result.append(&mut serialize_cairo_serde(config, value_ty, element));
+                if let FieldType::Primitive(PrimitiveType::FELT252) = **value_ty {
+                    result.append(&mut serialize_primitive(&PrimitiveType::FELT252, element));
+                } else {
+                    result.append(&mut serialize_cairo_serde(config, value_ty, element));
+                }
             }
         }
     }
@@ -195,13 +197,15 @@ pub fn deserialize_cairo_serde(
         }
         FieldType::Array(value_ty) => {
             let len = deserialize_primitive(&PrimitiveType::U64, value)
-                .as_number()
-                .unwrap()
                 .as_u64()
                 .unwrap() as usize;
             let mut result = Vec::new();
-            for _i in 0..len {
-                result.push(deserialize_cairo_serde(config, value_ty, value));
+            for _ in 0..len {
+                if let FieldType::Primitive(PrimitiveType::FELT252) = **value_ty {
+                    result.push(deserialize_primitive(&PrimitiveType::FELT252, value));
+                } else {
+                    result.push(deserialize_cairo_serde(config, value_ty, value));
+                }
             }
             Value::Array(result)
         }
