@@ -49,7 +49,7 @@ Options:
 
 The mandatory argument `<PATH>` is the folder name of the new project.
 
-`--lang` is the language of the template RPC server. At the moment the choice is `rust` or `js` (Javascript)
+`--lang` is the language of the template RPC server. At the moment the choice is `rust`, `js` (Javascript) or `ts` (Typescript)
 
 `--name` is the name of the project. Default is the name of the project folder.
 

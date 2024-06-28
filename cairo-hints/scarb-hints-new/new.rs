@@ -1,6 +1,7 @@
 use crate::new_cairo::mk_cairo;
 use crate::new_js::mk_js;
 use crate::new_rust::mk_rust;
+use crate::new_ts::mk_ts;
 use crate::{fsx, restricted_names, Lang};
 use anyhow::{bail, ensure, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -136,6 +137,7 @@ fn mk(
                 1. Start the hints server:
                     1. Rust: `cd rust; cargo run`
                     2. Javascript: `cd js; npm install; npm start`
+                    3. Typescript: `cd ts; npm install; npm start`
                 2. Run `scarb hints-run --oracle-server http://127.0.0.1:3000 --layout all_cairo`
 
                 ## Extra options
@@ -173,6 +175,7 @@ fn mk(
     match lang {
         Lang::Rust => mk_rust(&canonical_path, &name, &config)?,
         Lang::Js => mk_js(&canonical_path, &name, &config)?,
+        Lang::Ts => mk_ts(&canonical_path, &name, config)?,
     }
     mk_cairo(&canonical_path, &name, &config)?;
 
