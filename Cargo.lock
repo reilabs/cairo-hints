@@ -512,7 +512,7 @@ dependencies = [
  "cairo-oracle-hint-processor",
  "cairo-proto-build",
  "cairo-proto-serde",
- "cairo-vm 1.0.0-rc3",
+ "cairo-vm 1.0.0-rc2",
  "camino",
  "clap",
  "dunce",
@@ -665,7 +665,7 @@ dependencies = [
  "cairo-lang-utils",
  "cairo-oracle-hint-processor",
  "cairo-proto-serde",
- "cairo-vm 1.0.0-rc3",
+ "cairo-vm 1.0.0-rc2",
  "colored",
  "itertools 0.12.1",
  "num-traits 0.2.19",
@@ -1097,7 +1097,7 @@ dependencies = [
  "cairo-lang-sierra-type-size",
  "cairo-lang-utils",
  "cairo-proto-serde",
- "cairo-vm 1.0.0-rc3",
+ "cairo-vm 1.0.0-rc2",
  "camino",
  "clap",
  "indoc",
@@ -1110,7 +1110,7 @@ dependencies = [
  "scarb-ui 0.1.5",
  "serde",
  "serde_json",
- "starknet-types-core",
+ "starknet-types-core 0.0.7",
  "thiserror",
 ]
 
@@ -1137,7 +1137,7 @@ name = "cairo-proto-serde"
 version = "0.1.0"
 dependencies = [
  "cairo-lang-runner",
- "cairo-vm 1.0.0-rc3",
+ "cairo-vm 1.0.0-rc2",
  "num-traits 0.2.19",
  "serde",
  "serde_json",
@@ -1177,8 +1177,8 @@ dependencies = [
 
 [[package]]
 name = "cairo-vm"
-version = "1.0.0-rc3"
-source = "git+https://github.com/lambdaclass/cairo-vm?rev=v1.0.0-rc3#aecbb3f01dacb6d3f90256c808466c2c37606252"
+version = "1.0.0-rc2"
+source = "git+https://github.com/lambdaclass/cairo-vm?rev=v1.0.0-rc2#f3161e3e07a16afbc2ccfd03f33197674e223d50"
 dependencies = [
  "anyhow",
  "ark-ff",
@@ -1204,7 +1204,7 @@ dependencies = [
  "sha2",
  "sha3",
  "starknet-crypto",
- "starknet-types-core",
+ "starknet-types-core 0.1.3",
  "thiserror-no-std",
  "zip",
 ]
@@ -3479,14 +3479,36 @@ dependencies = [
 
 [[package]]
 name = "lambdaworks-crypto"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d4c222d5b2fdc0faf702d3ab361d14589b097f40eac9dc550e27083483edc65"
+dependencies = [
+ "lambdaworks-math 0.5.0",
+ "serde",
+ "sha2",
+ "sha3",
+]
+
+[[package]]
+name = "lambdaworks-crypto"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fb5d4f22241504f7c7b8d2c3a7d7835d7c07117f10bff2a7d96a9ef6ef217c3"
 dependencies = [
- "lambdaworks-math",
+ "lambdaworks-math 0.7.0",
  "serde",
  "sha2",
  "sha3",
+]
+
+[[package]]
+name = "lambdaworks-math"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ee7dcab3968c71896b8ee4dc829147acc918cffe897af6265b1894527fe3add"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -5118,12 +5140,28 @@ dependencies = [
 
 [[package]]
 name = "starknet-types-core"
+version = "0.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d791c671fecde494f435170a01c6fcb2949d0dd61be0b31b7c410b041609f96"
+dependencies = [
+ "bitvec",
+ "lambdaworks-crypto 0.5.0",
+ "lambdaworks-math 0.5.0",
+ "lazy_static",
+ "num-bigint",
+ "num-integer",
+ "num-traits 0.2.19",
+ "serde",
+]
+
+[[package]]
+name = "starknet-types-core"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe29a53d28ff630e4c7827788f14b28f9386d27cb9d05186a5f2e73218c34677"
 dependencies = [
- "lambdaworks-crypto",
- "lambdaworks-math",
+ "lambdaworks-crypto 0.7.0",
+ "lambdaworks-math 0.7.0",
  "num-bigint",
  "num-integer",
  "num-traits 0.2.19",
