@@ -1,5 +1,5 @@
 use crate::configuration::{Configuration, FieldType, PrimitiveType};
-use cairo_vm::Felt252;
+use starknet_types_core::felt::Felt as Felt252;
 use num_traits::One;
 use num_traits::ToPrimitive;
 use num_traits::Zero;
@@ -193,7 +193,7 @@ mod tests {
         Configuration, Field, FieldType, MethodDeclaration, PrimitiveType, Service,
     };
     use crate::{deserialize_cairo_serde, serialize_cairo_serde};
-    use cairo_vm::Felt252;
+    use starknet_types_core::felt::Felt as Felt252;
     use serde_json::{json, Value};
     use std::collections::{BTreeMap, HashMap};
 
