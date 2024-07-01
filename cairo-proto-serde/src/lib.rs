@@ -1,9 +1,9 @@
 use crate::configuration::{Configuration, FieldType, PrimitiveType};
-use starknet_types_core::felt::Felt as Felt252;
 use num_traits::One;
 use num_traits::ToPrimitive;
 use num_traits::Zero;
 use serde_json::{json, Map, Value};
+use starknet_types_core::felt::Felt as Felt252;
 
 pub mod configuration;
 
@@ -74,15 +74,20 @@ fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
             json!(i64::try_from(num).expect(format!("Error converting {value:?} to i64").as_str()))
         }
         PrimitiveType::BYTEARRAY => {
-            let v: Vec<Vec<u8>> = value
-                .to_vec()
-                .split_last()
-                .unwrap()
-                .1
-                .iter()
-                .map(|e| e.to_bytes_be().to_vec())
-                .collect();
-            json!(String::from_utf8(v.concat()).unwrap())
+            let data_len = usize::try_from(num).unwrap();
+            let data = &value[0..data_len];
+            let pending_word = value[data_len];
+            let pending_word_len = value[data_len + 1].to_u32().unwrap() as usize;
+            let trim_len = 32 - pending_word_len;
+            *value = &value[(data_len + 2)..];
+
+            let mut v = Vec::<u8>::with_capacity(31 * data.len());
+            for felt in data {
+                v.extend_from_slice(&felt.to_bytes_be()[1..]);
+            }
+            v.extend_from_slice(&pending_word.to_bytes_be()[trim_len..]);
+
+            json!(String::from_utf8(v).unwrap())
         }
         PrimitiveType::BOOL => {
             if num.is_one() {
@@ -193,8 +198,8 @@ mod tests {
         Configuration, Field, FieldType, MethodDeclaration, PrimitiveType, Service,
     };
     use crate::{deserialize_cairo_serde, serialize_cairo_serde};
-    use starknet_types_core::felt::Felt as Felt252;
     use serde_json::{json, Value};
+    use starknet_types_core::felt::Felt as Felt252;
     use std::collections::{BTreeMap, HashMap};
 
     #[test]
@@ -244,6 +249,21 @@ mod tests {
         println!("JSON {json_string:?} -> {configuration:?}");
     }
 
+    #[test]
+    fn it_handles_multiple_strings() {
+        let configuration = test_configuration();
+        let json = json!({
+            "a": "lorem",
+            "b": "this is a somewhat longer string that overflows a single felt",
+            "c": "dolor"
+        });
+        let ty = FieldType::Message("Strings".into());
+        let cairo_message = serialize_cairo_serde(&configuration, &ty, &json);
+        let deserialized_message =
+            deserialize_cairo_serde(&configuration, &ty, &mut cairo_message.as_ref());
+        assert_eq!(json, deserialized_message);
+    }
+
     fn test_configuration() -> Configuration {
         let mut messages = BTreeMap::new();
         messages.insert(
@@ -267,6 +287,23 @@ mod tests {
                 Field {
                     name: "y".into(),
                     ty: FieldType::Array(Box::new(FieldType::Primitive(PrimitiveType::I32))),
+                },
+            ],
+        );
+        messages.insert(
+            String::from("Strings"),
+            vec![
+                Field {
+                    name: "a".into(),
+                    ty: FieldType::Primitive(PrimitiveType::BYTEARRAY),
+                },
+                Field {
+                    name: "b".into(),
+                    ty: FieldType::Primitive(PrimitiveType::BYTEARRAY),
+                },
+                Field {
+                    name: "c".into(),
+                    ty: FieldType::Primitive(PrimitiveType::BYTEARRAY),
                 },
             ],
         );
