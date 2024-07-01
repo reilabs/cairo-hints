@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Configuration {
     pub enums: BTreeMap<String, Vec<Mapping>>,
     pub messages: BTreeMap<String, Vec<Field>>,
@@ -9,7 +9,7 @@ pub struct Configuration {
 }
 
 // primitive types supported by both Protocol Buffers and Cairo
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum PrimitiveType {
     U64,
@@ -18,9 +18,10 @@ pub enum PrimitiveType {
     I64,
     BOOL,
     BYTEARRAY,
+    FELT252,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum FieldType {
     Primitive(PrimitiveType),
@@ -30,25 +31,25 @@ pub enum FieldType {
     Array(Box<FieldType>),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Field {
     pub name: String,
     pub ty: FieldType,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Mapping {
     pub name: String,
     pub nb: i32,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(transparent)]
 pub struct Service {
     pub methods: HashMap<String, MethodDeclaration>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct MethodDeclaration {
     pub input: FieldType,
     pub output: FieldType,
@@ -63,6 +64,7 @@ impl From<String> for FieldType {
             "i64" => FieldType::Primitive(PrimitiveType::I64),
             "bool" => FieldType::Primitive(PrimitiveType::BOOL),
             "ByteArray" => FieldType::Primitive(PrimitiveType::BYTEARRAY),
+            "felt252" => FieldType::Primitive(PrimitiveType::FELT252),
             _ => FieldType::Message(value),
         }
     }
