@@ -11,9 +11,7 @@ pub const SERVER_BUILD_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["rust", "build.rs"].iter().collect());
 pub const SERVER_MANIFEST_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["rust", "Cargo.toml"].iter().collect());
-pub const GITIGNORE_PATH: Lazy<Utf8PathBuf> =
-    Lazy::new(|| [".gitignore"].iter().collect());
-
+pub const GITIGNORE_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| [".gitignore"].iter().collect());
 
 pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Config) -> Result<()> {
     // Create the `main.rs` file.
@@ -27,31 +25,32 @@ pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Confi
                 mod oracle;
 
                 use axum::{
-                    extract,
-                    routing::{post, get},
+                    extract::{Json, Path, State},
+                    routing::{get, post},
                     Router,
-                    Json,
                 };
-                use serde::{Serialize, Deserialize};
-                use tracing::debug;
-                use tower_http::trace::TraceLayer;
                 use oracle::*;
-                use std::sync::{Arc, Mutex};
+                use serde::{Deserialize, Serialize};
                 use std::collections::HashMap;
-                use uuid::Uuid;
+                use std::sync::{Arc, Mutex};
+                #[allow(unused_imports)]
                 use tokio::time::{sleep, Duration};
+                use tower_http::trace::TraceLayer;
+                use tracing::debug;
+                use uuid::Uuid;
 
                 #[derive(Debug, Serialize, Deserialize)]
                 struct JsonResult {
-                    result: Response
+                    result: Response,
                 }
 
+                #[allow(non_snake_case)]
                 #[derive(Debug, Serialize, Deserialize)]
                 struct JobResponse {
-                    job_id: String,
+                    jobId: String,
                 }
 
-                #[derive(Debug, Serialize, Deserialize)]
+                #[derive(Debug, Serialize, Deserialize, Clone)]
                 struct JobStatus {
                     status: String,
                     result: Option<Response>,
@@ -62,23 +61,27 @@ pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Confi
                 }
 
                 async fn create_job(
-                    extract::Json(payload): extract::Json<Request>,
-                    state: extract::State<Arc<AppState>>,
+                    State(state): State<Arc<AppState>>,
+                    Json(payload): Json<Request>,
                 ) -> Json<JobResponse> {
-                    debug!("received payload {payload:?}");
+                    debug!("received payload {:?}", payload);
                     let job_id = Uuid::new_v4().to_string();
 
                     let mut jobs = state.jobs.lock().unwrap();
-                    jobs.insert(job_id.clone(), JobStatus {
-                        status: "processing".to_string(),
-                        result: None,
-                    });
+                    jobs.insert(
+                        job_id.clone(),
+                        JobStatus {
+                            status: "processing".to_string(),
+                            result: None,
+                        },
+                    );
 
                     let job_id_clone = job_id.clone();
                     let state_clone = Arc::clone(&state);
 
                     tokio::spawn(async move {
-                        sleep(Duration::from_secs(5)).await; // Simulate long-running process
+                        //Uncomment this line to simulate long-running process
+                        // sleep(Duration::from_secs(5)).await;
                         let n = (payload.n as f64).sqrt() as u64;
                         let mut jobs = state_clone.jobs.lock().unwrap();
                         if let Some(job) = jobs.get_mut(&job_id_clone) {
@@ -87,12 +90,12 @@ pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Confi
                         }
                     });
 
-                    Json(JobResponse { job_id })
+                    Json(JobResponse { jobId: job_id })
                 }
 
                 async fn get_job_status(
-                    extract::Path(job_id): extract::Path<String>,
-                    state: extract::State<Arc<AppState>>,
+                    State(state): State<Arc<AppState>>,
+                    Path(job_id): Path<String>,
                 ) -> Json<JobStatus> {
                     let jobs = state.jobs.lock().unwrap();
                     let status = jobs.get(&job_id).cloned().unwrap_or(JobStatus {
@@ -193,6 +196,6 @@ pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Confi
             "#},
         )?;
     }
-    
+
     Ok(())
 }

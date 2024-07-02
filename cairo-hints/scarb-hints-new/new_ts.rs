@@ -90,20 +90,20 @@ pub fn mk_ts(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Config)
 
                     app.post('/sqrt', (req: Request, res: Response) => {
                         console.dir(`received payload ${JSON.stringify(req.body)}`);
-                        
+
                         // Generate a unique job ID
                         const jobId = crypto.randomBytes(16).toString('hex');
 
                         // Start the job
-                        jobs.set(jobId, {status: 'processing'});
+                        jobs.set(jobId, { status: 'processing' });
 
-                        // Simulate a long-running process
-                        setTimeout(() => {
-                            const n = Math.sqrt(req.body.felt252_n);
-                            const result = { n: Math.trunc(n).toString() };
-                            jobs.set(jobId, {status: 'completed', result: result});
+                        // Simulate a long-running process by uncommenting `setTimeout`
+                        //setTimeout(() => {
+                            const n = Math.sqrt(req.body.n);
+                            const result = { n: Math.trunc(n) };
+                            jobs.set(jobId, { status: 'completed', result: result });
                             console.log(`Job ${jobId} completed: ${JSON.stringify(result, null, 2)}`);
-                        }, 5000); // Simulate a 5-second process
+                        //}, 5000); // Simulate a 5-second process
 
                         // Immediately return the job ID
                         res.json({ jobId });
