@@ -333,7 +333,7 @@ mod tests {
 
         let servers_config = ServerConfig {
             server_url: "http://127.0.0.1:3000".to_string(),
-            pooling_config: None,
+            polling_config: None,
         };
         let mut servers_config_map = HashMap::new();
         servers_config_map.insert("sqrt".to_string(), servers_config);
@@ -351,7 +351,7 @@ mod tests {
         let configuration = test_configuration();
         let expected_server_config = ServerConfig {
             server_url: "http://127.0.0.1:3000".to_string(),
-            pooling_config: None,
+            polling_config: None,
         };
         assert_eq!(
             configuration.servers_config.get("sqrt"),

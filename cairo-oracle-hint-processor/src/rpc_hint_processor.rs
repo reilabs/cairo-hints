@@ -6,7 +6,7 @@ use cairo_lang_casm::{
     operand::{CellRef, ResOperand},
 };
 use cairo_lang_utils::bigint::BigIntAsHex;
-use cairo_proto_serde::configuration::{Configuration, PoolingConfig};
+use cairo_proto_serde::configuration::{Configuration, PollingConfig};
 use cairo_proto_serde::{deserialize_cairo_serde, serialize_cairo_serde};
 use cairo_vm::hint_processor::cairo_1_hint_processor::hint_processor::Cairo1HintProcessor;
 use cairo_vm::hint_processor::hint_processor_definition::HintProcessorLogic;
@@ -115,21 +115,21 @@ impl<'a> Rpc1HintProcessor<'a> {
             })?;
 
         // Polling parameters
-        let default_pooling_config = PoolingConfig {
+        let default_polling_config = PollingConfig {
             max_attempts: 30,
             polling_interval: 2,
             timeout: 60,
         };
 
-        let pooling_config = server_config
-            .pooling_config
+        let polling_config = server_config
+            .polling_config
             .as_ref()
-            .unwrap_or(&default_pooling_config);
+            .unwrap_or(&default_polling_config);
 
-        let max_attempts = pooling_config.max_attempts;
-        let polling_interval = Duration::from_secs(pooling_config.polling_interval);
+        let max_attempts = polling_config.max_attempts;
+        let polling_interval = Duration::from_secs(polling_config.polling_interval);
         let start_time = Instant::now();
-        let timeout = Duration::from_secs(pooling_config.timeout);
+        let timeout = Duration::from_secs(polling_config.timeout);
 
         // Initial request to start the job
         let response = client

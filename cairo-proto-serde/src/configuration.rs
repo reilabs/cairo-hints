@@ -12,11 +12,11 @@ pub struct Configuration {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ServerConfig {
     pub server_url: String,
-    pub pooling_config: Option<PoolingConfig>,
+    pub polling_config: Option<PollingConfig>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct PoolingConfig {
+pub struct PollingConfig {
     pub max_attempts: u64,     // Maximum number of polling attempts
     pub polling_interval: u64, // Time (in seconds) between polling attempts
     pub timeout: u64,          // Overall timeout
