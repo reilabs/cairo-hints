@@ -7,7 +7,7 @@ use std::{env, fs};
 use anyhow::{Context, Result};
 use cairo_lang_hints_test_runner::{CompiledTestRunner, TestRunConfig};
 use cairo_lang_test_plugin::TestCompilation;
-use cairo_proto_serde::configuration::Configuration;
+use cairo_proto_serde::configuration::{Configuration, ServerConfig};
 use cairo_vm::types::layout_name::LayoutName;
 use clap::Parser;
 use scarb_metadata::{Metadata, MetadataCommand, PackageMetadata, ScarbCommand, TargetMetadata};
@@ -111,10 +111,19 @@ fn main() -> Result<()> {
             .expect("servers config path must be provided either in the Scarb.toml file in the [tool.hints] section or default to servers.json in the project root.");
 
         // Read and parse the servers config file
-        let config_content = fs::read_to_string(&servers_config_path)
-            .with_context(|| format!("failed to read servers config file: {}", servers_config_path.display()))?;
-        let servers_config: HashMap<String, String> = serde_json::from_str(&config_content)
-            .with_context(|| format!("failed to parse servers config file: {}", servers_config_path.display()))?;
+        let config_content = fs::read_to_string(&servers_config_path).with_context(|| {
+            format!(
+                "failed to read servers config file: {}",
+                servers_config_path.display()
+            )
+        })?;
+        let servers_config: HashMap<String, ServerConfig> = serde_json::from_str(&config_content)
+            .with_context(|| {
+            format!(
+                "failed to parse servers config file: {}",
+                servers_config_path.display()
+            )
+        })?;
 
         // Add the server_config to the Configuration
         service_config.servers_config = servers_config;

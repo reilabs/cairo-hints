@@ -6,7 +6,7 @@ use cairo_lang_casm::{
     operand::{CellRef, ResOperand},
 };
 use cairo_lang_utils::bigint::BigIntAsHex;
-use cairo_proto_serde::configuration::Configuration;
+use cairo_proto_serde::configuration::{Configuration, PoolingConfig};
 use cairo_proto_serde::{deserialize_cairo_serde, serialize_cairo_serde};
 use cairo_vm::hint_processor::cairo_1_hint_processor::hint_processor::Cairo1HintProcessor;
 use cairo_vm::hint_processor::hint_processor_definition::HintProcessorLogic;
@@ -80,7 +80,7 @@ impl<'a> Rpc1HintProcessor<'a> {
             ))));
         };
 
-        let server_url = self
+        let server_config = self
             .configuration
             .servers_config
             .get(selector)
@@ -90,7 +90,7 @@ impl<'a> Rpc1HintProcessor<'a> {
                 )))
             })?;
 
-        let mut server_url = Url::parse(server_url).map_err(|e| {
+        let mut server_url = Url::parse(&server_config.server_url).map_err(|e| {
             HintError::CustomHint(Box::from(format!(
                 "Invalid URL for selector {selector}: {e}"
             )))
@@ -115,10 +115,21 @@ impl<'a> Rpc1HintProcessor<'a> {
             })?;
 
         // Polling parameters
-        let max_attempts = 30; // Maximum number of polling attempts
-        let polling_interval = Duration::from_secs(2); // Time between polling attempts
+        let default_pooling_config = PoolingConfig {
+            max_attempts: 30,
+            polling_interval: 2,
+            timeout: 60,
+        };
+
+        let pooling_config = server_config
+            .pooling_config
+            .as_ref()
+            .unwrap_or(&default_pooling_config);
+
+        let max_attempts = pooling_config.max_attempts;
+        let polling_interval = Duration::from_secs(pooling_config.polling_interval);
         let start_time = Instant::now();
-        let timeout = Duration::from_secs(60); // Overall timeout
+        let timeout = Duration::from_secs(pooling_config.timeout);
 
         // Initial request to start the job
         let response = client

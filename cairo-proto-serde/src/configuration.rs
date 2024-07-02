@@ -6,7 +6,20 @@ pub struct Configuration {
     pub enums: BTreeMap<String, Vec<Mapping>>,
     pub messages: BTreeMap<String, Vec<Field>>,
     pub services: BTreeMap<String, Service>,
-    pub servers_config: HashMap<String, String>,
+    pub servers_config: HashMap<String, ServerConfig>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ServerConfig {
+    pub server_url: String,
+    pub pooling_config: Option<PoolingConfig>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct PoolingConfig {
+    pub max_attempts: u64,     // Maximum number of polling attempts
+    pub polling_interval: u64, // Time (in seconds) between polling attempts
+    pub timeout: u64,          // Overall timeout
 }
 
 // primitive types supported by both Protocol Buffers and Cairo
