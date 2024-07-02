@@ -25,8 +25,6 @@ use cairo_vm::{
     },
 };
 use core::any::Any;
-use indoc::formatdoc;
-use itertools::Itertools;
 use reqwest::Url;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -60,7 +58,7 @@ impl<'a> Rpc1HintProcessor<'a> {
         // Parse the selector.
         let selector = &selector.value.to_bytes_be().1;
         let selector = std::str::from_utf8(selector).map_err(|_| {
-            HintError::CustomHint(Box::from("failed to parse selector".to_string()))
+            HintError::CustomHint(Box::from("Failed to parse selector".to_string()))
         })?;
 
         // Extract the inputs.
@@ -109,73 +107,73 @@ impl<'a> Rpc1HintProcessor<'a> {
         );
         println!("let the oracle decide... Inputs: {data:?}");
 
-        let client = reqwest::blocking::Client::new();
+        let client = reqwest::blocking::ClientBuilder::new()
+            .timeout(std::time::Duration::from_secs(60))
+            .build()
+            .map_err(|e| {
+                HintError::CustomHint(Box::from(format!("Failed to create HTTP client: {}", e)))
+            })?;
 
-        let req = client.post(server_url.clone()).json(&data).send().expect(
-            format!("Couldn't connect to oracle server {server_url}. Is the server running?")
-                .as_str(),
-        );
+        let response = client
+            .post(server_url.clone())
+            .json(&data)
+            .send()
+            .map_err(|e| {
+                HintError::CustomHint(Box::from(format!(
+                    "Couldn't connect to oracle server {}: {}",
+                    server_url, e
+                )))
+            })?;
 
-        let status_code = req.error_for_status_ref().map(|_| ());
-        let body = req.text().expect(
-            formatdoc! {
-                r#"
-                Response from oracle server can't be parsed as string."#
-            }
-            .as_str(),
-        );
+        let status = response.status();
+        let body = response.text().map_err(|e| {
+            HintError::CustomHint(Box::from(format!("Failed to read response body: {}", e)))
+        })?;
 
-        status_code.expect(
-            formatdoc! {
-                r#"
-                Received {body:?}.
-                Response status from oracle server not successful."#
-            }
-            .as_str(),
-        );
+        if !status.is_success() {
+            return Err(HintError::CustomHint(Box::from(format!(
+                "Received unsuccessful status code {}: {}",
+                status, body
+            ))));
+        }
 
-        let body = serde_json::from_str::<Value>(body.as_str()).expect(
-            formatdoc! {
-                r#"
-                Received {body:?}.
-                Error converting response from oracle server {server_url} to JSON."#
-            }
-            .as_str(),
-        );
+        let body: Value = serde_json::from_str(&body).map_err(|e| {
+            HintError::CustomHint(Box::from(format!(
+                "Failed to parse response as JSON: {}",
+                e
+            )))
+        })?;
 
-        let body = body.as_object().expect(
-            formatdoc! {r#"
-                Received {body:?}.
-                Error serialising response as object from oracle server.
-            "#}
-            .as_str(),
-        );
-
-        body.keys()
-            .exactly_one()
-            .map_err(|_| {
-                formatdoc! {r#"
-                    Received {body:?}.
-                    Expected response format from oracle server is {{"result": <response_object>}}.
-                "#}
-            })
-            .unwrap();
-
-        let output = body.get("result").expect(
-            formatdoc! {r#"
-                Received {body:?}.
-                Expected response format from oracle server is {{"result": <response_object>}}.
-            "#}
-            .as_str(),
-        );
+        let output = body.get("result").ok_or_else(|| {
+            HintError::CustomHint(Box::from(format!(
+                "Expected response format {{\"result\": <response_object>}}, got: {}",
+                body
+            )))
+        })?;
 
         let data = serialize_cairo_serde(self.configuration, &configuration.output, output);
         println!("Output: {output}");
-        res_segment.write_data(data.iter())?;
+        res_segment.write_data(data.iter()).map_err(|e| {
+            HintError::CustomHint(Box::from(format!(
+                "Failed to write data to result segment: {}",
+                e
+            )))
+        })?;
 
         let res_segment_end = res_segment.ptr;
-        insert_value_to_cellref!(vm, output_start, res_segment_start)?;
-        insert_value_to_cellref!(vm, output_end, res_segment_end)?;
+        insert_value_to_cellref!(vm, output_start, res_segment_start).map_err(|e| {
+            HintError::CustomHint(Box::from(format!(
+                "Failed to insert output start value: {}",
+                e
+            )))
+        })?;
+        insert_value_to_cellref!(vm, output_end, res_segment_end).map_err(|e| {
+            HintError::CustomHint(Box::from(format!(
+                "Failed to insert output end value: {}",
+                e
+            )))
+        })?;
+
         Ok(())
     }
 }
