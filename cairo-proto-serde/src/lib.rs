@@ -88,15 +88,20 @@ fn deserialize_primitive(ty: &PrimitiveType, value: &mut &[Felt252]) -> Value {
             json!(i64::try_from(num).expect(format!("Error converting {value:?} to i64").as_str()))
         }
         PrimitiveType::BYTEARRAY => {
-            let v: Vec<Vec<u8>> = value
-                .to_vec()
-                .split_last()
-                .unwrap()
-                .1
-                .iter()
-                .map(|e| e.to_bytes_be().to_vec())
-                .collect();
-            json!(String::from_utf8(v.concat()).unwrap())
+            let data_len = usize::try_from(num).unwrap();
+            let data = &value[0..data_len];
+            let pending_word = value[data_len];
+            let pending_word_len = value[data_len + 1].to_u32().unwrap() as usize;
+            let trim_len = 32 - pending_word_len;
+            *value = &value[(data_len + 2)..];
+
+            let mut v = Vec::<u8>::with_capacity(31 * data.len());
+            for felt in data {
+                v.extend_from_slice(&felt.to_bytes_be()[1..]);
+            }
+            v.extend_from_slice(&pending_word.to_bytes_be()[trim_len..]);
+
+            json!(String::from_utf8(v).unwrap())
         }
         PrimitiveType::BOOL => {
             if num.is_one() {
