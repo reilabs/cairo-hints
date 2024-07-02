@@ -28,7 +28,7 @@ pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Confi
 
                 use axum::{
                     extract,
-                    routing::post,
+                    routing::{post, get},
                     Router,
                     Json,
                 };
@@ -36,16 +36,70 @@ pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Confi
                 use tracing::debug;
                 use tower_http::trace::TraceLayer;
                 use oracle::*;
+                use std::sync::{Arc, Mutex};
+                use std::collections::HashMap;
+                use uuid::Uuid;
+                use tokio::time::{sleep, Duration};
 
                 #[derive(Debug, Serialize, Deserialize)]
                 struct JsonResult {
                     result: Response
                 }
 
-                async fn root(extract::Json(payload): extract::Json<Request>) -> Json<JsonResult> {
+                #[derive(Debug, Serialize, Deserialize)]
+                struct JobResponse {
+                    job_id: String,
+                }
+
+                #[derive(Debug, Serialize, Deserialize)]
+                struct JobStatus {
+                    status: String,
+                    result: Option<Response>,
+                }
+
+                struct AppState {
+                    jobs: Mutex<HashMap<String, JobStatus>>,
+                }
+
+                async fn create_job(
+                    extract::Json(payload): extract::Json<Request>,
+                    state: extract::State<Arc<AppState>>,
+                ) -> Json<JobResponse> {
                     debug!("received payload {payload:?}");
-                    let n = (payload.n as f64).sqrt() as u64;
-                    Json(JsonResult { result: Response { n } })
+                    let job_id = Uuid::new_v4().to_string();
+
+                    let mut jobs = state.jobs.lock().unwrap();
+                    jobs.insert(job_id.clone(), JobStatus {
+                        status: "processing".to_string(),
+                        result: None,
+                    });
+
+                    let job_id_clone = job_id.clone();
+                    let state_clone = Arc::clone(&state);
+
+                    tokio::spawn(async move {
+                        sleep(Duration::from_secs(5)).await; // Simulate long-running process
+                        let n = (payload.n as f64).sqrt() as u64;
+                        let mut jobs = state_clone.jobs.lock().unwrap();
+                        if let Some(job) = jobs.get_mut(&job_id_clone) {
+                            job.status = "completed".to_string();
+                            job.result = Some(Response { n });
+                        }
+                    });
+
+                    Json(JobResponse { job_id })
+                }
+
+                async fn get_job_status(
+                    extract::Path(job_id): extract::Path<String>,
+                    state: extract::State<Arc<AppState>>,
+                ) -> Json<JobStatus> {
+                    let jobs = state.jobs.lock().unwrap();
+                    let status = jobs.get(&job_id).cloned().unwrap_or(JobStatus {
+                        status: "not_found".to_string(),
+                        result: None,
+                    });
+                    Json(status)
                 }
 
                 #[tokio::main(flavor = "current_thread")]
@@ -54,9 +108,15 @@ pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Confi
                         .with_max_level(tracing::Level::DEBUG)
                         .init();
 
+                    let state = Arc::new(AppState {
+                        jobs: Mutex::new(HashMap::new()),
+                    });
+
                     let app = Router::new()
-                        .route("/sqrt", post(root))
-                        .layer(TraceLayer::new_for_http());
+                        .route("/sqrt", post(create_job))
+                        .route("/status/:job_id", get(get_job_status))
+                        .layer(TraceLayer::new_for_http())
+                        .with_state(state);
 
                     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
                         .await
@@ -113,6 +173,7 @@ pub fn mk_rust(canonical_path: &Utf8PathBuf, name: &PackageName, _config: &Confi
                 tracing = "0.1.40"
                 tracing-subscriber = "0.3.18"
                 prost = "0.12.3"
+                uuid = {{ version = "1.3", features = ["v4"] }}
 
                 [build-dependencies]
                 prost-build = "0.12.3"
