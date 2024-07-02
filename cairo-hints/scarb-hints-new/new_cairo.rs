@@ -150,7 +150,14 @@ pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Confi
             &filename,
             indoc! {r#"
             {
-                "sqrt": "http://127.0.0.1:3000"
+                "sqrt": {
+                    "server_url": "http://127.0.0.1:3000",
+                    "pooling_config": {
+                        "max_attempts": 30,
+                        "polling_interval": 2,
+                        "timeout": 60
+                    }
+                }
             }
         "#},
         )?;
