@@ -107,18 +107,12 @@ impl<'a> Rpc1HintProcessor<'a> {
         );
         println!("let the oracle decide... Inputs: {data:?}");
 
-        let client = reqwest::blocking::ClientBuilder::new()
-            .timeout(Duration::from_secs(10)) // Short timeout for each request
-            .build()
-            .map_err(|e| {
-                HintError::CustomHint(Box::from(format!("Failed to create HTTP client: {}", e)))
-            })?;
-
         // Polling parameters
         let default_polling_config = PollingConfig {
             max_attempts: 30,
             polling_interval: 2,
-            timeout: 60,
+            request_timeout: 10,
+            overall_timeout: 60,
         };
 
         let polling_config = server_config
@@ -126,10 +120,17 @@ impl<'a> Rpc1HintProcessor<'a> {
             .as_ref()
             .unwrap_or(&default_polling_config);
 
+        let client = reqwest::blocking::ClientBuilder::new()
+            .timeout(Duration::from_secs(default_polling_config.request_timeout))
+            .build()
+            .map_err(|e| {
+                HintError::CustomHint(Box::from(format!("Failed to create HTTP client: {}", e)))
+            })?;
+
         let max_attempts = polling_config.max_attempts;
         let polling_interval = Duration::from_secs(polling_config.polling_interval);
         let start_time = Instant::now();
-        let timeout = Duration::from_secs(polling_config.timeout);
+        let overall_timeout = Duration::from_secs(polling_config.overall_timeout);
 
         // Initial request to start the job
         let response = client
@@ -164,7 +165,7 @@ impl<'a> Rpc1HintProcessor<'a> {
 
         let mut attempt = 0;
         loop {
-            if attempt >= max_attempts || start_time.elapsed() > timeout {
+            if attempt >= max_attempts || start_time.elapsed() > overall_timeout {
                 return Err(HintError::CustomHint(Box::from(
                     "Polling timed out".to_string(),
                 )));

@@ -19,7 +19,8 @@ pub struct ServerConfig {
 pub struct PollingConfig {
     pub max_attempts: u64,     // Maximum number of polling attempts
     pub polling_interval: u64, // Time (in seconds) between polling attempts
-    pub timeout: u64,          // Overall timeout
+    pub request_timeout: u64,  // Short timeout for each request
+    pub overall_timeout: u64,  // Overall timeout
 }
 
 // primitive types supported by both Protocol Buffers and Cairo

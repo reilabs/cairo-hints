@@ -4,7 +4,8 @@
         "polling_config": {
             "max_attempts": 30,
             "polling_interval": 2,
-            "timeout": 60
+            "request_timeout": 10,
+            "overall_timeout": 60
         }
     }
 }
