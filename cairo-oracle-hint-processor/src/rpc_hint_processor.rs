@@ -107,144 +107,209 @@ impl<'a> Rpc1HintProcessor<'a> {
         );
         println!("let the oracle decide... Inputs: {data:?}");
 
-        // Polling parameters
-        let default_polling_config = PollingConfig {
-            max_attempts: 30,
-            polling_interval: 2,
-            request_timeout: 10,
-            overall_timeout: 60,
-        };
+        let use_polling = server_config.polling.unwrap_or(false);
 
-        let polling_config = server_config
-            .polling_config
-            .as_ref()
-            .unwrap_or(&default_polling_config);
+        if use_polling {
+            let default_polling_config = PollingConfig {
+                max_attempts: 30,
+                polling_interval: 2,
+                request_timeout: 10,
+                overall_timeout: 60,
+            };
 
-        let client = reqwest::blocking::ClientBuilder::new()
-            .timeout(Duration::from_secs(default_polling_config.request_timeout))
-            .build()
-            .map_err(|e| {
-                HintError::CustomHint(Box::from(format!("Failed to create HTTP client: {}", e)))
-            })?;
+            let polling_config = server_config
+                .polling_config
+                .as_ref()
+                .unwrap_or(&default_polling_config);
 
-        let max_attempts = polling_config.max_attempts;
-        let polling_interval = Duration::from_secs(polling_config.polling_interval);
-        let start_time = Instant::now();
-        let overall_timeout = Duration::from_secs(polling_config.overall_timeout);
+            let client = reqwest::blocking::ClientBuilder::new()
+                .timeout(Duration::from_secs(polling_config.request_timeout))
+                .build()
+                .map_err(|e| {
+                    HintError::CustomHint(Box::from(format!("Failed to create HTTP client: {}", e)))
+                })?;
 
-        // Initial request to start the job
-        let response = client
-            .post(server_url.clone())
-            .json(&data)
-            .send()
-            .map_err(|e| {
-                HintError::CustomHint(Box::from(format!(
-                    "Failed to send request to oracle server {}: {}",
-                    server_url, e
-                )))
-            })?;
+            let max_attempts = polling_config.max_attempts;
+            let polling_interval = Duration::from_secs(polling_config.polling_interval);
+            let start_time = Instant::now();
+            let overall_timeout = Duration::from_secs(polling_config.overall_timeout);
 
-        let response_body = response.text().map_err(|e| {
-            HintError::CustomHint(Box::from(format!("Failed to get response body: {}", e)))
-        })?;
-
-        println!("Initial response body: {}", response_body);
-
-        let response_json: serde_json::Value =
-            serde_json::from_str(&response_body).map_err(|e| {
-                HintError::CustomHint(Box::from(format!("Failed to parse response JSON: {}", e)))
-            })?;
-
-        let job_id = response_json
-            .get("jobId")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| HintError::CustomHint(Box::from("Failed to get jobId")))?
-            .to_string();
-
-        println!("Received job_id: {}", job_id);
-
-        let mut attempt = 0;
-        loop {
-            if attempt >= max_attempts || start_time.elapsed() > overall_timeout {
-                return Err(HintError::CustomHint(Box::from(
-                    "Polling timed out".to_string(),
-                )));
-            }
-
-            let status_url = server_url
-                .join(&format!("status/{}", job_id))
+            // Initial request to start the job
+            let response = client
+                .post(server_url.clone())
+                .json(&data)
+                .send()
                 .map_err(|e| {
                     HintError::CustomHint(Box::from(format!(
-                        "Failed to construct status URL: {}",
+                        "Failed to send request to oracle server {}: {}",
+                        server_url, e
+                    )))
+                })?;
+
+            let response_body = response.text().map_err(|e| {
+                HintError::CustomHint(Box::from(format!("Failed to get response body: {}", e)))
+            })?;
+
+            println!("Initial response body: {}", response_body);
+
+            let response_json: serde_json::Value =
+                serde_json::from_str(&response_body).map_err(|e| {
+                    HintError::CustomHint(Box::from(format!(
+                        "Failed to parse response JSON: {}",
                         e
                     )))
                 })?;
 
-            println!("Checking status at URL: {}", status_url);
+            let job_id = response_json
+                .get("jobId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| HintError::CustomHint(Box::from("Failed to get jobId")))?
+                .to_string();
 
-            let status_response = client.get(status_url.clone()).send().map_err(|e| {
-                HintError::CustomHint(Box::from(format!("Failed to send status request: {}", e)))
+            println!("Received job_id: {}", job_id);
+
+            let mut attempt = 0;
+            loop {
+                if attempt >= max_attempts || start_time.elapsed() > overall_timeout {
+                    return Err(HintError::CustomHint(Box::from(
+                        "Polling timed out".to_string(),
+                    )));
+                }
+
+                let status_url = server_url
+                    .join(&format!("status/{}", job_id))
+                    .map_err(|e| {
+                        HintError::CustomHint(Box::from(format!(
+                            "Failed to construct status URL: {}",
+                            e
+                        )))
+                    })?;
+
+                println!("Checking status at URL: {}", status_url);
+
+                let status_response = client.get(status_url.clone()).send().map_err(|e| {
+                    HintError::CustomHint(Box::from(format!(
+                        "Failed to send status request: {}",
+                        e
+                    )))
+                })?;
+
+                let status_body = status_response.text().map_err(|e| {
+                    HintError::CustomHint(Box::from(format!(
+                        "Failed to get status response body: {}",
+                        e
+                    )))
+                })?;
+
+                println!("Status response body: {}", status_body);
+
+                let status_json: serde_json::Value = match serde_json::from_str(&status_body) {
+                    Ok(json) => json,
+                    Err(e) => {
+                        println!(
+                            "Failed to parse status JSON: {}. Raw response: {}",
+                            e, status_body
+                        );
+                        return Err(HintError::CustomHint(Box::from(format!(
+                            "Failed to parse status JSON: {}. Raw response: {}",
+                            e, status_body
+                        ))));
+                    }
+                };
+
+                if status_json.get("status").and_then(|s| s.as_str()) == Some("completed") {
+                    if let Some(output) = status_json.get("result") {
+                        let data = serialize_cairo_serde(
+                            self.configuration,
+                            &configuration.output,
+                            output,
+                        );
+                        println!("Output: {output}");
+                        res_segment.write_data(data.iter()).map_err(|e| {
+                            HintError::CustomHint(Box::from(format!(
+                                "Failed to write data to result segment: {}",
+                                e
+                            )))
+                        })?;
+
+                        let res_segment_end = res_segment.ptr;
+                        insert_value_to_cellref!(vm, output_start, res_segment_start).map_err(
+                            |e| {
+                                HintError::CustomHint(Box::from(format!(
+                                    "Failed to insert output start value: {}",
+                                    e
+                                )))
+                            },
+                        )?;
+                        insert_value_to_cellref!(vm, output_end, res_segment_end).map_err(|e| {
+                            HintError::CustomHint(Box::from(format!(
+                                "Failed to insert output end value: {}",
+                                e
+                            )))
+                        })?;
+
+                        return Ok(());
+                    }
+                } else {
+                    println!("Job not completed. Current status: {:?}", status_json);
+                }
+
+                std::thread::sleep(polling_interval);
+                attempt += 1;
+            }
+        } else {
+            let client = reqwest::blocking::Client::new();
+            let response = client
+                .post(server_url.clone())
+                .json(&data)
+                .send()
+                .map_err(|e| {
+                    HintError::CustomHint(Box::from(format!(
+                        "Failed to send request to oracle server {}: {}",
+                        server_url, e
+                    )))
+                })?;
+
+            let response_body = response.text().map_err(|e| {
+                HintError::CustomHint(Box::from(format!("Failed to get response body: {}", e)))
             })?;
 
-            let status_body = status_response.text().map_err(|e| {
+            let response_json: serde_json::Value =
+                serde_json::from_str(&response_body).map_err(|e| {
+                    HintError::CustomHint(Box::from(format!(
+                        "Failed to parse response JSON: {}",
+                        e
+                    )))
+                })?;
+
+            let output = response_json.get("result").ok_or_else(|| {
+                HintError::CustomHint(Box::from("Missing 'result' field in response"))
+            })?;
+
+            let data = serialize_cairo_serde(self.configuration, &configuration.output, output);
+            res_segment.write_data(data.iter()).map_err(|e| {
                 HintError::CustomHint(Box::from(format!(
-                    "Failed to get status response body: {}",
+                    "Failed to write data to result segment: {}",
                     e
                 )))
             })?;
 
-            println!("Status response body: {}", status_body);
-
-            let status_json: serde_json::Value = match serde_json::from_str(&status_body) {
-                Ok(json) => json,
-                Err(e) => {
-                    println!(
-                        "Failed to parse status JSON: {}. Raw response: {}",
-                        e, status_body
-                    );
-                    return Err(HintError::CustomHint(Box::from(format!(
-                        "Failed to parse status JSON: {}. Raw response: {}",
-                        e, status_body
-                    ))));
-                }
-            };
-
-            if status_json.get("status").and_then(|s| s.as_str()) == Some("completed") {
-                if let Some(output) = status_json.get("result") {
-                    let data =
-                        serialize_cairo_serde(self.configuration, &configuration.output, output);
-                    println!("Output: {output}");
-                    res_segment.write_data(data.iter()).map_err(|e| {
-                        HintError::CustomHint(Box::from(format!(
-                            "Failed to write data to result segment: {}",
-                            e
-                        )))
-                    })?;
-
-                    let res_segment_end = res_segment.ptr;
-                    insert_value_to_cellref!(vm, output_start, res_segment_start).map_err(|e| {
-                        HintError::CustomHint(Box::from(format!(
-                            "Failed to insert output start value: {}",
-                            e
-                        )))
-                    })?;
-                    insert_value_to_cellref!(vm, output_end, res_segment_end).map_err(|e| {
-                        HintError::CustomHint(Box::from(format!(
-                            "Failed to insert output end value: {}",
-                            e
-                        )))
-                    })?;
-
-                    return Ok(());
-                }
-            } else {
-                println!("Job not completed. Current status: {:?}", status_json);
-            }
-
-            // If we haven't returned yet, sleep and try again
-            std::thread::sleep(polling_interval);
-            attempt += 1;
+            let res_segment_end = res_segment.ptr;
+            insert_value_to_cellref!(vm, output_start, res_segment_start).map_err(|e| {
+                HintError::CustomHint(Box::from(format!(
+                    "Failed to insert output start value: {}",
+                    e
+                )))
+            })?;
+            insert_value_to_cellref!(vm, output_end, res_segment_end).map_err(|e| {
+                HintError::CustomHint(Box::from(format!(
+                    "Failed to insert output end value: {}",
+                    e
+                )))
+            })?;
         }
+
+        Ok(())
     }
 }
 

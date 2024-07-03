@@ -333,6 +333,7 @@ mod tests {
 
         let servers_config = ServerConfig {
             server_url: "http://127.0.0.1:3000".to_string(),
+            polling: None,
             polling_config: None,
         };
         let mut servers_config_map = HashMap::new();
@@ -351,6 +352,7 @@ mod tests {
         let configuration = test_configuration();
         let expected_server_config = ServerConfig {
             server_url: "http://127.0.0.1:3000".to_string(),
+            polling: None,
             polling_config: None,
         };
         assert_eq!(

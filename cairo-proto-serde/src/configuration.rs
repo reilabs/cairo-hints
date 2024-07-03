@@ -12,6 +12,7 @@ pub struct Configuration {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ServerConfig {
     pub server_url: String,
+    pub polling: Option<bool>,
     pub polling_config: Option<PollingConfig>,
 }
 
