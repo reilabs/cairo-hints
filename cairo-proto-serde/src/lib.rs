@@ -220,7 +220,7 @@ pub fn deserialize_cairo_serde(
 #[cfg(test)]
 mod tests {
     use crate::configuration::{
-        Configuration, Field, FieldType, MethodDeclaration, PrimitiveType, Service,
+        Configuration, Field, FieldType, MethodDeclaration, PrimitiveType, ServerConfig, Service,
     };
     use crate::{deserialize_cairo_serde, serialize_cairo_serde};
     use cairo_vm::Felt252;
@@ -331,23 +331,33 @@ mod tests {
 
         let enums = BTreeMap::new();
 
-        let mut servers_config = HashMap::new();
-        servers_config.insert("sqrt".to_string(), "http://127.0.0.1:3000".to_string());
+        let servers_config = ServerConfig {
+            server_url: "http://127.0.0.1:3000".to_string(),
+            polling: None,
+            polling_config: None,
+        };
+        let mut servers_config_map = HashMap::new();
+        servers_config_map.insert("sqrt".to_string(), servers_config);
 
         Configuration {
             enums,
             messages,
             services,
-            servers_config,
+            servers_config: servers_config_map,
         }
     }
 
     #[test]
     fn it_handles_servers_config() {
         let configuration = test_configuration();
+        let expected_server_config = ServerConfig {
+            server_url: "http://127.0.0.1:3000".to_string(),
+            polling: None,
+            polling_config: None,
+        };
         assert_eq!(
             configuration.servers_config.get("sqrt"),
-            Some(&"http://127.0.0.1:3000".to_string())
+            Some(&expected_server_config)
         );
 
         let json_string = serde_json::to_string(&configuration).unwrap();
@@ -355,7 +365,7 @@ mod tests {
 
         assert_eq!(
             new_configuration.servers_config.get("sqrt"),
-            Some(&"http://127.0.0.1:3000".to_string())
+            Some(&expected_server_config)
         );
     }
 }

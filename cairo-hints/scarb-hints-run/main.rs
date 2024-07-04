@@ -9,7 +9,7 @@ use std::{
 use anyhow::{Context, Result};
 use cairo_lang_sierra::program::VersionedProgram;
 use cairo_oracle_hint_processor::{run_1, Error, FuncArg, FuncArgs};
-use cairo_proto_serde::configuration::Configuration;
+use cairo_proto_serde::configuration::{Configuration, ServerConfig};
 use cairo_vm::types::layout_name::LayoutName;
 use cairo_vm::Felt252;
 use camino::Utf8PathBuf;
@@ -169,8 +169,10 @@ fn main() -> Result<(), Error> {
 
     // Read and parse the servers config file
     let config_content = fs::read_to_string(&servers_config_path).map_err(|e| Error::IO(e))?;
-    let servers_config: HashMap<String, String> = serde_json::from_str(&config_content)
-        .map_err(|e| Error::ServersConfigFileError(format!("Failed to parse servers config: {}", e)))?;
+    let servers_config: HashMap<String, ServerConfig> = serde_json::from_str(&config_content)
+        .map_err(|e| {
+            Error::ServersConfigFileError(format!("Failed to parse servers config: {}", e))
+        })?;
 
     // Add the servers_config to the Configuration
     service_configuration.servers_config = servers_config;

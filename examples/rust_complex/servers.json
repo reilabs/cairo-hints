@@ -1,3 +1,11 @@
 {
-    "shirt": "http://127.0.0.1:3000"
+    "shirt": {
+        "server_url": "http://127.0.0.1:3000",
+        "polling_config": {
+            "max_attempts": 30,
+            "polling_interval": 2,
+            "request_timeout": 10,
+            "overall_timeout": 60
+        }
+    }
 }
