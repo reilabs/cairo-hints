@@ -23,7 +23,7 @@ use cairo_vm::vm::errors::vm_errors::VirtualMachineError;
 use cairo_vm::Felt252;
 use thiserror::Error;
 
-mod cairo_run;
+pub mod cairo_run;
 pub mod rpc_hint_processor;
 
 mod hint_processor_utils;
