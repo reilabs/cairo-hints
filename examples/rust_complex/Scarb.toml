@@ -9,10 +9,10 @@ edition = "2023_10"
 alexandria_math = { git = "https://github.com/keep-starknet-strange/alexandria.git", rev = "417c5a80ed2fef05ce159d643f3e34a5386ee06c" }
 
 [tool.hints]
-definitions = "proto/oracle.proto"  # must be provided
+definitions = "proto/oracle.proto" # must be provided
 # cairo_output = "src"                 # default "src"
 # oracle_lock = "Oracle.lock"          # default "Oracle.lock"
 # servers_config = "servers.json"      # default "servers.json"
 
 [cairo]
-enable-gas = true
+enable-gas = false

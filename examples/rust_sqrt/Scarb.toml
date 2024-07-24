@@ -14,4 +14,4 @@ definitions = "proto/oracle.proto"  # required
 # servers_config = "servers.json"
 
 [cairo]
-enable-gas = true
+enable-gas = false

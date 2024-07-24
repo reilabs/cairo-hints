@@ -11,6 +11,7 @@ cairo-lang-filesystem = { workspace = true }
 cairo-lang-runner = { workspace = true }
 cairo-lang-sierra = { workspace = true }
 cairo-lang-sierra-to-casm = { workspace = true }
+cairo-lang-sierra-generator = { workspace = true }
 cairo-lang-starknet = { workspace = true }
 cairo-lang-test-plugin = { workspace = true }
 cairo-lang-utils = { workspace = true }

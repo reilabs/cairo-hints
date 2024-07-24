@@ -202,7 +202,7 @@ fn main() -> Result<(), Error> {
     ) {
         Err(Error::Cli(err)) => err.exit(),
         Ok(return_values) => {
-            if !return_values.is_empty() {
+            if return_values.is_some() {
                 let return_values_string_list =
                     return_values.iter().map(|m| m.to_string()).join(", ");
                 println!("Return values : [{}]", return_values_string_list);
