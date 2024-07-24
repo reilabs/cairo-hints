@@ -1,9 +1,7 @@
 use std::{ops::Deref, str::FromStr};
 
-use cairo_felt::Felt252;
 use cairo_lang_runner::Arg;
-// use cairo_vm::Felt252;
-// use cairo_felt::Felt252;
+use cairo_vm::Felt252;
 use serde::{de::Visitor, Deserialize};
 use serde_json::Value;
 use thiserror::Error;
@@ -17,7 +15,7 @@ pub enum ArgsError {
     #[error("number out of range")]
     NumberOutOfRange,
     #[error("failed to parse arguments: {0}")]
-    ParseError(#[from] serde_json::Error),
+    ParseError(String),
 }
 
 /// `Args` is a wrapper around a vector of `Arg`.
@@ -41,19 +39,18 @@ impl Args {
     pub fn new(args: Vec<Arg>) -> Self {
         Self(args)
     }
+
+    fn clone_arg(arg: &Arg) -> Arg {
+        match arg {
+            Arg::Value(v) => Arg::Value(*v),
+            Arg::Array(arr) => Arg::Array(arr.iter().map(Self::clone_arg).collect()),
+        }
+    }
 }
 
 impl Clone for Args {
     fn clone(&self) -> Self {
-        Self(
-            self.0
-                .iter()
-                .map(|arg| match arg {
-                    Arg::Value(value) => Arg::Value(value.to_owned()),
-                    Arg::Array(array) => Arg::Array(array.iter().map(ToOwned::to_owned).collect()),
-                })
-                .collect(),
-        )
+        Self(self.0.iter().map(Self::clone_arg).collect())
     }
 }
 
@@ -79,7 +76,8 @@ impl From<Vec<Arg>> for Args {
 impl FromStr for Args {
     type Err = ArgsError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let args = serde_json::from_str::<Args>(s)?;
+        let args =
+            serde_json::from_str::<Args>(s).map_err(|e| ArgsError::ParseError(e.to_string()))?;
         Ok(args)
     }
 }
@@ -97,26 +95,34 @@ impl Args {
                 }
                 Value::String(n) => {
                     let n = num_bigint::BigUint::from_str(n)?;
-                    args.push(Arg::Value(Felt252::from_bytes_be(&n.to_bytes_be())));
+                    let bytes = n.to_bytes_be();
+                    let mut padded = [0u8; 32];
+                    padded[32 - bytes.len()..].copy_from_slice(&bytes);
+                    args.push(Arg::Value(Felt252::from_bytes_be(&padded)));
                 }
                 Value::Array(arr) => {
-                    let mut inner_args = Vec::new();
-                    for a in arr {
-                        match a {
-                            Value::Number(n) => {
-                                let n = n.as_u64().ok_or(ArgsError::NumberOutOfRange)?;
-                                inner_args.push(Felt252::from(n));
-                            }
-                            Value::String(n) => {
-                                let n = num_bigint::BigUint::from_str(n)?;
-                                inner_args.push(Felt252::from_bytes_be(&n.to_bytes_be()));
-                            }
-                            _ => (),
-                        }
-                    }
+                    let inner_args =
+                        arr.iter()
+                            .map(|a| match a {
+                                Value::Number(n) => {
+                                    let n = n.as_u64().ok_or(ArgsError::NumberOutOfRange)?;
+                                    Ok(Arg::Value(Felt252::from(n)))
+                                }
+                                Value::String(n) => {
+                                    let n = num_bigint::BigUint::from_str(n)?;
+                                    let bytes = n.to_bytes_be();
+                                    let mut padded = [0u8; 32];
+                                    padded[32 - bytes.len()..].copy_from_slice(&bytes);
+                                    Ok(Arg::Value(Felt252::from_bytes_be(&padded)))
+                                }
+                                Value::Array(nested_arr) => Self::visit_seq_helper(nested_arr)
+                                    .map(|args| Arg::Array(args.0)),
+                                _ => Err(ArgsError::ParseError("Invalid type".to_string())),
+                            })
+                            .collect::<Result<Vec<Arg>, ArgsError>>()?;
                     args.push(Arg::Array(inner_args));
                 }
-                _ => (),
+                _ => return Err(ArgsError::ParseError("Invalid type".to_string())),
             }
         }
 
