@@ -15,7 +15,6 @@ use cairo_vm::air_public_input::PublicInputError;
 use cairo_vm::cairo_run::EncodeTraceError;
 use cairo_vm::types::errors::program_errors::ProgramError;
 use cairo_vm::types::layout_name::LayoutName;
-use cairo_vm::types::relocatable::MaybeRelocatable;
 use cairo_vm::vm::errors::memory_errors::MemoryError;
 use cairo_vm::vm::errors::runner_errors::RunnerError;
 use cairo_vm::vm::errors::trace_errors::TraceError;
@@ -75,6 +74,10 @@ pub enum Error {
         param_index: usize,
         arg_index: usize,
     },
+    #[error("Only programs returning `Array<Felt252>` can be currently proven. Try serializing the final values before returning them")]
+    IlegalReturnValue,
+    #[error("Only programs with `Array<Felt252>` as an input can be currently proven. Try inputing the serialized version of the input and deserializing it on main")]
+    IlegalInputValue,
     #[error("Configuration error: {0}")]
     ConfigError(String),
     #[error("Servers configuration file error: {0}")]
@@ -133,7 +136,7 @@ pub fn run_1(
     sierra_program: &SierraProgram,
     entry_func_name: &str,
     proof_mode: bool,
-) -> Result<Vec<MaybeRelocatable>, Error> {
+) -> Result<Option<String>, Error> {
     // let compiler_config = CompilerConfig {
     //     replace_ids: true,
     //     ..CompilerConfig::default()
@@ -146,10 +149,12 @@ pub fn run_1(
     let cairo_run_config = Cairo1RunConfig {
         proof_mode: proof_mode,
         relocate_mem: memory_file.is_some(), //|| air_public_input.is_some(),
-        layout: layout,
+        layout: *layout,
         trace_enabled: trace_file.is_some(), //|| args.air_public_input.is_some(),
         args: &args.0,
-        finalize_builtins: false, //args.air_private_input.is_some() || args.cairo_pie_output.is_some(),
+        finalize_builtins: false,
+        serialize_output: true,
+        append_return_values: false, //args.air_private_input.is_some() || args.cairo_pie_output.is_some(),
     };
 
     let (runner, _vm, return_values) = cairo_run::cairo_run_program(
