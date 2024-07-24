@@ -2,7 +2,6 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use anyhow::{bail, Result};
-use cairo_felt::Felt252;
 use cairo_lang_compiler::db::RootDatabase;
 use cairo_lang_compiler::diagnostics::DiagnosticsReporter;
 use cairo_lang_compiler::project::setup_project;
@@ -12,7 +11,8 @@ use cairo_lang_sierra::program::Program;
 use cairo_lang_starknet::starknet_plugin_suite;
 use cairo_lang_test_plugin::test_config::{PanicExpectation, TestExpectation};
 use cairo_lang_test_plugin::{
-    compile_test_prepared_db, test_plugin_suite, TestCompilation, TestConfig,
+    compile_test_prepared_db, test_plugin_suite, TestCompilation, TestCompilationMetadata,
+    TestConfig, TestsCompilationConfig,
 };
 use cairo_oracle_hint_processor::{run_1, Error, FuncArgs};
 use cairo_proto_serde::configuration::Configuration;
@@ -90,8 +90,8 @@ impl CompiledTestRunner {
             ignored,
             failed_run_results,
         } = run_tests(
-            compiled.named_tests,
-            compiled.sierra_program,
+            compiled.metadata.named_tests,
+            compiled.sierra_program.program,
             configuration,
             layout,
         )?;
@@ -199,9 +199,14 @@ impl TestCompiler {
 
     /// Build the tests and collect metadata.
     pub fn build(&self) -> Result<TestCompilation> {
+        let config = TestsCompilationConfig {
+            starknet: true,
+            add_statements_functions: true,
+        };
+
         compile_test_prepared_db(
             &self.db,
-            self.starknet,
+            config,
             self.main_crate_ids.clone(),
             self.test_crate_ids.clone(),
         )
@@ -223,8 +228,9 @@ pub fn filter_test_cases(
     ignored: bool,
     filter: String,
 ) -> (TestCompilation, usize) {
-    let total_tests_count = compiled.named_tests.len();
+    let total_tests_count = compiled.metadata.named_tests.len();
     let named_tests = compiled
+        .metadata
         .named_tests
         .into_iter()
         .map(|(func, mut test)| {
@@ -239,10 +245,17 @@ pub fn filter_test_cases(
         .filter(|(_, test)| !ignored || test.ignored)
         .collect_vec();
     let filtered_out = total_tests_count - named_tests.len();
+
     let tests = TestCompilation {
-        named_tests,
-        ..compiled
+        sierra_program: compiled.sierra_program,
+        metadata: TestCompilationMetadata {
+            named_tests: named_tests,
+            contracts_info: compiled.metadata.contracts_info,
+            function_set_costs: compiled.metadata.function_set_costs,
+            statements_functions: compiled.metadata.statements_functions,
+        },
     };
+
     (tests, filtered_out)
 }
 
@@ -275,11 +288,6 @@ pub struct TestsSummary {
     failed: Vec<String>,
     ignored: Vec<String>,
     failed_run_results: Vec<RunResultValue>,
-}
-
-fn is_equal_vec_felt(a: &Vec<VMFelt>, b: &Vec<Felt252>) -> bool {
-    a.iter().map(|f| f.to_biguint()).collect_vec()
-        != b.iter().map(|f: &Felt252| f.to_biguint()).collect_vec()
 }
 
 /// Runs the tests and process the results for a summary.
@@ -333,9 +341,7 @@ pub fn run_tests(
                                 }
                                 TestExpectation::Panics(panic_expectation) => {
                                     match panic_expectation {
-                                        PanicExpectation::Exact(expected)
-                                            if !is_equal_vec_felt(&panic_data, &expected) =>
-                                        {
+                                        PanicExpectation::Exact(_) => {
                                             TestStatus::Fail(RunResultValue::Panic(panic_data))
                                         }
                                         _ => TestStatus::Success,
