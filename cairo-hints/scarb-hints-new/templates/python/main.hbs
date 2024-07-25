@@ -1,0 +1,82 @@
+from math import sqrt
+from unittest.mock import Base
+from uuid import uuid4
+
+from fastapi import BackgroundTasks, FastAPI, HTTPException, status
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class Job:
+    def __init__(self, status: str = "processing"):
+        self.status = status
+        self.result = None
+
+    def set_result(self, result):
+        self.result = result
+        self.status = "completed"
+
+jobs = {}
+
+# Mimic a long running process
+def preprocess(number: int, job: Job = None):
+    """
+    Preprocesses the data and sets the result of the provided job.
+
+    Args:
+        job (Job, optional): The job to set the result for. Defaults to None.
+
+    Returns:
+        dict: A dictionary containing the status and result of the preprocessing.
+    """
+
+    if job is not None:
+        job.set_result({
+            "status": "completed",
+            "result": sqrt(number),
+        })
+    return {
+        "status": "completed",
+        "result": sqrt(number)
+    }
+
+
+@app.get("/healtcheck")
+def read_root():
+    return {"status": "OK"}
+
+class SqrtRequest(BaseModel):
+    n: int
+
+@app.post("/sqrt", status_code=status.HTTP_201_CREATED)
+def pre(number: SqrtRequest, background_taks: BackgroundTasks, sync: bool = True):
+    if not sync:
+        job_id = str(uuid4())
+        job = Job()
+        jobs[job_id] = job
+        background_taks.add_task(preprocess, number.n, job)
+        print(jobs)
+        result = {"job_id": job_id}
+    else:
+        result = preprocess(number.n)
+    return result
+
+@app.get("/status/{job_id}", status_code=status.HTTP_200_OK)
+def status(job_id: str):
+    job = jobs.get(job_id)
+
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if job.status == "processing":
+        return {"status": job.status}
+    else:
+        result = job.result
+        job_status = job.status
+        jobs.pop(job_id)
+        return {"status": job_status, "result": result}
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", host="0.0.0.0", port=3000, reload=True)
