@@ -2,6 +2,7 @@ use crate::new_cairo::mk_cairo;
 use crate::new_js::mk_js;
 use crate::new_rust::mk_rust;
 use crate::new_ts::mk_ts;
+use crate::new_python::mk_python;
 use crate::{fsx, restricted_names, Lang};
 use anyhow::{bail, ensure, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -138,6 +139,7 @@ fn mk(
                     1. Rust: `cd rust; cargo run`
                     2. Javascript: `cd js; npm install; npm start`
                     3. Typescript: `cd ts; npm install; npm start`
+                    4. Python: `cd python; python3 -m venv .venv; source venv/bin/activate; pip install -r requirements.txt; python src/main.py`
                 2. Run `scarb hints-run --layout all_cairo`
 
                 ## Extra options
@@ -176,6 +178,7 @@ fn mk(
         Lang::Rust => mk_rust(&canonical_path, &name, &config)?,
         Lang::Js => mk_js(&canonical_path, &name, &config)?,
         Lang::Ts => mk_ts(&canonical_path, &name, config)?,
+        Lang::Python => mk_python(&canonical_path, &name, config)?,
     }
     mk_cairo(&canonical_path, &name, &config)?;
 

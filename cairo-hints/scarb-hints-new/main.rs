@@ -11,6 +11,8 @@ mod new_cairo;
 mod new_js;
 mod new_rust;
 mod new_ts;
+mod new_python;
+mod templates;
 mod restricted_names;
 
 #[derive(Parser, Debug)]
@@ -30,6 +32,7 @@ pub enum Lang {
     Rust,
     Js,
     Ts,
+    Python,
 }
 
 /// Arguments accepted by the `init` command.

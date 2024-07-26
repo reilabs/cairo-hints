@@ -55,3 +55,4 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 cairo-lang-hints-test-runner = { workspace = true }
 cairo-lang-test-plugin = { workspace = true }
+handlebars = "6.0.0"
