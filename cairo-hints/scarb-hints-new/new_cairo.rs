@@ -42,7 +42,7 @@ pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Confi
             # servers_config = "servers.json"
 
             [cairo]
-            enable-gas = true
+            enable-gas = false
         "#},
         )?;
     }
