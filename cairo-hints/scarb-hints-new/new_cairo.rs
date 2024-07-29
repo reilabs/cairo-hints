@@ -171,7 +171,7 @@ pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Confi
         fsx::write(
             &filename,
             indoc! {r#"
-            scarb 2.6.5
+            scarb 2.7.0-rc.3
         "#},
         )?;
     }
