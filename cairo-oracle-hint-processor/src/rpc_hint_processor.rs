@@ -138,6 +138,7 @@ impl<'a> Rpc1HintProcessor<'a> {
             let response = client
                 .post(server_url.clone())
                 .json(&data)
+                .header("x-admin-api-key", "qwerty")
                 .send()
                 .map_err(|e| {
                     HintError::CustomHint(Box::from(format!(
@@ -262,6 +263,7 @@ impl<'a> Rpc1HintProcessor<'a> {
             let response = client
                 .post(server_url.clone())
                 .json(&data)
+                .header("x-admin-api-key", "qwerty")
                 .send()
                 .map_err(|e| {
                     HintError::CustomHint(Box::from(format!(
@@ -281,7 +283,7 @@ impl<'a> Rpc1HintProcessor<'a> {
                         e
                     )))
                 })?;
-
+            print!("Response: {response_json}");
             let output = response_json.get("result").ok_or_else(|| {
                 HintError::CustomHint(Box::from("Missing 'result' field in response"))
             })?;

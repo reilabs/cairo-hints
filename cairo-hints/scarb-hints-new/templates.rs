@@ -7,5 +7,6 @@ pub fn get_template_engine() -> handlebars::Handlebars<'static> {
     registry.register_template_string("main", include_str!("templates/python/main.hbs").to_owned()).unwrap();
     registry.register_template_string("pre-commit", include_str!("templates/python/.pre-commit-config.hbs").to_owned()).unwrap();
     registry.register_template_string("gitignore", include_str!("templates/python/.gitignore.hbs").to_owned()).unwrap();
+    registry.register_template_string("readme", include_str!("templates/python/README.hbs").to_owned()).unwrap();
     registry
 }

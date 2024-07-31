@@ -1,0 +1,381 @@
+# Agent Tutorial
+
+This is a tutorial for creating a new agent an interacting with the Agents API in orther to leverage session keys execution.
+
+## Prerequisites
+
+- Python 3.10 or later
+- [Scarb](https://docs.swmansion.com/scarb/)
+- `protoc` from [here](https://grpc.io/docs/protoc-installation/)
+- `cairo-hnts` from [here](https://github.com/gizatechxyz/cairo-hints)
+
+## Explanation
+
+This repository comes with the following structure:
+
+```
+.
+├── Dockerfile              # Dockerfile for the python server
+├── Oracle.lock             # Lock file for the oracle
+├── README.md
+├── Scarb.lock              # Lock file for scarb
+├── Scarb.toml              # Scarb configuration file
+├── proto                   # Protobuf files
+│   └── oracle.proto        # Protobuf file for the oracle
+├── python                  # Python folder for the server
+│   ├── requirements.txt    # Python requirements file
+│   └── src
+│       └── main.py         # Main file for the server
+├── servers.json            # Servers file where the external calls are declared
+├── src                     # Cairo source files
+    ├── lib.cairo           # Cairo entrypoint
+    └── oracle.cairo        # Cairo file for the oracle which contains the structs and functions
+
+```
+
+The most important files are the `oracle.proto` file and the `oracle.cairo` file. The `oracle.proto` file is the protobuf file that will be used to generate the client and server code for the oracle. The `oracle.cairo` file is the Cairo file where the oracle proto structs and functions will be implemented by Cairo Hints.
+
+The `.proto` file uses the `protobuf` syntax to define the messages and services that the oracle will use, you can find more information about the syntax [here](https://developers.google.com/protocol-buffers/docs/proto3).
+
+Let's see how it works.
+
+### Message and server definition
+
+The following is the `oracle.proto` file:
+
+```proto
+syntax = "proto3";
+
+package oracle;
+
+message Request {
+    uint64 n = 1;
+}
+
+message Response {
+    uint64 n = 1;
+    string status = 2;
+}
+
+// We define the service by defining the response and request messages as well as the server
+service SqrtOracle {
+    rpc Sqrt(Request) returns (Response);
+}
+```
+
+This file defines a `Request` message with a single field `n` of type `uint64`, a `Response` message with two fields `n` and `status` of type `uint64` and `string` respectively, and a `SqrtOracle` service with a single `Sqrt` rpc that takes a `Request` message and returns a `Response` message.
+
+The request will be the struct that we will be using in cairo to reach the python server or the agents-api and the response is the information that we will be receiving from the server.
+
+Also we can see that we have define a service called `SqrtOracle` with a single rpc called `Sqrt` that will be used to get the square root of a number. This service refers to the endpoint that we want to reach and its definition its contained in the `servers.json` file.
+
+The following is the `servers.json` file:
+
+```json
+{
+    "sqrt": {                                   // This is the `Sqrt` used in the proto file
+        "server_url": "http://127.0.0.1:8000",  // Python server url
+        "polling_config": {                     // Polling configuration
+            "max_attempts": 30,
+            "polling_interval": 2,
+            "request_timeout": 60,
+            "overall_timeout": 300
+        }
+    }
+}
+```
+
+This file is how we interlink the protobuf service with the actual url of the server that we want to reach. The most common urls used will be:
+
+- `http://127.0.0.1:8000` for the python server as it will be always running in the same container as the cairo-hints agent.
+- `https://agents-api-6nn4ryaqca-ew.a.run.app` for the agents-api that will run as a server in the cloud. This URL is for **DEVELOPMENT** purposes only.
+
+When we define this server we must have in mind that the key used will be the endpoint that we want to call. Here we have `sqrt` as the key and the `server_url` is `http://127.0.0.1:8000` which in turn will make the request to `http://127.0.0.1:8000/sqrt`. This is important to have in mind as we have to define our endpoints in the server accordingly to the server key name.
+
+### Generating the cairo files
+
+Now we have all the configuration files needed to start using the `cairo-hints` utilities `scarb hints-generate`. This command will take the information declared in the `oracle.proto` file and the `servers.json` file and generate the `oracle.cairo` files to interact with the server.
+
+```bash
+scarb hints-generate
+```
+
+This will generate the `oracle.cairo` file in the `src` folder. This file will contain the structs and functions needed to interact with the server and it will also update the `Oracle.lock` file with the information of the last generation.
+
+An example of the generated `oracle.cairo` file is the following:
+
+```rust
+use starknet::testing::cheatcode;
+#[derive(Drop, Serde)]
+struct Request {
+    n: u64,
+}
+#[derive(Drop, Serde)]
+struct Response {
+    n: u64,
+    status: ByteArray,
+}
+
+#[generate_trait]
+impl SqrtOracle of SqrtOracleTrait {
+    fn sqrt(arg: super::oracle::Request) -> super::oracle::Response {
+        let mut serialized = ArrayTrait::new();
+        arg.serialize(ref serialized);
+        let mut result = cheatcode::<'sqrt'>(serialized.span());
+        Serde::deserialize(ref result).unwrap()
+    }
+}
+```
+
+And it can be used in the `lib.cairo` file as follows:
+
+```rust
+// Add oracle as a module
+mod oracle;
+
+// Use the oracle module and import the service and request
+use oracle::{Request, SqrtOracle};
+
+fn main() -> bool {
+    let num = 1764;
+
+    // Fill the request struct
+    let request = Request { n: num };
+
+    // Call the oracle and it should return the struct used in the response definition
+    let result = SqrtOracle::sqrt(request);
+
+    result.n * result.n == num
+}
+```
+
+### How to run
+
+As we use the python server first we need to install the dependencies:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r python/requirements.txt
+```
+
+Then we can run the server:
+
+```bash
+uvicorn python/src.main:app --host 0.0.0.0 --port 8000 --reload
+# or
+python python/src/main.py
+```
+
+And finally we can run the cairo program with `scarb hints-run --layout all_cairo`:
+
+```bash
+scarb hints-run --layout all_cairo
+```
+
+This will compile and run the program, using cairo hints to perform the square root of the number `1764` in the python server and check if the result is correct in cairo.
+
+## Real world example using the agents-api
+
+When we want to use the `agents-api` we need to perform some operations:
+
+- Create a smart account
+- Create a backend wallet
+- Create a session key
+
+### Pre-requisites with frontend
+
+To make this process a little easier there is a frontend available to help us with this thre steps. You can find the frontend [here](https://github.com/gizatechxyz/agents-api/tree/develop/apps/demo-web)
+
+You will need `node`, `nvm` and `npm` to run the frontend. You can install them with the following commands:
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
+nvm install node # "node" is an alias for the latest version
+```
+
+Then you can clone the repository and run the frontend:
+
+```bash
+git clone git@github.com:gizatechxyz/agents-api.git
+cd agents-api/apps/demo-web
+```
+
+Create a `.env` with the following variables:
+
+```
+NEXT_PUBLIC_CLIENT_ID="abe0c73224ebc08133fa6c6a67681736"
+NEXT_PUBLIC_API_URL="https://agents-api-6nn4ryaqca-ew.a.run.app"
+```
+
+Then run and install the dependencies:
+
+```bash
+npm install
+npm run dev
+```
+
+This will start the frontend in `http://localhost:3000` and you can follow the steps to create the smart account. For now only `thirdweb` is supported as there are somethings to improve in starknet.
+
+In order to change the information used to create the session keys, there is a file for the constants at `agents-api/apps/demo-web/src/constants/index.ts`
+
+Here you can import the chain that you want to use ([available list here](https://thirdweb.com/chainlist)) and can easily be imported in the `constants/index.ts` file.
+
+```typescript
+import { baseSepolia, zkSyncSepolia, zkSync, sepolia } from "thirdweb/chains";
+```
+
+Then we need to fill the rest of the information that we need:
+
+```typescript
+// Select the chain here
+export const chain = baseSepolia;
+
+// Fill with the contract addresses you want to use
+export const contractAddresses = ["0x638263e3eaa3917a53630e61b1fba685308024fa"];
+// Fill with the functions you want to use
+export const contractFunctions = ["claim"];
+// Agent ID make sure to change it so it does not overwrite one from a colleague
+export const agentId = "test";
+```
+
+
+If you want to use the `Send Test Transaction` button you will need to modify the function `handleSendTransaction` at `agents-api/apps/demo-web/src/thirdweb/page.tsx` with the calldata.
+
+### How to add the Agents API to the server
+
+To add the agents-api to the server we need to add the following to the `servers.json` file:
+
+```json
+{
+    "sqrt": {
+        "server_url": "http://127.0.0.1:8000",
+        "polling_config": {
+            "max_attempts": 30,
+            "polling_interval": 2,
+            "request_timeout": 60,
+            "overall_timeout": 300
+        }
+    },
+    "execute": {
+        "server_url": "http://127.0.0.1:3001/thirdweb/sessions/0xe2e2C18CC8f3Ba72013AaB13244f740f0f320B37",
+        "polling_config": {
+            "max_attempts": 30,
+            "polling_interval": 2,
+            "request_timeout": 60,
+            "overall_timeout": 300
+        }
+    }
+}
+```
+
+This will include the execute endpoint (have in mind that the actual endpoint is `server_url` + `/execute`). This endpoint will be used to interact with the agents-api and it will be used to execute the transaction using the session keys.
+
+Now lets create the proto. The previous endpoint expects a request with the following structure:
+
+```json
+{
+    "entrypoint": "{function to execute}",
+    "agent_id": "{agent id, same as in the constants file}",
+    "calldata": {
+        // arbitrary calldata in form of a json of strings
+    }
+}
+```
+
+We can create the following proto struct for the request:
+
+```proto
+message ExecuteAPI {
+    string entrypoint = 1;
+    string agentId = 2;
+    CallData calldata = 3;
+}
+```
+
+As the call data is arbitrary we can create a new message for it:
+
+```proto
+message CallData {
+    string receiver = 1;
+    string tokenId = 2;
+    string quantity = 3;
+    string currency = 4;
+    string pricePerToken = 5;
+    AllowlistProof allowlistProof = 6;
+    string data = 7;
+}
+```
+
+And the `AllowlistProof` message is as follows:
+
+```proto
+message AllowlistProof {
+    repeated string proof = 1;
+    string quantityLimitPerWallet = 2;
+    string pricePerToken = 3;
+    string currency = 4;
+}
+```
+
+As you can see you can nest message, as the `AllowlistProof` is a tuple in the smart contract we need to nest it into the call data.
+
+The naming is important, proto follows the camelCase naming convention and the struct in cairo follows the snake_case naming convention, so when running `scarb hints-generate` the names will be converted from camelCase to snake_case. Later the call to the contract will be handled by the `execute` endpoint in the agents-api.
+
+Now lets add the service to the `oracle.proto` file:
+
+```proto
+service Execute {
+    rpc Execute(ExecuteAPI) returns (AgentsAPIResponse);
+}
+```
+
+Now we are ready to run `scarb hints-generate` and generate the `oracle.cairo` file with our new structs.
+
+Now we are ready to modify the `lib.cairo` file to include the new service:
+
+```rust
+mod oracle;
+
+use oracle::{AllowlistProof, CallData, Execute, ExecuteApi};
+
+fn main() -> bool {
+
+    // Here we fill the call data of the contract
+    let data = CallData {
+                receiver: "0xe2e2C18CC8f3Ba72013AaB13244f740f0f320B37",
+                token_id: "0",
+                quantity: "1",
+                currency: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                price_per_token: "0",
+                // This is the allowlist proof nested in the call data
+                allowlist_proof: Option::Some(AllowlistProof {
+                        proof: array![],
+                        quantity_limit_per_wallet: "0",
+                        price_per_token: "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+                        currency: "0x0000000000000000000000000000000000000000",
+                    }
+                ),
+                data: "0x0000000000000000000000000000000000000000000000000000000000000080",
+        };
+
+    // Here we fill the request struct
+    let request = ExecuteApi {
+        entrypoint: "claim",
+        agent_id: "test",
+        calldata: Option::Some(data)
+    };
+
+    // Here we call the execute endpoint
+    let agent_r = Execute::execute(request);
+
+    true
+
+}
+```
+
+Now we can run the cairo program with `scarb hints-run --layout all_cairo` and it will execute the transaction in the agents-api.
+
+```bash
+scarb hints-run --layout all_cairo
+```
