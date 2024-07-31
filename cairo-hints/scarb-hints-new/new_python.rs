@@ -11,6 +11,7 @@ pub const SERVER_MANIFEST_PATH: Lazy<Utf8PathBuf> =
 pub const SERVER_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["python/src", "main.py"].iter().collect());
 pub const GITIGNORE_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| [".gitignore"].iter().collect());
+pub const README_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["README.md"].iter().collect());
 pub const DOCKERFILE_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["Dockerfile"].iter().collect());
 pub const PRE_COMMIT_CONFIG: Lazy<Utf8PathBuf> = Lazy::new(|| [".pre-commit-config.yaml"].iter().collect());
 
@@ -51,6 +52,16 @@ pub fn mk_python(canonical_path: &Utf8PathBuf, _: &PackageName, _config: &Config
             pre_commit,
         )?;
     }
+
+    // Create the `README.md` file.
+    let filename = canonical_path.join(README_PATH.as_path());
+    let pre_commit = registry.render("readme", &json!({}))?;
+    fsx::create_dir_all(filename.parent().unwrap())?;
+
+    fsx::write(
+        filename,
+        pre_commit,
+    )?;
 
     // Create the `main.py` file.
     let filename = canonical_path.join(SERVER_SOURCE_PATH.as_path());
