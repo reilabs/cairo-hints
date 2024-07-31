@@ -127,6 +127,8 @@ pub fn serialize_cairo_serde(
             let message_config = config.messages.get(message_ty).expect(
                 format!("Key `{message_ty}` not found in configuration JSON file").as_str(),
             );
+            println!("message_config {message_config:?}");
+            println!("value {value:?}");
             let value = value
                 .as_object()
                 .expect(format!("must be an object to serialize as message {message_ty}").as_str());
