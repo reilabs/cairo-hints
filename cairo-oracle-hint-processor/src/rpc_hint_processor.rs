@@ -284,11 +284,16 @@ impl<'a> Rpc1HintProcessor<'a> {
                     )))
                 })?;
             print!("Response: {response_json}");
-            let output = response_json.get("result").ok_or_else(|| {
-                HintError::CustomHint(Box::from("Missing 'result' field in response"))
-            })?;
+            let output = if response_json.is_object() {
+                response_json
+            } else {
+                return Err(HintError::CustomHint(Box::from(format!(
+                    "Unexpected response format. Expected an object, got: {:?}",
+                    response_json
+                ))));
+            };            
 
-            let data = serialize_cairo_serde(self.configuration, &configuration.output, output);
+            let data = serialize_cairo_serde(self.configuration, &configuration.output, &output);
             res_segment.write_data(data.iter()).map_err(|e| {
                 HintError::CustomHint(Box::from(format!(
                     "Failed to write data to result segment: {}",
