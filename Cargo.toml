@@ -22,29 +22,28 @@ bincode = { version = "2.0.0-rc.3", default-features = false, features = [
     "serde",
 ] }
 bytes = "1.5.0"
-cairo-lang-casm = { version = "2.7.0-rc.3" }
-cairo-lang-compiler = { version = "2.7.0-rc.3" }
-cairo-lang-filesystem = { version = "2.7.0-rc.3" }
-cairo-lang-runner = { version = "2.7.0-rc.3" }
-cairo-lang-sierra = { version = "2.7.0-rc.3" }
-cairo-lang-sierra-ap-change = { version = "2.7.0-rc.3", default-features = false }
-cairo-lang-sierra-gas = { version = "2.7.0-rc.3", default-features = false }
-cairo-lang-sierra-to-casm = { version = "2.7.0-rc.3" }
-cairo-lang-sierra-generator = { version = "2.7.0-rc.3" }
-cairo-lang-sierra-type-size = { version = "2.7.0-rc.3", default-features = false }
-cairo-lang-starknet = { version = "2.7.0-rc.3" }
+cairo-lang-casm = { version = "2.7.0" }
+cairo-lang-compiler = { version = "2.7.0" }
+cairo-lang-filesystem = { version = "2.7.0" }
+cairo-lang-runner = { version = "2.7.0" }
+cairo-lang-sierra = { version = "2.7.0" }
+cairo-lang-sierra-ap-change = { version = "2.7.0", default-features = false }
+cairo-lang-sierra-gas = { version = "2.7.0", default-features = false }
+cairo-lang-sierra-to-casm = { version = "2.7.0" }
+cairo-lang-sierra-generator = { version = "2.7.0" }
+cairo-lang-sierra-type-size = { version = "2.7.0", default-features = false }
+cairo-lang-starknet = { version = "2.7.0" }
 cairo-lang-hints-test-runner = { path = "./cairo-lang-hints-test-runner", version = "0.1.0" }
-cairo-lang-test-plugin = { version = "2.7.0-rc.3" }
-cairo-lang-utils = { version = "2.7.0-rc.3" }
+cairo-lang-test-plugin = { version = "2.7.0" }
+cairo-lang-utils = { version = "2.7.0" }
 cairo-oracle-hint-processor = { path = "./cairo-oracle-hint-processor", version = "0.1.0" }
 cairo-proto-build = { path = "./cairo-proto-build", default-features = false, version = "0.1.0" }
 cairo-proto-serde = { path = "./cairo-proto-serde", version = "0.1.0" }
-# cairo-vm = { version = "0.9.1", features = ["cairo-1-hints"] }
 cairo-felt = "0.9.1"
-cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm", rev = "24c2349", features = [
+cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm", rev = "v1.0.0", features = [
     "std",
     "cairo-1-hints",
-] } #v1.0.0-rc6
+] }
 camino = "1.1.6"
 clap = { version = "4.3.10", features = ["derive"] }
 colored = "2.1.0"
@@ -64,7 +63,7 @@ prost = "0.12.3"
 prost-types = "0.12.3"
 rayon = "1.8.1"
 reqwest = { version = "0.11.23", features = ["blocking", "json"] }
-scarb = { git = "https://github.com/software-mansion/scarb.git", rev = "v2.7.0-rc.3" }
+scarb = { git = "https://github.com/software-mansion/scarb.git", rev = "v2.7.0" }
 scarb-metadata = "1.12.0"
 scarb-ui = "0.1.5"
 serde = { version = "1.0.195", features = ["derive"] }
