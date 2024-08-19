@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::iter;
 
 use cairo_proto_serde::configuration::{
-    Configuration, Field, FieldType, Mapping, MethodDeclaration,
+    Configuration, Field, FieldType, Mapping, MethodDeclaration, PrimitiveType,
 };
 use heck::ToTitleCase;
 use itertools::{Either, Itertools};
@@ -631,6 +631,22 @@ impl<'a> CodeGenerator<'a> {
                 if type_name.starts_with(".orion.") {
                     let type_name = type_name.trim_start_matches(".orion.");
                     self.add_import(&format!("use orion_numbers::{};", type_name));
+
+                    // Add the orion type to the configuration
+                    if !self
+                        .serde_config
+                        .messages
+                        .contains_key(&format!("orion::{}", type_name))
+                    {
+                        self.serde_config.messages.insert(
+                            format!("orion::{}", type_name),
+                            vec![Field {
+                                name: "d".to_string(),
+                                ty: FieldType::Primitive(PrimitiveType::I64),
+                            }],
+                        );
+                    }
+
                     type_name.to_string()
                 } else {
                     self.resolve_ident(type_name)

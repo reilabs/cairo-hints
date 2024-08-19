@@ -362,6 +362,7 @@ impl Config {
     ) -> std::io::Result<HashMap<Module, (String, Configuration)>> {
         let mut modules = HashMap::new();
         let mut packages = HashMap::new();
+        let mut orion_config = Configuration::default();
 
         let message_graph = MessageGraph::new(requests.iter().map(|x| &x.1))
             .map_err(|error| Error::new(ErrorKind::InvalidInput, error))?;
@@ -369,32 +370,44 @@ impl Config {
             .map_err(|error| Error::new(ErrorKind::InvalidInput, error))?;
 
         for (request_module, request_fd) in requests {
-            // Skip generation for the orion package
-            if request_fd.package == Some("orion".to_string()) {
-                continue;
-            }
-
             // Only record packages that have services
             if !request_fd.service.is_empty() {
                 packages.insert(request_module.clone(), request_fd.package().to_string());
             }
-            let (code_buf, config_buf) =
-                modules.entry(request_module.clone()).or_insert_with(|| {
-                    let mut init_buf = String::new();
-                    Config::append_header(&mut init_buf);
-                    (init_buf, Configuration::default())
-                });
-            CodeGenerator::generate(
-                self,
-                &message_graph,
-                &extern_paths,
-                request_fd,
-                code_buf,
-                config_buf,
-            );
-            if code_buf.is_empty() {
-                // Did not generate any code, remove from list to avoid inclusion in include file or output file list
-                modules.remove(&request_module);
+
+            if request_fd.package() == "orion" {
+                // Process orion package for configuration only
+                let mut dummy_buf = String::new();
+                CodeGenerator::generate(
+                    self,
+                    &message_graph,
+                    &extern_paths,
+                    request_fd,
+                    &mut dummy_buf,
+                    &mut orion_config,
+                );
+            } else {
+                // Process non-orion packages normally
+                let (code_buf, config_buf) =
+                    modules.entry(request_module.clone()).or_insert_with(|| {
+                        let mut init_buf = String::new();
+                        Config::append_header(&mut init_buf);
+                        (init_buf, Configuration::default())
+                    });
+
+                CodeGenerator::generate(
+                    self,
+                    &message_graph,
+                    &extern_paths,
+                    request_fd,
+                    code_buf,
+                    config_buf,
+                );
+
+                if code_buf.is_empty() {
+                    // Did not generate any code, remove from list to avoid inclusion in include file or output file list
+                    modules.remove(&request_module);
+                }
             }
         }
 
