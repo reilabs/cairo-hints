@@ -39,6 +39,7 @@ pub struct CodeGenerator<'a> {
     path: Vec<i32>,
     code_buf: &'a mut String,
     serde_config: &'a mut Configuration,
+    imports: Vec<String>,
 }
 
 fn push_indent(buf: &mut String, depth: u8) {
@@ -47,7 +48,18 @@ fn push_indent(buf: &mut String, depth: u8) {
     }
 }
 
+pub fn should_generate_file(file: &FileDescriptorProto) -> bool {
+    // Skip generation for the orion package
+    !file.package.as_ref().map_or(false, |p| p == "orion")
+}
+
 impl<'a> CodeGenerator<'a> {
+    fn add_import(&mut self, import: &str) {
+        if !self.imports.contains(&import.to_string()) {
+            self.imports.push(import.to_string());
+        }
+    }
+
     pub fn generate(
         config: &mut Config,
         message_graph: &MessageGraph,
@@ -56,6 +68,10 @@ impl<'a> CodeGenerator<'a> {
         code_buf: &mut String,
         serde_config: &mut Configuration,
     ) {
+        if !should_generate_file(&file) {
+            return;
+        }
+
         let source_info = file.source_code_info.map(|mut s| {
             s.location.retain(|loc| {
                 let len = loc.path.len();
@@ -83,6 +99,7 @@ impl<'a> CodeGenerator<'a> {
             path: Vec::new(),
             code_buf,
             serde_config,
+            imports: Vec::new(),
         };
 
         debug!(
@@ -115,6 +132,10 @@ impl<'a> CodeGenerator<'a> {
         }
 
         code_gen.path.pop();
+
+        // Add imports at the beginning of the file
+        let imports = code_gen.imports.join("\n");
+        code_gen.code_buf.insert_str(0, &format!("{}\n\n", imports));
     }
 
     fn append_enum(&mut self, desc: EnumDescriptorProto) {
@@ -255,7 +276,7 @@ impl<'a> CodeGenerator<'a> {
         self.push_indent();
         self.code_buf.push_str("#[derive(Drop, Serde)]\n");
         self.push_indent();
-        self.code_buf.push_str("struct ");
+        self.code_buf.push_str("pub(crate) struct ");
         self.code_buf.push_str(&struct_name);
         self.code_buf.push_str(" {\n");
 
@@ -388,6 +409,7 @@ impl<'a> CodeGenerator<'a> {
         let field_name = to_snake(field.name());
 
         self.push_indent();
+        self.code_buf.push_str("pub(crate) ");
         self.code_buf.push_str(&field_name);
         self.code_buf.push_str(": ");
 
@@ -518,7 +540,7 @@ impl<'a> CodeGenerator<'a> {
         // Generate a trait for the service.
         self.code_buf.push_str("#[generate_trait]\n");
         self.code_buf.push_str(&format!(
-            "impl {} of {}Trait {{\n",
+            "pub(crate) impl {} of {}Trait {{\n",
             &service.name, &service.name
         ));
 
@@ -592,7 +614,7 @@ impl<'a> CodeGenerator<'a> {
         self.code_buf.push_str("}\n");
     }
 
-    fn resolve_type(&self, field: &FieldDescriptorProto) -> String {
+    fn resolve_type(&mut self, field: &FieldDescriptorProto) -> String {
         match field.r#type() {
             Type::Float => panic!("Float type not supported"),
             Type::Double => panic!("Double type not supported"),
@@ -604,13 +626,28 @@ impl<'a> CodeGenerator<'a> {
             Type::String if field.name().contains("felt252_") => String::from("felt252"),
             Type::String => String::from("ByteArray"),
             Type::Bytes => String::from("ByteArray"),
-            Type::Group | Type::Message | Type::Enum => self.resolve_ident(field.type_name()),
+            Type::Group | Type::Message | Type::Enum => {
+                let type_name = field.type_name();
+                if type_name.starts_with(".orion.") {
+                    let type_name = type_name.trim_start_matches(".orion.");
+                    self.add_import(&format!("use orion_numbers::{};", type_name));
+                    type_name.to_string()
+                } else {
+                    self.resolve_ident(type_name)
+                }
+            }
         }
     }
 
-    fn resolve_ident(&self, pb_ident: &str) -> String {
+    fn resolve_ident(&mut self, pb_ident: &str) -> String {
         // protoc should always give fully qualified identifiers.
         assert_eq!(".", &pb_ident[..1]);
+
+        if pb_ident.starts_with(".orion.") {
+            let type_name = pb_ident.trim_start_matches(".orion.");
+            self.add_import(&format!("use orion_numbers::{};", type_name));
+            return type_name.to_string();
+        }
 
         if let Some(proto_ident) = self.extern_paths.resolve_ident(pb_ident) {
             return proto_ident;
@@ -657,7 +694,11 @@ impl<'a> CodeGenerator<'a> {
     }
 
     fn remove_super(&self, input: &str) -> String {
-        input.split("super::").last().unwrap().to_string()
+        if input.contains("F64") {
+            "orion::F64".to_string()
+        } else {
+            input.split("super::").last().unwrap().to_string()
+        }
     }
 
     /// Returns `true` if the field options includes the `deprecated` option.

@@ -369,6 +369,11 @@ impl Config {
             .map_err(|error| Error::new(ErrorKind::InvalidInput, error))?;
 
         for (request_module, request_fd) in requests {
+            // Skip generation for the orion package
+            if request_fd.package == Some("orion".to_string()) {
+                continue;
+            }
+
             // Only record packages that have services
             if !request_fd.service.is_empty() {
                 packages.insert(request_module.clone(), request_fd.package().to_string());

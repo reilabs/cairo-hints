@@ -13,6 +13,8 @@ pub const ORACLE_SOURCE_PATH: Lazy<Utf8PathBuf> =
 pub const CAIRO_MANIFEST_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["Scarb.toml"].iter().collect());
 pub const PROTO_SOURCE_PATH: Lazy<Utf8PathBuf> =
     Lazy::new(|| ["proto", "oracle.proto"].iter().collect());
+pub const ORION_PROTO_SOURCE_PATH: Lazy<Utf8PathBuf> =
+    Lazy::new(|| ["proto", "orion.proto"].iter().collect());
 pub const ORACLE_LOCK_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["Oracle.lock"].iter().collect());
 pub const SERVERS_JSON_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["servers.json"].iter().collect());
 pub const TOOL_VERSIONS_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| [".tool-versions"].iter().collect());
@@ -112,6 +114,8 @@ pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Confi
                 syntax = "proto3";
 
                 package oracle;
+                
+                import "orion.proto";
 
                 message Request {
                     uint64 n = 1;
@@ -124,6 +128,25 @@ pub fn mk_cairo(canonical_path: &Utf8PathBuf, name: &PackageName, config: &Confi
                 service SqrtOracle {
                     rpc Sqrt(Request) returns (Response);
                 }
+            "#},
+        )?;
+    }
+
+    // Create the `orion.proto` file.
+    let filename = canonical_path.join(ORION_PROTO_SOURCE_PATH.as_path());
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
+
+        fsx::write(
+            filename,
+            indoc! {r#"
+                syntax = "proto3";
+
+                package orion;
+
+                message F64 {
+                    int64 d = 1;
+                }                
             "#},
         )?;
     }
