@@ -162,7 +162,7 @@ pip install -r python/requirements.txt
 Then we can run the server:
 
 ```bash
-uvicorn python/src.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn python/src.main:app --host 0.0.0.0 --port 3000 --reload
 # or
 python python/src/main.py
 ```
@@ -379,3 +379,87 @@ Now we can run the cairo program with `scarb hints-run --layout all_cairo` and i
 ```bash
 scarb hints-run --layout all_cairo
 ```
+
+### Adding a preprocessing step
+
+If we want to add a preprocessing step to the server we can do it by adding a new endpoint to the server and modifying the `main.py` file. This preprocessing step will be executed before the actual call to the cairo code. This is useful if we need to do some computation like gathering data, transforming data or get information from the database prior to passing it to cairo.
+
+The following is an example of the `main.py` file with the preprocessing step:
+
+```python
+@app.post("/preprocess")
+async def pre(request: Request):
+    data = await request.json()
+    print(f"Preprocessing data: {data}")
+    return {"args": ""}
+```
+
+This will create a new endpoint `/preprocess` that will receive the data from the request and will print it to the console. This is useful to see the data that is being passed to the server.
+
+Here we do the following:
+
+- We create a new endpoint `/preprocess` that will receive the data from the request.
+- Get the json data from the response.
+- Execute the preprocessing step.
+- Return the result as the arguments that will be passed to the cairo code. The arguments are passed as a single string reflecting the arguments that will be passed to the cairo code.
+
+Then this args will be passed to the main function in the `lib.cairo` file.
+
+This a way to test this is directly using the `hints-run` command:
+
+```bash
+scarb hints-run --no-build --args "some_value"
+```
+
+### Bringing it all together with Orion Runner
+
+Orion Runner is our main entrypoint to the agent, this means that the call will be directed to the Orion Runner service, execute the preprocessing step and execute cairo using the hints. This is how the agent is going to be used in the real world.
+
+For simplicity we provide a docker image of the orion runner that can be easily used to run the agent. The docker image is available in the `europe-west1-docker.pkg.dev/giza-platform-common/platform-images/orion-runner` repository.
+
+To run the docker image first we need to create the `repository` where the needed files should be stored. This repository folder looks like this:
+
+```
+repository/
+├── graph.onnx // Optional. Only if using ONNX.
+└── programs
+    ├── program1.sierra.json
+    └── program2.sierra.json
+├── Oracle.lock // Optional. Only for hints.
+├── servers.json // Optional. Only for hints. 
+```
+
+As we will be using docker, we will need to tell the docker container where to call the python server that its running locally, for this we need to update  the `servers.json`:
+
+```json
+{
+    "sqrt": {
+        "server_url": "http://host.docker.internal:3000",
+        "polling_config": {
+            "max_attempts": 30,
+            "polling_interval": 2,
+            "request_timeout": 60,
+            "overall_timeout": 300
+        }
+    }
+}
+
+Then we can run the docker image with the following command:
+
+```bash
+docker run -it --rm -p 8080:8080  \
+  -e REGISTRY_URL="file:///app/registry" \
+  -e PREPROCESS_URL="http://host.docker.internal:3000/preprocess" \ # Here we suppose that your python server is running locally
+  -v /your/path/to/registry:/app/registry \
+  orion-runner
+```
+
+When the image is running we can do the E2E test with the following command:
+
+```bash
+curl -X POST http://localhost:8080/agent_run \
+     -H "Content-Type: application/json" \
+     -d '{"preprocess":true, "preprocess_body":{"key1": "value1", "key2": "value2"}}'
+```
+
+The `preprocess` key is used to tell the Orion Runner to execute the preprocessing step and the `preprocess_body` is the data that will be passed to the server. The body can be any json that the preprocessing expects.

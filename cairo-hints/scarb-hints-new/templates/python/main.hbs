@@ -7,6 +7,19 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
+# This is the preprocessing step, this will be called before executing the cairo code
+# Make sure that any process that you need to do before executing the cairo code is done here
+@app.post("/preprocess")
+async def pre(request: Request):
+    # Get the data from the request
+    data = await request.json()
+    # Do the preprocessing here
+    print(f"Preprocessing data: {data}")
+
+    # The data that its returned here must be a string with the arguments that will be passed to the cairo code
+    # This means that it should be formated in a way that the cairo code can understand
+    return {"args": ""}
+
 class Job:
     def __init__(self, status: str = "processing"):
         self.status = status
@@ -19,12 +32,13 @@ class Job:
 jobs = {}
 
 # Mimic a long running process
-def preprocess(number: int, job: Job = None):
+def sqrt_job(number: int, job: Job = None):
     """
-    Preprocesses the data and sets the result of the provided job.
+    Execute the SQRT as a job or synchronously.
 
     Args:
-        job (Job, optional): The job to set the result for. Defaults to None.
+        number: The number to calculate the square root.
+        job: The job object to store the result.
 
     Returns:
         dict: A dictionary containing the status and result of the preprocessing.
@@ -54,11 +68,11 @@ def pre(number: SqrtRequest, background_taks: BackgroundTasks, sync: bool = True
         job_id = str(uuid4())
         job = Job()
         jobs[job_id] = job
-        background_taks.add_task(preprocess, number.n, job)
+        background_taks.add_task(sqrt_job, number.n, job)
         print(jobs)
         result = {"job_id": job_id}
     else:
-        result = preprocess(number.n)
+        result = sqrt_job(number.n)
     return result
 
 @app.get("/status/{job_id}", status_code=status.HTTP_200_OK)
