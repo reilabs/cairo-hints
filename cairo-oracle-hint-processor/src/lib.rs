@@ -132,29 +132,23 @@ pub fn run_1(
     layout: &LayoutName,
     trace_file: &Option<PathBuf>,
     memory_file: &Option<PathBuf>,
+    cairo_pie_output: &Option<PathBuf>,
+    air_public_input: &Option<PathBuf>,
+    air_private_input: &Option<PathBuf>,
     args: &FuncArgs,
     sierra_program: &SierraProgram,
     entry_func_name: &str,
     proof_mode: bool,
 ) -> Result<Option<String>, Error> {
-    // let compiler_config = CompilerConfig {
-    //     replace_ids: true,
-    //     ..CompilerConfig::default()
-    // };
-
-    // let sierra_program = (*compile_cairo_project_at_path(&args.filename, compiler_config)
-    //     .map_err(|err| Error::SierraCompilation(err.to_string()))?)
-    // .clone();
-
     let cairo_run_config = Cairo1RunConfig {
         proof_mode: proof_mode,
+        serialize_output: true,
         relocate_mem: memory_file.is_some(), //|| air_public_input.is_some(),
         layout: *layout,
         trace_enabled: trace_file.is_some(), //|| args.air_public_input.is_some(),
         args: &args.0,
-        finalize_builtins: false,
-        serialize_output: true,
-        append_return_values: false, //args.air_private_input.is_some() || args.cairo_pie_output.is_some(),
+        finalize_builtins: cairo_pie_output.is_some(),
+        append_return_values: false,
     };
 
     let (runner, _vm, return_values) = cairo_run::cairo_run_program(
@@ -163,6 +157,40 @@ pub fn run_1(
         configuration,
         entry_func_name,
     )?;
+
+    if let Some(file_path) = air_public_input {
+        let json = runner.get_air_public_input()?.serialize_json()?;
+        std::fs::write(file_path, json)?;
+    }
+
+    if let (Some(file_path), Some(trace_file), Some(memory_file)) =
+        (air_private_input, trace_file.clone(), memory_file.clone())
+    {
+        // Get absolute paths of trace_file & memory_file
+        let trace_path = trace_file
+            .as_path()
+            .canonicalize()
+            .unwrap_or(trace_file.clone())
+            .to_string_lossy()
+            .to_string();
+        let memory_path = memory_file
+            .as_path()
+            .canonicalize()
+            .unwrap_or(memory_file.clone())
+            .to_string_lossy()
+            .to_string();
+
+        let json = runner
+            .get_air_private_input()
+            .to_serializable(trace_path, memory_path)
+            .serialize_json()
+            .map_err(PublicInputError::Serde)?;
+        std::fs::write(file_path, json)?;
+    }
+
+    if let Some(ref file_path) = cairo_pie_output {
+        runner.get_cairo_pie()?.write_zip_file(file_path)?
+    }
 
     if let Some(trace_path) = trace_file {
         let relocated_trace = runner
