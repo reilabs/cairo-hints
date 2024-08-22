@@ -29,7 +29,9 @@ use cairo_lang_sierra_to_casm::{
     metadata::calc_metadata_ap_change_only,
 };
 use cairo_lang_sierra_type_size::get_type_size_map;
-use cairo_lang_utils::{bigint::BigIntAsHex, casts::IntoOrPanic, unordered_hash_map::UnorderedHashMap};
+use cairo_lang_utils::{
+    bigint::BigIntAsHex, casts::IntoOrPanic, unordered_hash_map::UnorderedHashMap,
+};
 use cairo_proto_serde::configuration::Configuration;
 use cairo_vm::{
     hint_processor::cairo_1_hint_processor::hint_processor::Cairo1HintProcessor,
@@ -315,9 +317,6 @@ pub fn cairo_run_program(
 
     Ok((runner, return_values, serialized_output))
 }
-
-
-
 
 #[allow(clippy::type_complexity)]
 fn build_hints_vec<'b>(

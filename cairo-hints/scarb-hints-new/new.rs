@@ -27,6 +27,7 @@ pub struct InitOptions {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct NewResult {
     pub name: PackageName,
 }

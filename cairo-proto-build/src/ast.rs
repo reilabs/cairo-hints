@@ -2,6 +2,7 @@ use prost_types::source_code_info::Location;
 
 /// Comments on a Protobuf item.
 #[derive(Debug, Default, Clone)]
+#[allow(dead_code)]
 pub struct Comments {
     /// Leading detached blocks of comments.
     pub leading_detached: Vec<Vec<String>>,
@@ -38,44 +39,46 @@ impl Comments {
 
 /// A service descriptor.
 #[derive(Debug, Clone)]
-pub struct Service {
+#[allow(dead_code)]
+pub(crate) struct Service {
     /// The service name in Rust style.
-    pub name: String,
+    pub(crate) name: String,
     /// The service name as it appears in the .proto file.
-    pub proto_name: String,
+    pub(crate) proto_name: String,
     /// The package name as it appears in the .proto file.
-    pub package: String,
+    pub(crate) package: String,
     /// The service comments.
-    pub comments: Comments,
+    pub(crate) comments: Comments,
     /// The service methods.
-    pub methods: Vec<Method>,
+    pub(crate) methods: Vec<Method>,
     /// The service options.
-    pub options: prost_types::ServiceOptions,
+    pub(crate) options: prost_types::ServiceOptions,
 }
 
 /// A service method descriptor.
 #[derive(Debug, Clone)]
-pub struct Method {
+#[allow(dead_code)]
+pub(crate) struct Method {
     /// The name of the method in Rust style.
-    pub name: String,
+    pub(crate) name: String,
     /// The name of the method as it appears in the .proto file.
-    pub proto_name: String,
+    pub(crate) proto_name: String,
     /// The method comments.
-    pub comments: Comments,
+    pub(crate) comments: Comments,
     /// The input Rust type.
-    pub input_type: String,
+    pub(crate) input_type: String,
     /// The output Rust type.
-    pub output_type: String,
+    pub(crate) output_type: String,
     /// The input Protobuf type.
-    pub input_proto_type: String,
+    pub(crate) input_proto_type: String,
     /// The output Protobuf type.
-    pub output_proto_type: String,
+    pub(crate) output_proto_type: String,
     /// The method options.
-    pub options: prost_types::MethodOptions,
+    pub(crate) options: prost_types::MethodOptions,
     /// Identifies if client streams multiple client messages.
-    pub client_streaming: bool,
+    pub(crate) client_streaming: bool,
     /// Identifies if server streams multiple server messages.
-    pub server_streaming: bool,
+    pub(crate) server_streaming: bool,
 }
 
 #[cfg(not(feature = "cleanup-markdown"))]

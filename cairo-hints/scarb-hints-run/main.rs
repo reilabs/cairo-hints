@@ -23,38 +23,53 @@ mod deserialization;
 
 /// Execute the main function of a package.
 #[derive(Parser, Clone, Debug)]
-#[command(author, version)]
+#[clap(author, version, about, long_about = None)]
 struct Args {
     /// Name of the package.
-    #[command(flatten)]
+    #[clap(flatten)]
     packages_filter: PackagesFilter,
 
     /// Do not rebuild the package.
-    #[arg(long, default_value_t = false)]
+    #[clap(long, default_value_t = false)]
     no_build: bool,
 
     #[clap(long = "layout", default_value = "all_cairo", value_parser=validate_layout)]
     layout: String,
 
-    #[arg(long, default_value_t = false)]
+    #[clap(long, default_value_t = false)]
     proof_mode: bool,
 
+    #[clap(
+        long = "cairo_pie_output",
+        conflicts_with_all = ["proof_mode", "air_private_input", "air_public_input"]
+    )]
+    cairo_pie_output: Option<PathBuf>,
+
+    #[clap(long = "air_public_input", requires = "proof_mode")]
+    air_public_input: Option<PathBuf>,
+
+    #[clap(
+        long = "air_private_input",
+        requires_all = ["proof_mode", "trace_file", "memory_file"] 
+    )]
+    air_private_input: Option<PathBuf>,
+
     /// Configuration file for oracle servers.
-    #[arg(long)]
+    #[clap(long)]
     servers_config_file: Option<PathBuf>,
 
     /// Oracle lock file path.
-    #[arg(long)]
+    #[clap(long)]
     oracle_lock: Option<PathBuf>,
 
-    #[arg(long)]
+    #[clap(long)]
     trace_file: Option<PathBuf>,
 
-    #[arg(long)]
+    #[clap(long)]
     memory_file: Option<PathBuf>,
 
     /// Arguments of the Cairo function.
-    #[arg(long = "args", default_value = "", value_parser=process_args)]
+    #[clap(long = "args", default_value = "", value_parser=process_args)]
     args: FuncArgs,
 }
 
@@ -195,6 +210,9 @@ fn main() -> Result<(), Error> {
         &str_into_layout(&args.layout),
         &args.trace_file,
         &args.memory_file,
+        &args.cairo_pie_output,
+        &args.air_public_input,
+        &args.air_private_input,
         &args.args,
         &sierra_program,
         "::main",
