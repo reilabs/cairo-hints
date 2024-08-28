@@ -494,7 +494,7 @@ dependencies = [
 
 [[package]]
 name = "cairo-hints"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "bincode",
@@ -653,7 +653,7 @@ dependencies = [
 
 [[package]]
 name = "cairo-lang-hints-test-runner"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "cairo-felt",
@@ -1108,7 +1108,7 @@ dependencies = [
 
 [[package]]
 name = "cairo-oracle-hint-processor"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "bincode",
@@ -1140,7 +1140,7 @@ dependencies = [
 
 [[package]]
 name = "cairo-proto-build"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytes",
  "cairo-proto-serde",
@@ -1158,7 +1158,7 @@ dependencies = [
 
 [[package]]
 name = "cairo-proto-serde"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cairo-lang-runner",
  "cairo-vm 1.0.0 (git+https://github.com/lambdaclass/cairo-vm?rev=v1.0.0)",
