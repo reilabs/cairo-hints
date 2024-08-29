@@ -1,0 +1,74 @@
+steps:
+  - name: "ubuntu"
+    script: |
+      sed -n 's/^name = "\(.*\)"/\1/p' Scarb.toml > project_name.txt
+      sed -n 's/^version = "\(.*\)"/\1/p' Scarb.toml > version.txt
+    id: GET_PROJECT_NAME
+    waitFor: ["-"]
+  - name: "gcr.io/cloud-builders/docker"
+    script: |
+      docker build -t europe-west1-docker.pkg.dev/giza-platform-common/agents/$(cat project_name.txt):$(cat version.txt) .
+      docker push europe-west1-docker.pkg.dev/giza-platform-common/agents/$(cat project_name.txt):$(cat version.txt)
+    id: PUSH_PYTHON_SERVER
+    waitFor: ["GET_PROJECT_NAME"]
+
+  - name: "ubuntu"
+    script: |
+      apt-get update
+      apt-get install -y curl
+      sleep 1
+      curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh -s -- -v 2.7.0
+      $HOME/.local/bin/scarb build
+    id: BUILD_CAIRO
+
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk:stable"
+    env:
+      - "AGENTS_BUCKET=${_AGENTS_BUCKET}"
+      - "CLOUDSDK_CONTAINER_CLUSTER=agents"
+    script: |
+      servers_file=$(find . -path "./registry" -prune -o -name "servers.json" -print)
+      oracle_file=$(find . -path "./registry" -prune -o -name "Oracle.lock" -print)
+      sierra_file=$(find . -path "./registry" -prune -o -name "*.sierra.json" -print)
+      if [ -z "$servers_file" ] || [ -z "$oracle_file" ] || [ -z "$sierra_file" ]; then
+        echo "Missing required files"
+        exit 1
+      fi
+      registry_path="$AGENTS_BUCKET/$(cat project_name.txt)/$(cat version.txt)/registry"
+      echo $registry_path > registry_path.txt
+      gcloud storage cp $servers_file $registry_path/servers.json
+      gcloud storage cp $oracle_file $registry_path/Oracle.lock
+      gcloud storage cp $sierra_file $registry_path/programs/$(basename $sierra_file)
+    id: UPLOAD_REGISTRY
+    waitFor:
+      - BUILD_CAIRO
+
+  - name: "ubuntu"
+    script: |
+      sed -i s@%AGENT_NAME%@$(cat project_name.txt)@g run-service.yaml
+      sed -i s@%PYTHON_SERVER_IMAGE%@$(cat project_name.txt):$(cat version.txt)@g run-service.yaml
+      sed -i s@%REGISTRY_PATH%@$(cat registry_path.txt)@g run-service.yaml
+    id: REPLACE_YAML_VALUE
+    waitFor:
+      - UPLOAD_REGISTRY
+
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk:stable"
+    entrypoint: gcloud
+    args:
+      [
+        "run",
+        "services",
+        "replace",
+        "run-service.yaml",
+        "--region",
+        "europe-west1",
+      ]
+    id: DEPLOY_MULTICONTAINER
+    waitFor:
+      - PUSH_PYTHON_SERVER
+      - REPLACE_YAML_VALUE
+
+substitutions:
+  _AGENTS_BUCKET: gs://giza-platfrom-misc
+
+options:
+  dynamic_substitutions: true
