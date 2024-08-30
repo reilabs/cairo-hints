@@ -72,6 +72,7 @@ enum InputType {
     Bool,
     Struct(String),
     Array(Box<InputType>),
+    Span(Box<InputType>),
 }
 
 #[derive(Debug, Clone)]
@@ -125,6 +126,12 @@ pub fn parse_input_schema(file_path: &PathBuf) -> Result<InputSchema, String> {
     Ok(input_schema)
 }
 
+pub fn process_json_args(json_str: &str, schema: &InputSchema) -> Result<FuncArgs, String> {
+    let json: Value =
+        serde_json::from_str(json_str).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    parse_struct(&json, &schema.main_struct, schema)
+}
+
 fn parse_type(type_str: &str) -> Result<InputType, String> {
     match type_str {
         "u64" => Ok(InputType::U64),
@@ -142,14 +149,12 @@ fn parse_type(type_str: &str) -> Result<InputType, String> {
             let inner_type = s.trim_start_matches("Array<").trim_end_matches('>');
             Ok(InputType::Array(Box::new(parse_type(inner_type)?)))
         }
+        s if s.starts_with("Span<") => {
+            let inner_type = s.trim_start_matches("Span<").trim_end_matches('>');
+            Ok(InputType::Span(Box::new(parse_type(inner_type)?)))
+        }
         s => Ok(InputType::Struct(s.to_string())),
     }
-}
-
-pub fn process_json_args(json_str: &str, schema: &InputSchema) -> Result<FuncArgs, String> {
-    let json: Value =
-        serde_json::from_str(json_str).map_err(|e| format!("Failed to parse JSON: {}", e))?;
-    parse_struct(&json, &schema.main_struct, schema)
 }
 
 fn parse_struct(
@@ -237,6 +242,26 @@ fn parse_value(
                     .collect(),
             )])
         }
+        InputType::Span(inner_type) => {
+            let array = value
+                .as_array()
+                .ok_or_else(|| "Expected array".to_string())?;
+            let mut result = Vec::new();
+            for item in array {
+                let parsed = parse_value(item, inner_type, schema)?;
+                result.extend(parsed);
+            }
+            Ok(vec![FuncArg::Array(
+                result
+                    .into_iter()
+                    .flat_map(|arg| match arg {
+                        FuncArg::Single(felt) => vec![felt],
+                        FuncArg::Array(arr) => arr,
+                    })
+                    .collect(),
+            )])
+        }
+
         InputType::Struct(struct_name) => {
             parse_struct(value, struct_name, schema).map(|func_args| func_args.0)
         }
@@ -278,7 +303,7 @@ mod tests {
             a: u32
             b: felt252
             c: Array<i32>
-            d: Array<NestedStruct>
+            d: Span<NestedStruct>
             e: ByteArray
             f: AnotherNestedStruct
         }
