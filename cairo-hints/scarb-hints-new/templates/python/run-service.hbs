@@ -1,0 +1,39 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  annotations:
+    run.googleapis.com/launch-stage: ALPHA
+  name: %AGENT_NAME%-api
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/container-dependencies: '{"agent-runner":["python-server"]}'
+    spec:
+      containers:
+        - image: "europe-west1-docker.pkg.dev/giza-platform-common/platform-images/orion-runner:0.2.6preb44771"
+          name: agent-runner
+          ports:
+            - containerPort: 8080
+          env:
+          - name: REGISTRY_URL
+            value: "%REGISTRY_PATH%"
+          - name: PREPROCESS_URL
+            value: 'http://localhost:8888/preprocess'
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+        - image: "europe-west1-docker.pkg.dev/giza-platform-common/agents/%PYTHON_SERVER_IMAGE%"
+          name: python-server
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          startupProbe:
+            timeoutSeconds: 240
+            periodSeconds: 240
+            failureThreshold: 1
+            tcpSocket:
+              port: 8888

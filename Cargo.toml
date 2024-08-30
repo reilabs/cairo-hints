@@ -10,7 +10,7 @@ members = [
 exclude = ["examples/rust_complex/rust", "examples/rust_sqrt/rust"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 repository = "https://github.com/reilabs/cairo-hints/"
 license = "Apache-2.0"

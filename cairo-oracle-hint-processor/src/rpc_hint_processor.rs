@@ -142,7 +142,7 @@ impl<'a> Rpc1HintProcessor<'a> {
                 .send()
                 .map_err(|e| {
                     HintError::CustomHint(Box::from(format!(
-                        "Failed to send request to oracle server {}: {}",
+                        "Failed to send polling request to oracle server {}: {}",
                         server_url, e
                     )))
                 })?;
@@ -263,6 +263,7 @@ impl<'a> Rpc1HintProcessor<'a> {
             let response = client
                 .post(server_url.clone())
                 .json(&data)
+                .timeout(Duration::from_secs(240))
                 .header("x-admin-api-key", "qwerty")
                 .send()
                 .map_err(|e| {

@@ -14,6 +14,9 @@ pub const GITIGNORE_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| [".gitignore"].iter()
 pub const README_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["README.md"].iter().collect());
 pub const DOCKERFILE_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["Dockerfile"].iter().collect());
 pub const PRE_COMMIT_CONFIG: Lazy<Utf8PathBuf> = Lazy::new(|| [".pre-commit-config.yaml"].iter().collect());
+pub const CLOUDBUILD_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["cloudbuild.yaml"].iter().collect());
+pub const RUN_SERVICE_PATH: Lazy<Utf8PathBuf> = Lazy::new(|| ["run-service.yaml"].iter().collect());
+
 
 pub fn mk_python(canonical_path: &Utf8PathBuf, _: &PackageName, _config: &Config) -> Result<()> {
     // Get the templates registry
@@ -82,6 +85,28 @@ pub fn mk_python(canonical_path: &Utf8PathBuf, _: &PackageName, _config: &Config
         fsx::write(
             filename,
             registry.render("gitignore", &json!({}))?
+        )?;
+    }
+
+    // Create the `cloudbuild.yaml` file.
+    let filename = canonical_path.join(CLOUDBUILD_PATH.as_path());
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
+
+        fsx::write(
+            filename,
+            registry.render("cloudbuild", &json!({}))?
+        )?;
+    }
+
+    // Create the `run-service.yaml` file.
+    let filename = canonical_path.join(RUN_SERVICE_PATH.as_path());
+    if !filename.exists() {
+        fsx::create_dir_all(filename.parent().unwrap())?;
+
+        fsx::write(
+            filename,
+            registry.render("run-service", &json!({}))?
         )?;
     }
 
