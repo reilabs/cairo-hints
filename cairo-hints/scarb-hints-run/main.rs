@@ -7,21 +7,20 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use args::{process_args, process_json_args};
 use cairo_lang_sierra::program::VersionedProgram;
-use cairo_oracle_hint_processor::{run_1, Error, FuncArg, FuncArgs};
+use cairo_oracle_hint_processor::{run_1, Error, FuncArgs};
 use cairo_proto_serde::configuration::{Configuration, ServerConfig};
 use cairo_vm::types::layout_name::LayoutName;
-use cairo_vm::Felt252;
 use camino::Utf8PathBuf;
 use clap::Parser;
 use itertools::Itertools;
 use scarb_metadata::{MetadataCommand, ScarbCommand};
 use scarb_ui::args::PackagesFilter;
 use scarb_utils::absolute_path;
-use serialization::serialize_json_to_funcargs;
 
+pub mod args;
 mod deserialization;
-mod serialization;
 
 /// Execute the main function of a package.
 #[derive(Parser, Clone, Debug)]
@@ -72,58 +71,11 @@ struct Args {
 
     /// Arguments of the Cairo function.
     #[clap(long = "args", default_value = "", value_parser=process_args)]
-    args: FuncArgs,
+    args: Option<FuncArgs>,
 
-    /// Arguments of the Cairo function passed as JSON string.
-    #[clap(long = "args_json", default_value = "", value_parser=serialize_json_to_funcargs)]
-    args_json: FuncArgs,
-}
-
-pub fn process_args(value: &str) -> Result<FuncArgs, String> {
-    if value.is_empty() {
-        return Ok(FuncArgs::default());
-    }
-    let mut args = Vec::new();
-    let mut input = value.split(' ');
-    while let Some(value) = input.next() {
-        // First argument in an array
-        if value.starts_with('[') {
-            if value.ends_with(']') {
-                if value.len() == 2 {
-                    args.push(FuncArg::Array(Vec::new()));
-                } else {
-                    args.push(FuncArg::Array(vec![Felt252::from_dec_str(
-                        value.strip_prefix('[').unwrap().strip_suffix(']').unwrap(),
-                    )
-                    .unwrap()]));
-                }
-            } else {
-                let mut array_arg =
-                    vec![Felt252::from_dec_str(value.strip_prefix('[').unwrap()).unwrap()];
-                // Process following args in array
-                let mut array_end = false;
-                while !array_end {
-                    if let Some(value) = input.next() {
-                        // Last arg in array
-                        if value.ends_with(']') {
-                            array_arg.push(
-                                Felt252::from_dec_str(value.strip_suffix(']').unwrap()).unwrap(),
-                            );
-                            array_end = true;
-                        } else {
-                            array_arg.push(Felt252::from_dec_str(value).unwrap())
-                        }
-                    }
-                }
-                // Finalize array
-                args.push(FuncArg::Array(array_arg))
-            }
-        } else {
-            // Single argument
-            args.push(FuncArg::Single(Felt252::from_dec_str(value).unwrap()))
-        }
-    }
-    Ok(FuncArgs(args))
+    /// Arguments of the Cairo function.
+    #[clap(long = "args_json", default_value = "", value_parser=process_json_args)]
+    args_json: Option<FuncArgs>,
 }
 
 fn validate_layout(value: &str) -> Result<String, String> {
@@ -211,6 +163,14 @@ fn main() -> Result<(), Error> {
 
     let sierra_program = sierra_program.program;
 
+    let func_args = if let Some(json_args) = args.args_json {
+        json_args
+    } else if let Some(args) = args.args {
+        args
+    } else {
+        FuncArgs::default()
+    };
+
     match run_1(
         &service_configuration,
         &str_into_layout(&args.layout),
@@ -219,7 +179,7 @@ fn main() -> Result<(), Error> {
         &args.cairo_pie_output,
         &args.air_public_input,
         &args.air_private_input,
-        &args.args,
+        &func_args,
         &sierra_program,
         "::main",
         args.proof_mode,
