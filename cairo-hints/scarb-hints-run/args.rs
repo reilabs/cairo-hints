@@ -306,6 +306,7 @@ mod tests {
             d: Span<NestedStruct>
             e: ByteArray
             f: AnotherNestedStruct
+            g: bool
         }
 
         NestedStruct {
@@ -348,13 +349,14 @@ mod tests {
             "f": {
                 "a": 1,
                 "b": 2
-            }
+            },
+            "g": true
         }"#;
 
         let result = process_json_args(json, &input_schema).unwrap();
 
         // Assertions
-        assert_eq!(result.0.len(), 9);
+        assert_eq!(result.0.len(), 10);
         assert_eq!(result.0[0], FuncArg::Single(Felt252::from(42)));
         assert_eq!(
             result.0[1],
@@ -407,5 +409,6 @@ mod tests {
         );
         assert_eq!(result.0[7], FuncArg::Single(Felt252::from(1)));
         assert_eq!(result.0[8], FuncArg::Single(Felt252::from(2)));
+        assert_eq!(result.0[9], FuncArg::Single(Felt252::from(1)));
     }
 }
