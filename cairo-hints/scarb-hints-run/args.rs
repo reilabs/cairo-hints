@@ -100,7 +100,7 @@ fn parse_value(ty: &str, value: &Value) -> Result<Vec<FuncArg>, String> {
                 .ok_or_else(|| format!("Expected string for type {}", ty))?;
             Ok(vec![FuncArg::Single(Felt252::from_str(string).unwrap())])
         }
-        ty if ty.starts_with("vec<") => parse_vector(ty, value),
+        ty if ty.starts_with("vec<") || ty.starts_with("span<") => parse_vector(ty, value),
         "struct" => parse_struct(value),
         "bytearray" => parse_byte_array(value, ty),
         _ => Err(format!("Unsupported type: {}", ty)),
@@ -109,7 +109,7 @@ fn parse_value(ty: &str, value: &Value) -> Result<Vec<FuncArg>, String> {
 
 /// Helper function to parse vector values.
 fn parse_vector(ty: &str, value: &Value) -> Result<Vec<FuncArg>, String> {
-    let inner_ty = &ty[4..ty.len() - 1];
+    let inner_ty = &ty[ty.find('<').unwrap() + 1..ty.len() - 1];
     let arr = value
         .as_array()
         .ok_or_else(|| format!("Expected array for type {}", ty))?;
