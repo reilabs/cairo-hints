@@ -571,6 +571,7 @@ dependencies = [
  "scarb-ui 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
 ]
 

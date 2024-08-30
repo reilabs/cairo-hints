@@ -2,7 +2,11 @@ use cainome_cairo_serde::ByteArray;
 use cairo_oracle_hint_processor::{FuncArg, FuncArgs};
 use cairo_vm::Felt252;
 use serde_json::Value;
-use std::{collections::BTreeMap, str::FromStr};
+use std::collections::BTreeMap;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
+use std::str::FromStr;
 
 /// Parse a string into `FuncArgs`.
 /// Returns an error message if parsing fails or if the format is incorrect.
@@ -53,158 +57,278 @@ pub fn process_args(value: &str) -> Result<FuncArgs, String> {
     Ok(FuncArgs(args))
 }
 
-/// Parse a JSON string into `FuncArgs`.
-/// Returns an error message if parsing fails or if the format is incorrect.
-pub fn process_json_args(json_str: &str) -> Result<FuncArgs, String> {
+#[derive(Debug, Clone)]
+enum InputType {
+    U64,
+    I64,
+    U32,
+    I32,
+    U16,
+    I16,
+    U8,
+    I8,
+    Felt252,
+    ByteArray,
+    Bool,
+    Struct(String),
+    Array(Box<InputType>),
+}
+
+#[derive(Debug, Clone)]
+struct StructDef {
+    fields: Vec<(String, InputType)>,
+}
+
+#[derive(Debug)]
+pub struct InputSchema {
+    structs: BTreeMap<String, StructDef>,
+    main_struct: String,
+}
+
+pub fn parse_input_schema(file_path: &PathBuf) -> Result<InputSchema, String> {
+    let file = File::open(file_path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let reader = BufReader::new(file);
+    let mut input_schema = InputSchema {
+        structs: BTreeMap::new(),
+        main_struct: String::new(),
+    };
+    let mut current_struct: Option<(String, StructDef)> = None;
+
+    for line in reader.lines() {
+        let line = line.map_err(|e| format!("Failed to read line: {}", e))?;
+        let line = line.trim();
+
+        if line.is_empty() || line.starts_with("//") {
+            continue;
+        }
+
+        if line.ends_with("{") {
+            let struct_name = line.trim_end_matches("{").trim().to_string();
+            current_struct = Some((struct_name.clone(), StructDef { fields: Vec::new() }));
+            if input_schema.main_struct.is_empty() {
+                input_schema.main_struct = struct_name;
+            }
+        } else if line == "}" {
+            if let Some((name, struct_def)) = current_struct.take() {
+                input_schema.structs.insert(name, struct_def);
+            }
+        } else if let Some((_, struct_def)) = &mut current_struct {
+            let parts: Vec<&str> = line.split(':').map(|s| s.trim()).collect();
+            if parts.len() == 2 {
+                let field_name = parts[0].to_string();
+                let field_type = parse_type(parts[1])?;
+                struct_def.fields.push((field_name, field_type));
+            }
+        }
+    }
+
+    Ok(input_schema)
+}
+
+fn parse_type(type_str: &str) -> Result<InputType, String> {
+    match type_str {
+        "u64" => Ok(InputType::U64),
+        "i64" => Ok(InputType::I64),
+        "u32" => Ok(InputType::U32),
+        "i32" => Ok(InputType::I32),
+        "u16" => Ok(InputType::U16),
+        "i16" => Ok(InputType::I16),
+        "u8" => Ok(InputType::U8),
+        "i8" => Ok(InputType::I8),
+        "felt252" => Ok(InputType::Felt252),
+        "ByteArray" => Ok(InputType::ByteArray),
+        "bool" => Ok(InputType::Bool),
+        s if s.starts_with("Array<") => {
+            let inner_type = s.trim_start_matches("Array<").trim_end_matches('>');
+            Ok(InputType::Array(Box::new(parse_type(inner_type)?)))
+        }
+        s => Ok(InputType::Struct(s.to_string())),
+    }
+}
+
+pub fn process_json_args(json_str: &str, schema: &InputSchema) -> Result<FuncArgs, String> {
     let json: Value =
         serde_json::from_str(json_str).map_err(|e| format!("Failed to parse JSON: {}", e))?;
-    let obj = json
-        .as_object()
-        .ok_or_else(|| "JSON input must be an object".to_string())?;
-
-    let mut sorted_args = BTreeMap::new();
-    for (key, value) in obj {
-        let parts: Vec<&str> = key.split('_').collect();
-        if parts.len() != 2 {
-            return Err(format!("Invalid key format: {}", key));
-        }
-        let index: usize = parts[0]
-            .parse()
-            .map_err(|_| format!("Invalid index in key: {}", key))?;
-        sorted_args.insert(index, (parts[1], value));
-    }
-
-    let args = sorted_args
-        .into_iter()
-        .map(|(_, (ty, value))| parse_value(ty, value))
-        .collect::<Result<Vec<_>, _>>()
-        .map(|vec| vec.into_iter().flatten().collect());
-
-    let args = args.map(FuncArgs);
-
-    args
+    parse_struct(&json, &schema.main_struct, schema)
 }
 
-/// Parse a `Value` based on the specified type and return the corresponding `FuncArg`.
-fn parse_value(ty: &str, value: &Value) -> Result<Vec<FuncArg>, String> {
-    match ty {
-        "u8" | "i8" | "u16" | "i16" | "u32" | "i32" | "u64" | "i64" => {
-            let num = value
-                .as_i64()
-                .ok_or_else(|| format!("Expected integer for type {}", ty))?;
-            Ok(vec![FuncArg::Single(Felt252::from(num))])
-        }
-        "felt252" => {
-            let string = value
-                .as_str()
-                .ok_or_else(|| format!("Expected string for type {}", ty))?;
-            Ok(vec![FuncArg::Single(Felt252::from_str(string).unwrap())])
-        }
-        ty if ty.starts_with("vec<") || ty.starts_with("span<") => parse_vector(ty, value),
-        "struct" => parse_struct(value),
-        "bytearray" => parse_byte_array(value, ty),
-        _ => Err(format!("Unsupported type: {}", ty)),
-    }
-}
-
-/// Helper function to parse vector values.
-fn parse_vector(ty: &str, value: &Value) -> Result<Vec<FuncArg>, String> {
-    let inner_ty = &ty[ty.find('<').unwrap() + 1..ty.len() - 1];
-    let arr = value
-        .as_array()
-        .ok_or_else(|| format!("Expected array for type {}", ty))?;
-
-    let parsed_results: Result<Vec<Vec<FuncArg>>, String> =
-        arr.iter().map(|v| parse_value(inner_ty, v)).collect();
-
-    let flat_parsed: Result<Vec<FuncArg>, String> =
-        parsed_results.map(|vecs| vecs.into_iter().flatten().collect());
-
-    let parsed: Result<Vec<Felt252>, String> = flat_parsed.map(|args| {
-        args.into_iter()
-            .flat_map(|arg| match arg {
-                FuncArg::Single(felt) => vec![felt],
-                FuncArg::Array(arr) => arr,
-            })
-            .collect()
-    });
-
-    parsed.map(|result| vec![FuncArg::Array(result)])
-}
-
-/// Helper function to parse struct values.
-fn parse_struct(value: &Value) -> Result<Vec<FuncArg>, String> {
+fn parse_struct(
+    value: &Value,
+    struct_name: &str,
+    schema: &InputSchema,
+) -> Result<FuncArgs, String> {
     let obj = value
         .as_object()
-        .ok_or_else(|| "Expected object for struct".to_string())?;
-    let mut results = Vec::new();
-    for (key, val) in obj {
-        let parts: Vec<&str> = key.split('_').collect();
-        if parts.len() != 2 {
-            return Err(format!("Invalid struct field format: {}", key));
-        }
-        let field_value = parse_value(parts[1], val)?;
-        results.extend(field_value);
+        .ok_or_else(|| format!("Expected object for struct {}", struct_name))?;
+
+    let struct_def = schema
+        .structs
+        .get(struct_name)
+        .ok_or_else(|| format!("Struct {} not found in schema", struct_name))?;
+
+    let mut args = Vec::new();
+
+    for (field_name, field_type) in &struct_def.fields {
+        let value = obj
+            .get(field_name)
+            .ok_or_else(|| format!("Missing field: {} in struct {}", field_name, struct_name))?;
+
+        let parsed = parse_value(value, field_type, schema)?;
+        args.extend(parsed);
     }
-    Ok(results)
+
+    Ok(FuncArgs(args))
 }
 
-/// Helper function to parse byte array values.
-fn parse_byte_array(value: &Value, ty: &str) -> Result<Vec<FuncArg>, String> {
-    // Fixed typo, passed ty
-    let string = value
-        .as_str()
-        .ok_or_else(|| format!("Expected string for type {}", ty))?;
-
-    match ByteArray::from_string(string) {
-        Ok(byte_array) => {
-            let mut result = Vec::new();
-            let data = byte_array.data.iter().map(|b| b.felt()).collect::<Vec<_>>();
-            result.push(FuncArg::Array(data));
-            result.push(FuncArg::Single(byte_array.pending_word));
-            result.push(FuncArg::Single(Felt252::from(
-                byte_array.pending_word_len as i64,
-            )));
-            Ok(result)
+fn parse_value(
+    value: &Value,
+    ty: &InputType,
+    schema: &InputSchema,
+) -> Result<Vec<FuncArg>, String> {
+    match ty {
+        InputType::U64 | InputType::U32 | InputType::U16 | InputType::U8 => {
+            let num = value
+                .as_u64()
+                .ok_or_else(|| format!("Expected unsigned integer for {:?}", ty))?;
+            Ok(vec![FuncArg::Single(Felt252::from(num))])
         }
-        Err(e) => Err(format!("Error parsing bytearray: {}", e)),
+        InputType::I64 | InputType::I32 | InputType::I16 | InputType::I8 => {
+            let num = value
+                .as_i64()
+                .ok_or_else(|| format!("Expected signed integer for {:?}", ty))?;
+            Ok(vec![FuncArg::Single(Felt252::from(num))])
+        }
+        InputType::Felt252 => {
+            let string = value
+                .as_str()
+                .ok_or_else(|| "Expected string for Felt252".to_string())?;
+            Ok(vec![FuncArg::Single(
+                Felt252::from_str(string).map_err(|e| e.to_string())?,
+            )])
+        }
+        InputType::ByteArray => {
+            let string = value
+                .as_str()
+                .ok_or_else(|| "Expected string for ByteArray".to_string())?;
+            parse_byte_array(string)
+        }
+        InputType::Bool => {
+            let bool_value = value
+                .as_bool()
+                .ok_or_else(|| "Expected boolean value".to_string())?;
+            Ok(vec![FuncArg::Single(Felt252::from(bool_value as u64))])
+        }
+        InputType::Array(inner_type) => {
+            let array = value
+                .as_array()
+                .ok_or_else(|| "Expected array".to_string())?;
+            let mut result = Vec::new();
+            for item in array {
+                let parsed = parse_value(item, inner_type, schema)?;
+                result.extend(parsed);
+            }
+            Ok(vec![FuncArg::Array(
+                result
+                    .into_iter()
+                    .flat_map(|arg| match arg {
+                        FuncArg::Single(felt) => vec![felt],
+                        FuncArg::Array(arr) => arr,
+                    })
+                    .collect(),
+            )])
+        }
+        InputType::Struct(struct_name) => {
+            parse_struct(value, struct_name, schema).map(|func_args| func_args.0)
+        }
     }
+}
+
+fn parse_byte_array(string: &str) -> Result<Vec<FuncArg>, String> {
+    let byte_array =
+        ByteArray::from_string(string).map_err(|e| format!("Error parsing ByteArray: {}", e))?;
+
+    let mut result = Vec::new();
+    let data = byte_array.data.iter().map(|b| b.felt()).collect::<Vec<_>>();
+    result.push(FuncArg::Array(data));
+    result.push(FuncArg::Single(byte_array.pending_word));
+    result.push(FuncArg::Single(Felt252::from(
+        byte_array.pending_word_len as u64,
+    )));
+
+    Ok(result)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    fn create_temp_file_with_content(content: &str) -> NamedTempFile {
+        let mut file = NamedTempFile::new().unwrap();
+        file.write_all(content.as_bytes()).unwrap();
+        file
+    }
 
     #[test]
-    fn test_process_json_to_funcargs() {
+    fn test_parse_input_schema_and_process_json_args() {
+        // Create a temporary input schema file
+        let input_schema = r#"
+        Input {
+            a: u32
+            b: felt252
+            c: Array<i32>
+            d: Array<NestedStruct>
+            e: ByteArray
+            f: AnotherNestedStruct
+        }
+
+        NestedStruct {
+            a: u32
+            b: i32
+            c: felt252
+            d: ByteArray
+        }
+
+        AnotherNestedStruct {
+            a: u32
+            b: i64
+        }
+        "#;
+
+        let schema_file = create_temp_file_with_content(input_schema);
+        let input_schema = parse_input_schema(&schema_file.path().to_path_buf()).unwrap();
+
+        // Create JSON input
         let json = r#"
         {
-            "0_u32": 42,
-            "1_felt252": "0x68656c6c6f",
-            "2_vec<i32>": [1, -2, 3],
-            "3_vec<struct>": [
+            "a": 42,
+            "b": "0x68656c6c6f",
+            "c": [1, -2, 3],
+            "d": [
                 {
-                    "0_u32": 10,
-                    "1_i32": -20,
-                    "2_felt252": "30",
-                    "3_bytearray": "ABCD"
+                    "a": 10,
+                    "b": -20,
+                    "c": "30",
+                    "d": "ABCD"
                 },
                 {
-                    "0_u32": 40,
-                    "1_i32": -50,
-                    "2_felt252": "-60",
-                    "3_bytearray": "ABCDEFGHIJKLMNOPQRSTUVWXYZ12345"
+                    "a": 40,
+                    "b": -50,
+                    "c": "-60",
+                    "d": "ABCDEFGHIJKLMNOPQRSTUVWXYZ12345"
                 }
             ],
-            "4_bytearray": "Hello world, how are you doing today?",
-            "5_struct" : {
-                "0_u32": 1,
-                "1_i64": 2
+            "e": "Hello world, how are you doing today?",
+            "f": {
+                "a": 1,
+                "b": 2
             }
         }"#;
 
-        let result = process_json_args(json).unwrap();
+        let result = process_json_args(json, &input_schema).unwrap();
 
+        // Assertions
         assert_eq!(result.0.len(), 9);
         assert_eq!(result.0[0], FuncArg::Single(Felt252::from(42)));
         assert_eq!(

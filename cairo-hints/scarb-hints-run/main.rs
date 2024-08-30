@@ -7,7 +7,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use args::{process_args, process_json_args};
+use args::process_args;
 use cairo_lang_sierra::program::VersionedProgram;
 use cairo_oracle_hint_processor::{run_1, Error, FuncArgs};
 use cairo_proto_serde::configuration::{Configuration, ServerConfig};
@@ -74,8 +74,8 @@ struct Args {
     args: Option<FuncArgs>,
 
     /// Arguments of the Cairo function.
-    #[clap(long = "args_json", default_value = "", value_parser=process_json_args)]
-    args_json: Option<FuncArgs>,
+    #[clap(long = "args_json", default_value = "")]
+    args_json: Option<String>,
 }
 
 fn validate_layout(value: &str) -> Result<String, String> {
@@ -164,7 +164,13 @@ fn main() -> Result<(), Error> {
     let sierra_program = sierra_program.program;
 
     let func_args = if let Some(json_args) = args.args_json {
-        json_args
+        let inputs_shema = absolute_path(&package, None, "inputs_schema", Some(PathBuf::from("InputsSchema.txt")))
+        .expect("inputs schema path must be provided either in the Scarb.toml file in the [tool.hints] section or default to InputsSchema.txt in the project root.");
+
+        let schema =
+            args::parse_input_schema(&inputs_shema).expect("Failed to parse input schema file");
+
+        args::process_json_args(&json_args, &schema).expect("Failed to process json args.")
     } else if let Some(args) = args.args {
         args
     } else {

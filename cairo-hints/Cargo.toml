@@ -60,3 +60,4 @@ cainome-cairo-serde = {git = "https://github.com/cartridge-gg/cainome.git", rev 
 
 [dev-dependencies]
 hex = "0.4.3"
+tempfile.workspace = true
