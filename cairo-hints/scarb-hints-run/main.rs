@@ -18,8 +18,10 @@ use itertools::Itertools;
 use scarb_metadata::{MetadataCommand, ScarbCommand};
 use scarb_ui::args::PackagesFilter;
 use scarb_utils::absolute_path;
+use serialization::serialize_json_to_funcargs;
 
 mod deserialization;
+mod serialization;
 
 /// Execute the main function of a package.
 #[derive(Parser, Clone, Debug)]
@@ -71,6 +73,10 @@ struct Args {
     /// Arguments of the Cairo function.
     #[clap(long = "args", default_value = "", value_parser=process_args)]
     args: FuncArgs,
+
+    /// Arguments of the Cairo function passed as JSON string.
+    #[clap(long = "args_json", default_value = "", value_parser=serialize_json_to_funcargs)]
+    args_json: FuncArgs,
 }
 
 pub fn process_args(value: &str) -> Result<FuncArgs, String> {

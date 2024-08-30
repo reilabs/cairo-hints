@@ -85,7 +85,7 @@ pub enum Error {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum FuncArg {
     Array(Vec<Felt252>),
     Single(Felt252),
