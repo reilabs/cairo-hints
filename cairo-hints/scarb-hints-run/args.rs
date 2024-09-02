@@ -67,6 +67,7 @@ enum InputType {
     I16,
     U8,
     I8,
+    F64,
     Felt252,
     ByteArray,
     Bool,
@@ -142,6 +143,7 @@ fn parse_type(type_str: &str) -> Result<InputType, String> {
         "i16" => Ok(InputType::I16),
         "u8" => Ok(InputType::U8),
         "i8" => Ok(InputType::I8),
+        "f64" => Ok(InputType::F64),
         "felt252" => Ok(InputType::Felt252),
         "ByteArray" => Ok(InputType::ByteArray),
         "bool" => Ok(InputType::Bool),
@@ -155,34 +157,6 @@ fn parse_type(type_str: &str) -> Result<InputType, String> {
         }
         s => Ok(InputType::Struct(s.to_string())),
     }
-}
-
-fn parse_struct(
-    value: &Value,
-    struct_name: &str,
-    schema: &InputSchema,
-) -> Result<FuncArgs, String> {
-    let obj = value
-        .as_object()
-        .ok_or_else(|| format!("Expected object for struct {}", struct_name))?;
-
-    let struct_def = schema
-        .structs
-        .get(struct_name)
-        .ok_or_else(|| format!("Struct {} not found in schema", struct_name))?;
-
-    let mut args = Vec::new();
-
-    for (field_name, field_type) in &struct_def.fields {
-        let value = obj
-            .get(field_name)
-            .ok_or_else(|| format!("Missing field: {} in struct {}", field_name, struct_name))?;
-
-        let parsed = parse_value(value, field_type, schema)?;
-        args.extend(parsed);
-    }
-
-    Ok(FuncArgs(args))
 }
 
 fn parse_value(
@@ -203,6 +177,17 @@ fn parse_value(
                 .ok_or_else(|| format!("Expected signed integer for {:?}", ty))?;
             Ok(vec![FuncArg::Single(Felt252::from(num))])
         }
+
+        InputType::F64 => {
+            let num = value
+                .as_f64()
+                .ok_or_else(|| format!("Expected signed integer for {:?}", ty))?;
+
+            Ok(vec![FuncArg::Single(Felt252::from(
+                (num * 2.0_f64.powi(32)) as i64,
+            ))])
+        }
+
         InputType::Felt252 => {
             let string = value
                 .as_str()
@@ -268,6 +253,34 @@ fn parse_value(
     }
 }
 
+fn parse_struct(
+    value: &Value,
+    struct_name: &str,
+    schema: &InputSchema,
+) -> Result<FuncArgs, String> {
+    let obj = value
+        .as_object()
+        .ok_or_else(|| format!("Expected object for struct {}", struct_name))?;
+
+    let struct_def = schema
+        .structs
+        .get(struct_name)
+        .ok_or_else(|| format!("Struct {} not found in schema", struct_name))?;
+
+    let mut args = Vec::new();
+
+    for (field_name, field_type) in &struct_def.fields {
+        let value = obj
+            .get(field_name)
+            .ok_or_else(|| format!("Missing field: {} in struct {}", field_name, struct_name))?;
+
+        let parsed = parse_value(value, field_type, schema)?;
+        args.extend(parsed);
+    }
+
+    Ok(FuncArgs(args))
+}
+
 fn parse_byte_array(string: &str) -> Result<Vec<FuncArg>, String> {
     let byte_array =
         ByteArray::from_string(string).map_err(|e| format!("Error parsing ByteArray: {}", e))?;
@@ -307,6 +320,7 @@ mod tests {
             e: ByteArray
             f: AnotherNestedStruct
             g: bool
+            h: f64
         }
 
         NestedStruct {
@@ -350,13 +364,14 @@ mod tests {
                 "a": 1,
                 "b": 2
             },
-            "g": true
+            "g": true,
+            "h": 0.5
         }"#;
 
         let result = process_json_args(json, &input_schema).unwrap();
 
         // Assertions
-        assert_eq!(result.0.len(), 10);
+        assert_eq!(result.0.len(), 11);
         assert_eq!(result.0[0], FuncArg::Single(Felt252::from(42)));
         assert_eq!(
             result.0[1],
@@ -410,5 +425,6 @@ mod tests {
         assert_eq!(result.0[7], FuncArg::Single(Felt252::from(1)));
         assert_eq!(result.0[8], FuncArg::Single(Felt252::from(2)));
         assert_eq!(result.0[9], FuncArg::Single(Felt252::from(1)));
+        assert_eq!(result.0[10], FuncArg::Single(Felt252::from_hex("0x80000000").unwrap()));
     }
 }
