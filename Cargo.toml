@@ -44,6 +44,7 @@ cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm", rev = "v1.0.0", fe
     "std",
     "cairo-1-hints",
 ] }
+cainome-cairo-serde = {git = "https://github.com/cartridge-gg/cainome.git", rev = "0d29bb0"}
 camino = "1.1.6"
 clap = { version = "4.3.10", features = ["derive"] }
 colored = "2.1.0"

@@ -56,7 +56,7 @@ thiserror = { workspace = true }
 cairo-lang-hints-test-runner = { workspace = true }
 cairo-lang-test-plugin = { workspace = true }
 handlebars = "6.0.0"
-cainome-cairo-serde = {git = "https://github.com/cartridge-gg/cainome.git", rev = "0d29bb0"}
+cainome-cairo-serde = { workspace = true }
 
 [dev-dependencies]
 hex = "0.4.3"

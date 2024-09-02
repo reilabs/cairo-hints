@@ -1,3 +1,4 @@
+use cainome_cairo_serde::ByteArray;
 use cairo_lang_casm::{
     builder::{CasmBuilder, Var},
     casm, casm_build_extend,
@@ -20,7 +21,7 @@ use cairo_lang_sierra::{
         starknet::syscalls::SystemType,
         ConcreteType, NamedType,
     },
-    ids::{ConcreteTypeId, GenericTypeId},
+    ids::{ConcreteTypeId, GenericTypeId, UserTypeId},
     program::{Function, GenericArg, Program as SierraProgram},
     program_registry::ProgramRegistry,
 };
@@ -51,6 +52,7 @@ use cairo_vm::{
 use itertools::{chain, Itertools};
 use num_bigint::{BigInt, Sign};
 use num_traits::{cast::ToPrimitive, Zero};
+use serde_json::Value as JsonValue;
 use std::{collections::HashMap, iter::Peekable};
 
 use crate::{rpc_hint_processor::Rpc1HintProcessor, Error, FuncArg};
@@ -1150,35 +1152,32 @@ fn serialize_output(
     sierra_program_registry: &ProgramRegistry<CoreType, CoreLibfunc>,
     type_sizes: &UnorderedHashMap<ConcreteTypeId, i16>,
 ) -> String {
-    let mut output_string = String::new();
     let return_type_id = if let Some(id) = return_type_id {
         id
     } else {
-        return output_string;
+        return "null".to_string();
     };
     let mut return_values_iter = return_values.iter().peekable();
-    serialize_output_inner(
+    let json_value = serialize_output_inner(
         &mut return_values_iter,
-        &mut output_string,
         vm,
         return_type_id,
         sierra_program_registry,
         type_sizes,
     );
-    output_string
+
+    serde_json::to_string(&json_value).unwrap_or_else(|_| "null".to_string())
 }
 
 fn serialize_output_inner<'a>(
     return_values_iter: &mut Peekable<impl Iterator<Item = &'a MaybeRelocatable>>,
-    output_string: &mut String,
     vm: &mut VirtualMachine,
     return_type_id: &ConcreteTypeId,
     sierra_program_registry: &ProgramRegistry<CoreType, CoreLibfunc>,
     type_sizes: &UnorderedHashMap<ConcreteTypeId, i16>,
-) {
+) -> JsonValue {
     match sierra_program_registry.get_type(return_type_id).unwrap() {
         cairo_lang_sierra::extensions::core::CoreTypeConcrete::Array(info) => {
-            // Fetch array from memory
             let array_start = return_values_iter
                 .next()
                 .expect("Missing return value")
@@ -1194,20 +1193,18 @@ fn serialize_output_inner<'a>(
             let array_data = vm.get_continuous_range(array_start, array_size).unwrap();
             let mut array_data_iter = array_data.iter().peekable();
             let array_elem_id = &info.ty;
-            // Serialize array data
-            maybe_add_whitespace(output_string);
-            output_string.push('[');
+
+            let mut json_array = Vec::new();
             while array_data_iter.peek().is_some() {
-                serialize_output_inner(
+                json_array.push(serialize_output_inner(
                     &mut array_data_iter,
-                    output_string,
                     vm,
                     array_elem_id,
                     sierra_program_registry,
                     type_sizes,
-                )
+                ));
             }
-            output_string.push(']');
+            JsonValue::Array(json_array)
         }
         cairo_lang_sierra::extensions::core::CoreTypeConcrete::Box(info) => {
             // As this represents a pointer, we need to extract it's values
@@ -1216,14 +1213,15 @@ fn serialize_output_inner<'a>(
                 .expect("Missing return value")
                 .get_relocatable()
                 .expect("Box Pointer is not Relocatable");
-            let type_size = type_sizes[&info.ty].try_into().expect("could not parse to usize"); 
+            let type_size = type_sizes[&info.ty]
+                .try_into()
+                .expect("could not parse to usize");
             let data = vm
                 .get_continuous_range(ptr, type_size)
                 .expect("Failed to extract value from nullable ptr");
             let mut data_iter = data.iter().peekable();
             serialize_output_inner(
                 &mut data_iter,
-                output_string,
                 vm,
                 &info.ty,
                 sierra_program_registry,
@@ -1233,40 +1231,52 @@ fn serialize_output_inner<'a>(
         cairo_lang_sierra::extensions::core::CoreTypeConcrete::Const(_) => {
             unimplemented!("Not supported in the current version")
         },
-        cairo_lang_sierra::extensions::core::CoreTypeConcrete::Felt252(_)
-        | cairo_lang_sierra::extensions::core::CoreTypeConcrete::BoundedInt(_)
-        // Only unsigned integer values implement Into<Bytes31>
-        | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Bytes31(_)
-        | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Uint8(_)
-        | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Uint16(_)
-        | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Uint32(_)
-        | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Uint64(_)
-        | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Uint128(_) => {
-            maybe_add_whitespace(output_string);
+        cairo_lang_sierra::extensions::core::CoreTypeConcrete::Felt252(_) => {
             let val = return_values_iter
                 .next()
                 .expect("Missing return value")
                 .get_int()
                 .expect("Value is not an integer");
-            output_string.push_str(&val.to_string());
+            JsonValue::String(val.to_hex_string())
+        }
+        cairo_lang_sierra::extensions::core::CoreTypeConcrete::BoundedInt(_)
+        // Only unsigned integer values implement Into<Bytes31>
+        | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Bytes31(_) => {
+            let val = return_values_iter
+            .next()
+            .expect("Missing return value")
+            .get_int()
+            .expect("Value is not an integer");
+
+            JsonValue::String(val.to_hex_string())
+        }
+        | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Uint8(_)
+        | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Uint16(_)
+        | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Uint32(_)
+        | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Uint64(_)
+        | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Uint128(_) => {
+            let val = return_values_iter
+                .next()
+                .expect("Missing return value")
+                .get_int()
+                .expect("Value is not an integer");
+            JsonValue::Number(val.to_u128().unwrap().into())
         }
         cairo_lang_sierra::extensions::core::CoreTypeConcrete::Sint8(_)
         | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Sint16(_)
         | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Sint32(_)
         | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Sint64(_)
         | cairo_lang_sierra::extensions::core::CoreTypeConcrete::Sint128(_) => {
-            maybe_add_whitespace(output_string);
             let val = return_values_iter
                 .next()
                 .expect("Missing return value")
                 .get_int()
                 .expect("Value is not an integer");
-            output_string.push_str(&signed_felt(val).to_string());
+            JsonValue::Number(signed_felt(val).to_i128().unwrap().into())
         }
         cairo_lang_sierra::extensions::core::CoreTypeConcrete::NonZero(info) => {
             serialize_output_inner(
                 return_values_iter,
-                output_string,
                 vm,
                 &info.ty,
                 sierra_program_registry,
@@ -1275,29 +1285,26 @@ fn serialize_output_inner<'a>(
         }
         cairo_lang_sierra::extensions::core::CoreTypeConcrete::Nullable(info) => {
             // As this represents a pointer, we need to extract it's values
-            let ptr = match return_values_iter.next().expect("Missing return value") {
-                MaybeRelocatable::RelocatableValue(ptr) => *ptr,
-                MaybeRelocatable::Int(felt) if felt.is_zero() => {
-                    // Nullable is Null
-                    maybe_add_whitespace(output_string);
-                    output_string.push_str("null");
-                    return;
+            match return_values_iter.next().expect("Missing return value") {
+                MaybeRelocatable::RelocatableValue(ptr) => {
+                    let type_size = type_sizes[&info.ty]
+                        .try_into()
+                        .expect("could not parse to usize");
+                    let data = vm
+                        .get_continuous_range(*ptr, type_size)
+                        .expect("Failed to extract value from nullable ptr");
+                    let mut data_iter = data.iter().peekable();
+                    serialize_output_inner(
+                        &mut data_iter,
+                        vm,
+                        &info.ty,
+                        sierra_program_registry,
+                        type_sizes,
+                    )
                 }
+                MaybeRelocatable::Int(felt) if felt.is_zero() => JsonValue::Null,
                 _ => panic!("Invalid Nullable"),
-            };
-            let type_size = type_sizes[&info.ty].try_into().expect("could not parse to usize");
-            let data = vm
-                .get_continuous_range(ptr, type_size)
-                .expect("Failed to extract value from nullable ptr");
-            let mut data_iter = data.iter().peekable();
-            serialize_output_inner(
-                &mut data_iter,
-                output_string,
-                vm,
-                &info.ty,
-                sierra_program_registry,
-                type_sizes,
-            )
+            }
         }
         cairo_lang_sierra::extensions::core::CoreTypeConcrete::Enum(info) => {
             // First we check if it is a Panic enum, as we already handled panics when fetching return values,
@@ -1310,7 +1317,6 @@ fn serialize_output_inner<'a>(
                 {
                     return serialize_output_inner(
                         return_values_iter,
-                        output_string,
                         vm,
                         &info.variants[0],
                         sierra_program_registry,
@@ -1354,13 +1360,7 @@ fn serialize_output_inner<'a>(
                         "Malformed bool enum"
                     );
 
-                    let boolean_string = match variant_idx {
-                        0 => "false",
-                        _ => "true",
-                    };
-                    maybe_add_whitespace(output_string);
-                    output_string.push_str(boolean_string);
-                    return;
+                    return JsonValue::Bool(variant_idx != 0);
                 }
             }
             // TODO: Something similar to the bool handling could be done for unit enum variants if we could get the type info with the variant names
@@ -1381,7 +1381,6 @@ fn serialize_output_inner<'a>(
             }
             serialize_output_inner(
                 return_values_iter,
-                output_string,
                 vm,
                 variant_type_id,
                 sierra_program_registry,
@@ -1389,113 +1388,178 @@ fn serialize_output_inner<'a>(
             )
         }
         cairo_lang_sierra::extensions::core::CoreTypeConcrete::Struct(info) => {
-            for member_type_id in &info.members {
-                serialize_output_inner(
-                    return_values_iter,
-                    output_string,
-                    vm,
-                    member_type_id,
-                    sierra_program_registry,
-                    type_sizes,
-                )
+            // Check if this struct is a Span
+            if let Some(UserTypeId { debug_name: Some(name), .. }) = info.info.long_id.generic_args.get(0)
+                .and_then(|arg| if let GenericArg::UserType(user_type) = arg { Some(user_type) } else { None }) {
+                if name.starts_with("core::array::Span") {
+                    if let Some(GenericArg::Type(array_type_id)) = info.info.long_id.generic_args.get(1) {
+                        return serialize_output_inner(
+                            return_values_iter,
+                            vm,
+                            array_type_id,
+                            sierra_program_registry,
+                            type_sizes,
+                        );
+                    }
+                }
             }
-        }
-        cairo_lang_sierra::extensions::core::CoreTypeConcrete::Felt252Dict(info) => {
-            // Process Dictionary
-            let dict_ptr = return_values_iter
-                .next()
-                .expect("Missing return val")
-                .get_relocatable()
-                .expect("Dict Ptr not Relocatable");
-            if !(dict_ptr.offset
-                == vm
-                    .get_segment_size(dict_ptr.segment_index as usize)
-                    .unwrap_or_default()
-                && dict_ptr.offset % 3 == 0)
-            {
-                panic!("Return value is not a valid Felt252Dict")
+
+            // Check if this struct in a F64 
+            if let Some(UserTypeId { debug_name: Some(name), .. }) = info.info.long_id.generic_args.get(0)
+            .and_then(|arg| if let GenericArg::UserType(user_type) = arg { Some(user_type) } else { None }) {
+            if name.starts_with("orion_numbers::f64::F64") {
+                    let data = serialize_output_inner(
+                        return_values_iter,
+                        vm,
+                        &info.members[0],
+                        sierra_program_registry,
+                        type_sizes,
+                    );
+
+                    let fl = if let JsonValue::Number(scaled) = data {
+                        scaled.as_f64().unwrap() / 2.0_f64.powi(32)
+                    } else {
+                        f64::NAN
+                    };
+                    
+                    let json_number = serde_json::Number::from_f64(fl).unwrap();
+                    return JsonValue::Number(json_number);
+                }
+            
             }
-            // Fetch dictionary values type id
-            let value_type_id = &info.ty;
-            // Fetch the dictionary's memory
-            let dict_mem = vm
-                .get_continuous_range((dict_ptr.segment_index, 0).into(), dict_ptr.offset)
-                .expect("Malformed dictionary memory");
-            // Serialize the dictionary
-            output_string.push('{');
-            // The dictionary's memory is made up of (key, prev_value, next_value) tuples
-            // The prev value is not relevant to the user so we can skip over it for calrity
-            for (key, _, value) in dict_mem.iter().tuples() {
-                maybe_add_whitespace(output_string);
-                // Serialize the key wich should always be a Felt value
-                output_string.push_str(&key.to_string());
-                output_string.push(':');
-                // Serialize the value
-                // We create a peekable array here in order to use the serialize_output_inner as the value could be a span
-                let value_vec = vec![value.clone()];
-                let mut value_iter = value_vec.iter().peekable();
-                serialize_output_inner(
-                    &mut value_iter,
-                    output_string,
-                    vm,
-                    value_type_id,
-                    sierra_program_registry,
-                    type_sizes,
+
+            // Check if this struct is a ByteArray
+            if let Some(UserTypeId { debug_name: Some(name), .. }) = info.info.long_id.generic_args.get(0)
+                .and_then(|arg| if let GenericArg::UserType(user_type) = arg { Some(user_type) } else { None }) {
+                if name == "core::byte_array::ByteArray" {
+                    // Handle ByteArray
+                    let data = serialize_output_inner(
+                        return_values_iter,
+                        vm,
+                        &info.members[0],
+                        sierra_program_registry,
+                        type_sizes,
+                    );
+                    let pending_word = serialize_output_inner(
+                        return_values_iter,
+                        vm,
+                        &info.members[1],
+                        sierra_program_registry,
+                        type_sizes,
+                    );
+                    let pending_word_len = serialize_output_inner(
+                        return_values_iter,
+                        vm,
+                        &info.members[2],
+                        sierra_program_registry,
+                        type_sizes,
+                    );
+
+                    // Reconstruct ByteArray
+                    let byte_array = ByteArray {
+                        data: if let JsonValue::Array(arr) = data {
+                            arr.into_iter()
+                                .map(|v| Felt252::from_hex(&v.as_str().unwrap()[2..]).unwrap().try_into().unwrap())
+                                .collect()
+                        } else {
+                            vec![]
+                        },
+                        pending_word: Felt252::from_hex(&pending_word.as_str().unwrap()[2..]).unwrap(),
+                        pending_word_len: pending_word_len.as_u64().unwrap() as usize,
+                    };
+
+                    // Convert to string and return
+                    return match byte_array.to_string() {
+                        Ok(s) => JsonValue::String(s),
+                        Err(_) => JsonValue::Null,
+                    };
+                }
+            }
+            
+            // If it's not a Span, proceed with normal struct serialization
+            let mut json_object = serde_json::Map::new();
+            for (index, member_type_id) in info.members.iter().enumerate() {
+                json_object.insert(
+                    index.to_string(),
+                    serialize_output_inner(
+                        return_values_iter,
+                        vm,
+                        member_type_id,
+                        sierra_program_registry,
+                        type_sizes,
+                    ),
                 );
             }
-            output_string.push('}');
-        }
-        cairo_lang_sierra::extensions::core::CoreTypeConcrete::SquashedFelt252Dict(info) => {
-            // Process Dictionary
-            let dict_start = return_values_iter
-                .next()
-                .expect("Missing return val")
-                .get_relocatable()
-                .expect("Squashed dict_start ptr not Relocatable");
-            let dict_end = return_values_iter
-                .next()
-                .expect("Missing return val")
-                .get_relocatable()
-                .expect("Squashed dict_end ptr not Relocatable");
-            let dict_size = (dict_end - dict_start).unwrap();
-            if dict_size % 3 != 0 {
-                panic!("Return value is not a valid SquashedFelt252Dict")
-            }
-            // Fetch dictionary values type id
+            JsonValue::Object(json_object)
+        },
+         cairo_lang_sierra::extensions::core::CoreTypeConcrete::Felt252Dict(info)
+        | cairo_lang_sierra::extensions::core::CoreTypeConcrete::SquashedFelt252Dict(info) => {
+            let (dict_start, dict_size) = match sierra_program_registry
+                .get_type(return_type_id)
+                .unwrap()
+            {
+                cairo_lang_sierra::extensions::core::CoreTypeConcrete::Felt252Dict(_) => {
+                    let dict_ptr = return_values_iter
+                        .next()
+                        .expect("Missing return val")
+                        .get_relocatable()
+                        .expect("Dict Ptr not Relocatable");
+                    if !(dict_ptr.offset
+                        == vm
+                            .get_segment_size(dict_ptr.segment_index as usize)
+                            .unwrap_or_default()
+                        && dict_ptr.offset % 3 == 0)
+                    {
+                        panic!("Return value is not a valid Felt252Dict")
+                    }
+                    ((dict_ptr.segment_index, 0).into(), dict_ptr.offset)
+                }
+                cairo_lang_sierra::extensions::core::CoreTypeConcrete::SquashedFelt252Dict(_) => {
+                    let dict_start = return_values_iter
+                        .next()
+                        .expect("Missing return val")
+                        .get_relocatable()
+                        .expect("Squashed dict_start ptr not Relocatable");
+                    let dict_end = return_values_iter
+                        .next()
+                        .expect("Missing return val")
+                        .get_relocatable()
+                        .expect("Squashed dict_end ptr not Relocatable");
+                    let dict_size = (dict_end - dict_start).unwrap();
+                    if dict_size % 3 != 0 {
+                        panic!("Return value is not a valid SquashedFelt252Dict")
+                    }
+                    (dict_start, dict_size)
+                }
+                _ => unreachable!(),
+            };
+
             let value_type_id = &info.ty;
-            // Fetch the dictionary's memory
             let dict_mem = vm
                 .get_continuous_range(dict_start, dict_size)
-                .expect("Malformed squashed dictionary memory");
-            // Serialize the dictionary
-            output_string.push('{');
-            // The dictionary's memory is made up of (key, prev_value, next_value) tuples
-            // The prev value is not relevant to the user so we can skip over it for calrity
+                .expect("Malformed dictionary memory");
+
+            let mut json_object = serde_json::Map::new();
             for (key, _, value) in dict_mem.iter().tuples() {
-                maybe_add_whitespace(output_string);
-                // Serialize the key wich should always be a Felt value
-                output_string.push_str(&key.to_string());
-                output_string.push(':');
-                // Serialize the value
-                // We create a peekable array here in order to use the serialize_output_inner as the value could be a span
+                let key_string = key.to_string();
                 let value_vec = vec![value.clone()];
                 let mut value_iter = value_vec.iter().peekable();
-                serialize_output_inner(
-                    &mut value_iter,
-                    output_string,
-                    vm,
-                    value_type_id,
-                    sierra_program_registry,
-                    type_sizes,
+                json_object.insert(
+                    key_string,
+                    serialize_output_inner(
+                        &mut value_iter,
+                        vm,
+                        value_type_id,
+                        sierra_program_registry,
+                        type_sizes,
+                    ),
                 );
             }
-            output_string.push('}');
+            JsonValue::Object(json_object)
         }
-        cairo_lang_sierra::extensions::core::CoreTypeConcrete::Span(_) => unimplemented!("Span types get resolved to Array in the current version"),
         cairo_lang_sierra::extensions::core::CoreTypeConcrete::Snapshot(info) => {
             serialize_output_inner(
                 return_values_iter,
-                output_string,
                 vm,
                 &info.ty,
                 sierra_program_registry,
@@ -1505,8 +1569,9 @@ fn serialize_output_inner<'a>(
         cairo_lang_sierra::extensions::core::CoreTypeConcrete::GasBuiltin(_info) => {
             // Ignore it
             let _ = return_values_iter.next();
-        },
-        _ => panic!("Unexpected return type")
+            JsonValue::Null
+        }
+        _ => panic!("Unexpected return type"),
     }
 }
 
