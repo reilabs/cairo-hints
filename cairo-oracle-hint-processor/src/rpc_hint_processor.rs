@@ -105,7 +105,6 @@ impl<'a> Rpc1HintProcessor<'a> {
             &configuration.input,
             &mut inputs.as_ref(),
         );
-        println!("let the oracle decide... Inputs: {data:?}");
 
         let use_polling = server_config.polling.unwrap_or(false);
 
@@ -284,7 +283,6 @@ impl<'a> Rpc1HintProcessor<'a> {
                         e
                     )))
                 })?;
-            print!("Response: {response_json}");
             let output = if response_json.is_object() {
                 response_json
             } else {
