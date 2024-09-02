@@ -6,7 +6,7 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use args::process_args;
 use cairo_lang_sierra::program::VersionedProgram;
 use cairo_oracle_hint_processor::{run_1, Error, FuncArgs};
@@ -14,10 +14,11 @@ use cairo_proto_serde::configuration::{Configuration, ServerConfig};
 use cairo_vm::types::layout_name::LayoutName;
 use camino::Utf8PathBuf;
 use clap::Parser;
-use itertools::Itertools;
 use scarb_metadata::{MetadataCommand, ScarbCommand};
 use scarb_ui::args::PackagesFilter;
 use scarb_utils::absolute_path;
+use serde_json::{json, Value};
+use std::process;
 
 pub mod args;
 mod deserialization;
@@ -110,74 +111,89 @@ fn str_into_layout(value: &str) -> LayoutName {
     }
 }
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let result = match run() {
+        Ok(return_values) => {
+            let parsed_data: Value = serde_json::from_str(&return_values)?;
+            json!({
+                "status": "success",
+                "data": parsed_data
+            })
+        }
+        Err(err) => {
+            json!({
+                "status": "error",
+                "message": err.to_string()
+            })
+        }
+    };
+
+    println!("{}", serde_json::to_string(&result)?);
+
+    if result["status"] == "error" {
+        process::exit(1);
+    } else {
+        process::exit(0);
+    }
+}
+
+fn run() -> Result<String, Box<dyn std::error::Error>> {
     let args: Args = Args::parse();
-    let metadata = MetadataCommand::new().inherit_stderr().exec().unwrap();
-    let package = args.packages_filter.match_one(&metadata).unwrap();
+    let metadata = MetadataCommand::new().inherit_stderr().exec()?;
+    let package = args.packages_filter.match_one(&metadata)?;
 
     if !args.no_build {
-        ScarbCommand::new().arg("build").run().unwrap();
+        ScarbCommand::new().arg("build").run()?;
     }
 
     let filename = format!("{}.sierra.json", package.name);
-    let scarb_target_dir = env::var("SCARB_TARGET_DIR").unwrap();
-    let scarb_profile = env::var("SCARB_PROFILE").unwrap();
-    let path = Utf8PathBuf::from(scarb_target_dir.clone())
-        .join(scarb_profile.clone())
-        .join(filename.clone());
+    let scarb_target_dir = env::var("SCARB_TARGET_DIR")?;
+    let scarb_profile = env::var("SCARB_PROFILE")?;
+    let path = Utf8PathBuf::from(scarb_target_dir)
+        .join(scarb_profile)
+        .join(filename);
 
-    path.try_exists()
-        .expect("package has not been compiled, file does not exist: {filename}");
+    if !path.try_exists()? {
+        return Err(format!(
+            "Package has not been compiled, file does not exist: {}",
+            path
+        )
+        .into());
+    }
 
     let lock_output = absolute_path(&package, args.oracle_lock, "oracle_lock", Some(PathBuf::from("Oracle.lock")))
-        .expect("lock path must be provided either as an argument (--oracle-lock src) or in the Scarb.toml file in the [tool.hints] section.");
-    let lock_file = File::open(lock_output).map_err(|e| Error::IO(e))?;
+        .ok_or_else(|| "Lock path must be provided either as an argument (--oracle-lock src) or in the Scarb.toml file in the [tool.hints] section.")?;
+    let lock_file = File::open(lock_output)?;
     let reader = BufReader::new(lock_file);
-    let mut service_configuration: Configuration =
-        serde_json::from_reader(reader).map_err(|e| Error::IO(e.into()))?;
+    let mut service_configuration: Configuration = serde_json::from_reader(reader)?;
 
-    // Get the servers config path using absolute_path
     let servers_config_path = absolute_path(&package, None, "servers_config", Some(PathBuf::from("servers.json")))
-        .expect("servers config path must be provided either in the Scarb.toml file in the [tool.hints] section or default to servers.json in the project root.");
+        .ok_or_else(|| "Servers config path must be provided either in the Scarb.toml file in the [tool.hints] section or default to servers.json in the project root.")?;
 
-    // Read and parse the servers config file
-    let config_content = fs::read_to_string(&servers_config_path).map_err(|e| Error::IO(e))?;
+    let config_content = fs::read_to_string(&servers_config_path)?;
     let servers_config: HashMap<String, ServerConfig> = serde_json::from_str(&config_content)
-        .map_err(|e| {
-            Error::ServersConfigFileError(format!("Failed to parse servers config: {}", e))
-        })?;
+        .map_err(|e| format!("Failed to parse servers config: {}", e))?;
 
-    // Add the servers_config to the Configuration
     service_configuration.servers_config = servers_config;
 
-    let sierra_program = serde_json::from_str::<VersionedProgram>(
-        &fs::read_to_string(path.clone())
-            .with_context(|| format!("failed to read Sierra file: {path}"))
-            .unwrap(),
-    )
-    .with_context(|| format!("failed to deserialize Sierra program: {path}"))
-    .unwrap()
-    .into_v1()
-    .with_context(|| format!("failed to load Sierra program: {path}"))
-    .unwrap();
-
-    let sierra_program = sierra_program.program;
+    let sierra_program = serde_json::from_str::<VersionedProgram>(&fs::read_to_string(&path)?)?
+        .into_v1()
+        .map_err(|_| format!("Failed to load Sierra program: {}", path))?
+        .program;
 
     let func_args = if let Some(json_args) = args.args_json {
-        let inputs_shema = absolute_path(&package, None, "inputs_schema", Some(PathBuf::from("InputsSchema.txt")))
-        .expect("inputs schema path must be provided either in the Scarb.toml file in the [tool.hints] section or default to InputsSchema.txt in the project root.");
+        let inputs_schema = absolute_path(&package, None, "inputs_schema", Some(PathBuf::from("InputsSchema.txt")))
+            .ok_or_else(|| "Inputs schema path must be provided either in the Scarb.toml file in the [tool.hints] section or default to InputsSchema.txt in the project root.")?;
 
-        let schema =
-            args::parse_input_schema(&inputs_shema).expect("Failed to parse input schema file");
-
-        args::process_json_args(&json_args, &schema).expect("Failed to process json args.")
+        let schema = args::parse_input_schema(&inputs_schema)?;
+        args::process_json_args(&json_args, &schema)?
     } else if let Some(args) = args.args {
         args
     } else {
         FuncArgs::default()
     };
 
-    match run_1(
+    let result = run_1(
         &service_configuration,
         &str_into_layout(&args.layout),
         &args.trace_file,
@@ -189,34 +205,26 @@ fn main() -> Result<(), Error> {
         &sierra_program,
         "::main",
         args.proof_mode,
-    ) {
-        Err(Error::Cli(err)) => err.exit(),
-        Ok(return_values) => {
-            if return_values.is_some() {
-                let return_values_string_list =
-                    return_values.iter().map(|m| m.to_string()).join(", ");
-                println!("Return values : {}", return_values_string_list);
-            }
-            Ok(())
-        }
+    );
+
+    match result {
+        Ok(return_values) => Ok(return_values.unwrap_or_else(|| "Null".to_string())),
         Err(Error::RunPanic(panic_data)) => {
-            if !panic_data.is_empty() {
-                let panic_data_string_list = panic_data
+            let panic_data_string = if panic_data.is_empty() {
+                "Null".to_string()
+            } else {
+                panic_data
                     .iter()
                     .map(|m| {
-                        // Try to parse to utf8 string
-                        let msg = String::from_utf8(m.to_bytes_be().to_vec());
-                        if let Ok(msg) = msg {
-                            format!("{} ('{}')", m, msg)
-                        } else {
-                            m.to_string()
-                        }
+                        String::from_utf8(m.to_bytes_be().to_vec())
+                            .map(|msg| format!("{} ('{}')", m, msg))
+                            .unwrap_or_else(|_| m.to_string())
                     })
-                    .join(", ");
-                println!("Run panicked with: [{}]", panic_data_string_list);
-            }
-            Ok(())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            Ok(format!("Run panicked with: [{}]", panic_data_string))
         }
-        Err(err) => Err(err),
+        Err(err) => Err(err.into()),
     }
 }
