@@ -10,9 +10,9 @@ use cairo_lang_test_plugin::TestCompilation;
 use cairo_proto_serde::configuration::{Configuration, ServerConfig};
 use cairo_vm::types::layout_name::LayoutName;
 use clap::Parser;
+use scarb_hints_lib::utils::absolute_path;
 use scarb_metadata::{Metadata, MetadataCommand, PackageMetadata, ScarbCommand, TargetMetadata};
 use scarb_ui::args::PackagesFilter;
-use scarb_utils::absolute_path;
 
 /// Execute all unit tests of a local package.
 #[derive(Parser, Clone, Debug)]

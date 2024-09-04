@@ -7,20 +7,19 @@ use std::{
 };
 
 use anyhow::Result;
-use args::process_args;
 use cairo_lang_sierra::program::VersionedProgram;
 use cairo_oracle_hint_processor::{run_1, Error, FuncArgs};
 use cairo_proto_serde::configuration::{Configuration, ServerConfig};
 use cairo_vm::types::layout_name::LayoutName;
 use camino::Utf8PathBuf;
 use clap::Parser;
+use scarb_hints_lib::serialization::{parse_input_schema, process_args, process_json_args};
+use scarb_hints_lib::utils::absolute_path;
 use scarb_metadata::{MetadataCommand, ScarbCommand};
 use scarb_ui::args::PackagesFilter;
-use scarb_utils::absolute_path;
 use serde_json::{json, Value};
 use std::process;
 
-pub mod args;
 mod deserialization;
 
 /// Execute the main function of a package.
@@ -185,8 +184,8 @@ fn run() -> Result<String, Box<dyn std::error::Error>> {
         let inputs_schema = absolute_path(&package, None, "inputs_schema", Some(PathBuf::from("InputsSchema.txt")))
             .ok_or_else(|| "Inputs schema path must be provided either in the Scarb.toml file in the [tool.hints] section or default to InputsSchema.txt in the project root.")?;
 
-        let schema = args::parse_input_schema(&inputs_schema)?;
-        args::process_json_args(&json_args, &schema)?
+        let schema = parse_input_schema(&inputs_schema)?;
+        process_json_args(&json_args, &schema)?
     } else if let Some(args) = args.args {
         args
     } else {

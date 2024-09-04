@@ -20,8 +20,8 @@ name = "scarb-hints-test"
 path = "scarb-hints-test/main.rs"
 
 [lib]
-name = "scarb_utils"
-path = "scarb-utils/lib.rs"
+name = "scarb_hints_lib"
+path = "scarb-hints-lib/lib.rs"
 
 [dependencies]
 bincode = { workspace = true }

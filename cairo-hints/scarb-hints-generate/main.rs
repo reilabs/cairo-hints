@@ -1,9 +1,9 @@
-use std::{io::Result, path::PathBuf};
 use cairo_proto_build::Config;
 use clap::Parser;
+use scarb_hints_lib::utils::absolute_path;
 use scarb_metadata::MetadataCommand;
 use scarb_ui::args::PackagesFilter;
-use scarb_utils::absolute_path;
+use std::{io::Result, path::PathBuf};
 
 /// Execute the main function of a package.
 #[derive(Parser, Clone, Debug)]
@@ -39,11 +39,14 @@ fn main() -> Result<()> {
     let cairo_output: PathBuf = absolute_path(&package, args.cairo_output, "cairo_output", Some(PathBuf::from("src")))
         .expect("cairo output path must be provided either as an argument (--cairo-output src) or in the Scarb.toml file in the [tool.hints] section.");
 
-    let oracle_module = args.oracle_module.or_else(|| {
-        package.tool_metadata("hints").and_then(|tool_config| {
-            tool_config["oracle_module"].as_str().map(String::from)
+    let oracle_module = args
+        .oracle_module
+        .or_else(|| {
+            package
+                .tool_metadata("hints")
+                .and_then(|tool_config| tool_config["oracle_module"].as_str().map(String::from))
         })
-    }).unwrap_or("lib.cairo".to_string());
+        .unwrap_or("lib.cairo".to_string());
 
     let lock_output = absolute_path(&package, args.oracle_lock, "oracle_lock", Some(PathBuf::from("Oracle.lock")))
         .expect("lock path must be provided either as an argument (--oracle-lock src) or in the Scarb.toml file in the [tool.hints] section.");
@@ -52,10 +55,7 @@ fn main() -> Result<()> {
         .out_dir(cairo_output)
         .oracle_module(&oracle_module)
         .oracle_lock(lock_output)
-        .compile_protos(
-            &[&definitions], 
-            &[includes]
-        )?;
+        .compile_protos(&[&definitions], &[includes])?;
 
     println!("Done");
     Ok(())
