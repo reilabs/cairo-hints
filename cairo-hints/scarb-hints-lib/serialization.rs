@@ -192,8 +192,27 @@ fn parse_value(
             let string = value
                 .as_str()
                 .ok_or_else(|| "Expected string for Felt252".to_string())?;
+            let processed_string =
+                if !string.starts_with("0x") && !string.chars().all(|c| c.is_digit(10)) {
+                    // Convert to hexadecimal if it's not already hex or decimal
+                    assert!(
+                        string.len() <= 31,
+                        "Input string must be 31 characters or less"
+                    );
+                    format!(
+                        "0x{}",
+                        string
+                            .as_bytes()
+                            .iter()
+                            .map(|b| format!("{:02x}", b))
+                            .collect::<String>()
+                    )
+                } else {
+                    string.to_string()
+                };
+
             Ok(vec![FuncArg::Single(
-                Felt252::from_str(string).map_err(|e| e.to_string())?,
+                Felt252::from_str(&processed_string).map_err(|e| e.to_string())?,
             )])
         }
         InputType::ByteArray => {
@@ -425,6 +444,9 @@ mod tests {
         assert_eq!(result.0[7], FuncArg::Single(Felt252::from(1)));
         assert_eq!(result.0[8], FuncArg::Single(Felt252::from(2)));
         assert_eq!(result.0[9], FuncArg::Single(Felt252::from(1)));
-        assert_eq!(result.0[10], FuncArg::Single(Felt252::from_hex("0x80000000").unwrap()));
+        assert_eq!(
+            result.0[10],
+            FuncArg::Single(Felt252::from_hex("0x80000000").unwrap())
+        );
     }
 }

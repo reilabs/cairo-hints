@@ -6,7 +6,7 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use cairo_lang_sierra::program::VersionedProgram;
 use cairo_oracle_hint_processor::{run_1, Error, FuncArgs};
 use cairo_proto_serde::configuration::{Configuration, ServerConfig};
@@ -17,24 +17,21 @@ use scarb_hints_lib::serialization::{parse_input_schema, process_args, process_j
 use scarb_hints_lib::utils::absolute_path;
 use scarb_metadata::{MetadataCommand, ScarbCommand};
 use scarb_ui::args::PackagesFilter;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::process;
 
 mod deserialization;
 
-/// Execute the main function of a package.
 #[derive(Parser, Clone, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Name of the package.
     #[clap(flatten)]
     packages_filter: PackagesFilter,
 
-    /// Do not rebuild the package.
     #[clap(long, default_value_t = false)]
     no_build: bool,
 
-    #[clap(long = "layout", default_value = "all_cairo", value_parser=validate_layout)]
+    #[clap(long = "layout", default_value = "all_cairo", value_parser = validate_layout)]
     layout: String,
 
     #[clap(long, default_value_t = false)]
@@ -55,11 +52,9 @@ struct Args {
     )]
     air_private_input: Option<PathBuf>,
 
-    /// Configuration file for oracle servers.
     #[clap(long)]
     servers_config_file: Option<PathBuf>,
 
-    /// Oracle lock file path.
     #[clap(long)]
     oracle_lock: Option<PathBuf>,
 
@@ -69,11 +64,9 @@ struct Args {
     #[clap(long)]
     memory_file: Option<PathBuf>,
 
-    /// Arguments of the Cairo function.
-    #[clap(long = "args", default_value = "", value_parser=process_args)]
+    #[clap(long = "args", default_value = "", value_parser = process_args)]
     args: Option<FuncArgs>,
 
-    /// Arguments of the Cairo function.
     #[clap(long = "args_json", default_value = "")]
     args_json: Option<String>,
 }
@@ -110,8 +103,20 @@ fn str_into_layout(value: &str) -> LayoutName {
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let result = match run() {
+#[derive(Serialize, Deserialize, Debug)]
+struct PreprocessResponse {
+    args: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct CairoRunResponse {
+    result: String,
+    request_id: String,
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let result = match run().await {
         Ok(return_values) => {
             let parsed_data: Value = serde_json::from_str(&return_values)?;
             json!({
@@ -129,14 +134,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("{}", serde_json::to_string(&result)?);
 
-    if result["status"] == "error" {
-        process::exit(1);
-    } else {
-        process::exit(0);
-    }
+    std::process::exit(if result["status"] == "error" { 1 } else { 0 });
 }
 
-fn run() -> Result<String, Box<dyn std::error::Error>> {
+async fn run() -> Result<String> {
     let args: Args = Args::parse();
     let metadata = MetadataCommand::new().inherit_stderr().exec()?;
     let package = args.packages_filter.match_one(&metadata)?;
@@ -146,51 +147,43 @@ fn run() -> Result<String, Box<dyn std::error::Error>> {
     }
 
     let filename = format!("{}.sierra.json", package.name);
-    let scarb_target_dir = env::var("SCARB_TARGET_DIR")?;
-    let scarb_profile = env::var("SCARB_PROFILE")?;
+    let scarb_target_dir = env::var("SCARB_TARGET_DIR").context("SCARB_TARGET_DIR not set")?;
+    let scarb_profile = env::var("SCARB_PROFILE").context("SCARB_PROFILE not set")?;
     let path = Utf8PathBuf::from(scarb_target_dir)
         .join(scarb_profile)
         .join(filename);
 
     if !path.try_exists()? {
-        return Err(format!(
+        anyhow::bail!(
             "Package has not been compiled, file does not exist: {}",
             path
-        )
-        .into());
+        );
     }
 
-    let lock_output = absolute_path(&package, args.oracle_lock, "oracle_lock", Some(PathBuf::from("Oracle.lock")))
-        .ok_or_else(|| "Lock path must be provided either as an argument (--oracle-lock src) or in the Scarb.toml file in the [tool.hints] section.")?;
+    let lock_output = absolute_path(&package, args.clone().oracle_lock, "oracle_lock", Some(PathBuf::from("Oracle.lock")))
+        .context("Lock path must be provided either as an argument (--oracle-lock src) or in the Scarb.toml file in the [tool.hints] section.")?;
     let lock_file = File::open(lock_output)?;
     let reader = BufReader::new(lock_file);
     let mut service_configuration: Configuration = serde_json::from_reader(reader)?;
 
     let servers_config_path = absolute_path(&package, None, "servers_config", Some(PathBuf::from("servers.json")))
-        .ok_or_else(|| "Servers config path must be provided either in the Scarb.toml file in the [tool.hints] section or default to servers.json in the project root.")?;
+        .context("Servers config path must be provided either in the Scarb.toml file in the [tool.hints] section or default to servers.json in the project root.")?;
 
     let config_content = fs::read_to_string(&servers_config_path)?;
-    let servers_config: HashMap<String, ServerConfig> = serde_json::from_str(&config_content)
-        .map_err(|e| format!("Failed to parse servers config: {}", e))?;
-
-    service_configuration.servers_config = servers_config;
+    let mut servers_config: HashMap<String, ServerConfig> =
+        serde_json::from_str(&config_content).context("Failed to parse servers config")?;
 
     let sierra_program = serde_json::from_str::<VersionedProgram>(&fs::read_to_string(&path)?)?
         .into_v1()
-        .map_err(|_| format!("Failed to load Sierra program: {}", path))?
+        .context("Failed to load Sierra program")?
         .program;
 
-    let func_args = if let Some(json_args) = args.args_json {
-        let inputs_schema = absolute_path(&package, None, "inputs_schema", Some(PathBuf::from("InputsSchema.txt")))
-            .ok_or_else(|| "Inputs schema path must be provided either in the Scarb.toml file in the [tool.hints] section or default to InputsSchema.txt in the project root.")?;
+    let preprocess_config = servers_config.remove("preprocess");
+    let postprocess_config = servers_config.remove("postprocess");
 
-        let schema = parse_input_schema(&inputs_schema)?;
-        process_json_args(&json_args, &schema)?
-    } else if let Some(args) = args.args {
-        args
-    } else {
-        FuncArgs::default()
-    };
+    let func_args = get_func_args(&args, &package, preprocess_config).await?;
+
+    service_configuration.servers_config = servers_config;
 
     let result = run_1(
         &service_configuration,
@@ -206,8 +199,74 @@ fn run() -> Result<String, Box<dyn std::error::Error>> {
         args.proof_mode,
     );
 
+    process_result(result, postprocess_config).await
+}
+
+async fn get_func_args(
+    args: &Args,
+    package: &scarb_metadata::PackageMetadata,
+    preprocess_config: Option<ServerConfig>,
+) -> Result<FuncArgs> {
+    let inputs_schema = get_inputs_schema(package)?;
+    let schema = parse_input_schema(&inputs_schema)
+        .map_err(|e| anyhow::anyhow!("Failed to parse input schema: {}", e))?;
+
+    if let Some(preprocess) = preprocess_config {
+        let body: Value =
+            serde_json::from_str(&args.args_json.as_ref().context("Expect --args_json")?)?;
+
+        let url = if preprocess.server_url.ends_with("/preprocess") {
+            preprocess.server_url.to_string()
+        } else if preprocess.server_url.ends_with('/') {
+            format!("{}preprocess", preprocess.server_url)
+        } else {
+            format!("{}/preprocess", preprocess.server_url)
+        };
+
+        let preprocess_result = call_server::<PreprocessResponse>(&url, body).await?.args;
+        process_json_args(&preprocess_result, &schema).map_err(|e| anyhow::anyhow!(e))
+    } else if let Some(json_args) = &args.args_json {
+        process_json_args(json_args, &schema).map_err(|e| anyhow::anyhow!(e))
+    } else if let Some(args) = &args.args {
+        Ok(args.clone())
+    } else {
+        Ok(FuncArgs::default())
+    }
+}
+
+fn get_inputs_schema(package: &scarb_metadata::PackageMetadata) -> Result<PathBuf> {
+    absolute_path(package, None, "inputs_schema", Some(PathBuf::from("InputsSchema.txt")))
+        .context("Inputs schema path must be provided either in the Scarb.toml file in the [tool.hints] section or default to InputsSchema.txt in the project root.")
+}
+
+async fn process_result(
+    result: Result<Option<String>, Error>,
+    postprocess_config: Option<ServerConfig>,
+) -> Result<String> {
     match result {
-        Ok(return_values) => Ok(return_values.unwrap_or_else(|| "Null".to_string())),
+        Ok(return_values) => {
+            let cairo_output = return_values.unwrap_or_else(|| "Null".to_string());
+            if let Some(postprocess) = postprocess_config {
+                let url = if postprocess.server_url.ends_with("/postprocess") {
+                    postprocess.server_url.to_string()
+                } else if postprocess.server_url.ends_with('/') {
+                    format!("{}postprocess", postprocess.server_url)
+                } else {
+                    format!("{}/postprocess", postprocess.server_url)
+                };
+
+                let body = CairoRunResponse {
+                    result: cairo_output,
+                    request_id: "None".to_string(),
+                };
+
+                call_server::<Value>(&url, body)
+                    .await
+                    .map(|v| v.to_string())
+            } else {
+                Ok(cairo_output)
+            }
+        }
         Err(Error::RunPanic(panic_data)) => {
             let panic_data_string = if panic_data.is_empty() {
                 "Null".to_string()
@@ -226,4 +285,14 @@ fn run() -> Result<String, Box<dyn std::error::Error>> {
         }
         Err(err) => Err(err.into()),
     }
+}
+
+async fn call_server<T: DeserializeOwned>(url: &str, body: impl Serialize) -> Result<T> {
+    let client = reqwest::Client::new();
+    let response = client.post(url).json(&body).send().await?;
+    response
+        .error_for_status()?
+        .json()
+        .await
+        .map_err(Into::into)
 }
