@@ -1,21 +1,21 @@
 use starknet::testing::cheatcode;
 #[derive(Drop, Serde)]
-struct Request {
-    inner: Option<super::shirts::request::Inner>,
+pub struct Request {
+    pub inner: Option<super::shirts::request::Inner>,
 }
 /// Nested message and enum types in `Request`.
-mod request {
+pub mod request {
     #[derive(Drop, Serde)]
-    struct Inner {
-        color: super::super::shirts::Size,
+    pub struct Inner {
+        pub color: super::super::shirts::Size,
     }
 }
 #[derive(Drop, Serde)]
-struct Response {
-    color: super::shirts::Size,
+pub struct Response {
+    pub color: super::shirts::Size,
 }
 #[derive(Drop, Serde, PartialEq)]
-enum Size {
+pub enum Size {
     Small,
     Medium,
     Large,

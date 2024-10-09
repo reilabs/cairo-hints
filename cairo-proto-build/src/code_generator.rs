@@ -149,7 +149,7 @@ impl<'a> CodeGenerator<'a> {
         self.code_buf
             .push_str("#[derive(Drop, Serde, PartialEq)]\n");
         self.push_indent();
-        self.code_buf.push_str("enum ");
+        self.code_buf.push_str("pub enum ");
         self.code_buf.push_str(&enum_name);
         self.code_buf.push_str(" {\n");
 
@@ -255,7 +255,7 @@ impl<'a> CodeGenerator<'a> {
         self.push_indent();
         self.code_buf.push_str("#[derive(Drop, Serde)]\n");
         self.push_indent();
-        self.code_buf.push_str("struct ");
+        self.code_buf.push_str("pub struct ");
         self.code_buf.push_str(&struct_name);
         self.code_buf.push_str(" {\n");
 
@@ -388,6 +388,7 @@ impl<'a> CodeGenerator<'a> {
         let field_name = to_snake(field.name());
 
         self.push_indent();
+        self.code_buf.push_str("pub ");
         self.code_buf.push_str(&field_name);
         self.code_buf.push_str(": ");
 
@@ -518,7 +519,7 @@ impl<'a> CodeGenerator<'a> {
         // Generate a trait for the service.
         self.code_buf.push_str("#[generate_trait]\n");
         self.code_buf.push_str(&format!(
-            "impl {} of {}Trait {{\n",
+            "pub impl {} of {}Trait {{\n",
             &service.name, &service.name
         ));
 
@@ -574,7 +575,7 @@ impl<'a> CodeGenerator<'a> {
         self.code_buf.push_str("`.\n");
 
         self.push_indent();
-        self.code_buf.push_str("mod ");
+        self.code_buf.push_str("pub mod ");
         self.code_buf.push_str(&to_snake(module));
         self.code_buf.push_str(" {\n");
 

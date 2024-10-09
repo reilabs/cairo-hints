@@ -1,14 +1,14 @@
 use starknet::testing::cheatcode;
 #[derive(Drop, Serde)]
-struct Request {
-    n: u64,
+pub struct Request {
+    pub n: u64,
 }
 #[derive(Drop, Serde)]
-struct Response {
-    n: u64,
+pub struct Response {
+    pub n: u64,
 }
 #[generate_trait]
-impl SqrtOracle of SqrtOracleTrait {
+pub impl SqrtOracle of SqrtOracleTrait {
     fn sqrt(arg: super::oracle::Request) -> super::oracle::Response {
         let mut serialized = ArrayTrait::new();
         arg.serialize(ref serialized);
