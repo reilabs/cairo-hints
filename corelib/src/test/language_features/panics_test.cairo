@@ -1,5 +1,5 @@
-use core::byte_array::BYTE_ARRAY_MAGIC;
-use core::{panics, panic_with_felt252};
+use crate::byte_array::BYTE_ARRAY_MAGIC;
+use crate::{panics, panic_with_felt252};
 
 #[test]
 #[should_panic(expected: 'short_string')]
@@ -143,4 +143,17 @@ fn test_panic_macro_basic_string() {
 #[should_panic(expected: "some_format(1)")]
 fn test_panic_macro_with_input() {
     panic!("some_format({})", 1)
+}
+
+
+#[test]
+#[should_panic(expected: 'PanicDestruct')]
+fn test_panic_destruct() {
+    panic_destruct_helper(1);
+}
+
+
+#[inline]
+fn panic_destruct_helper<T, +PanicDestruct<T>>(n: T) {
+    panic_with_felt252('PanicDestruct')
 }

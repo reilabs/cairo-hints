@@ -12,7 +12,8 @@ use cairo_lang_sierra::program::Program;
 use cairo_lang_starknet::starknet_plugin_suite;
 use cairo_lang_test_plugin::test_config::{PanicExpectation, TestExpectation};
 use cairo_lang_test_plugin::{
-    compile_test_prepared_db, test_plugin_suite, TestCompilation, TestConfig,
+    compile_test_prepared_db, test_plugin_suite, TestCompilation, TestCompilationMetadata,
+    TestConfig, TestsCompilationConfig,
 };
 use cairo_oracle_hint_processor::{run_1, Error, FuncArgs};
 use cairo_proto_serde::configuration::Configuration;
@@ -85,7 +86,7 @@ impl CompiledTestRunner {
             self.compiled,
             self.config.include_ignored,
             self.config.ignored,
-            self.config.filter,
+            &self.config.filter,
         );
         let TestsSummary {
             passed,
@@ -93,8 +94,8 @@ impl CompiledTestRunner {
             ignored,
             failed_run_results,
         } = run_tests(
-            compiled.named_tests,
-            compiled.sierra_program,
+            compiled.metadata.named_tests,
+            compiled.sierra_program.program,
             // compiled.function_set_costs,
             // compiled.contracts_info,
             oracle_server,
@@ -177,7 +178,10 @@ impl TestCompiler {
         let db = &mut {
             let mut b = RootDatabase::builder();
             b.detect_corelib();
-            b.with_cfg(CfgSet::from_iter([Cfg::name("test")]));
+            b.with_cfg(CfgSet::from_iter([
+                Cfg::name("test"),
+                Cfg::kv("target", "test"),
+            ]));
             b.with_plugin_suite(test_plugin_suite());
             if starknet {
                 b.with_plugin_suite(starknet_plugin_suite());
@@ -205,11 +209,18 @@ impl TestCompiler {
 
     /// Build the tests and collect metadata.
     pub fn build(&self) -> Result<TestCompilation> {
+        let allow_warnings = false;
+        let config = TestsCompilationConfig {
+            starknet: self.starknet,
+            add_statements_functions: false,
+            add_statements_code_locations: false,
+        };
         compile_test_prepared_db(
             &self.db,
-            self.starknet,
+            config,
             self.main_crate_ids.clone(),
             self.test_crate_ids.clone(),
+            allow_warnings,
         )
     }
 }
@@ -227,27 +238,31 @@ pub fn filter_test_cases(
     compiled: TestCompilation,
     include_ignored: bool,
     ignored: bool,
-    filter: String,
+    filter: &str,
 ) -> (TestCompilation, usize) {
-    let total_tests_count = compiled.named_tests.len();
+    let total_tests_count = compiled.metadata.named_tests.len();
     let named_tests = compiled
+        .metadata
         .named_tests
         .into_iter()
+        // Filtering unignored tests in `ignored` mode. Keep all tests in `include-ignored` mode.
+        .filter(|(_, test)| !ignored || test.ignored || include_ignored)
         .map(|(func, mut test)| {
-            // Un-ignoring all the tests in `include-ignored` mode.
-            if include_ignored {
+            // Un-ignoring all the tests in `include-ignored` and `ignored` mode.
+            if include_ignored || ignored {
                 test.ignored = false;
             }
             (func, test)
         })
-        .filter(|(name, _)| name.contains(&filter))
-        // Filtering unignored tests in `ignored` mode
-        .filter(|(_, test)| !ignored || test.ignored)
+        .filter(|(name, _)| name.contains(filter))
         .collect_vec();
     let filtered_out = total_tests_count - named_tests.len();
     let tests = TestCompilation {
-        named_tests,
-        ..compiled
+        sierra_program: compiled.sierra_program,
+        metadata: TestCompilationMetadata {
+            named_tests,
+            ..(compiled.metadata)
+        },
     };
     (tests, filtered_out)
 }
@@ -342,7 +357,7 @@ pub fn run_tests(
                                 TestExpectation::Panics(panic_expectation) => {
                                     match panic_expectation {
                                         PanicExpectation::Exact(expected)
-                                            if !is_equal_vec_felt(&panic_data, &expected) =>
+                                            if panic_data != expected =>
                                         {
                                             TestStatus::Fail(RunResultValue::Panic(panic_data))
                                         }
