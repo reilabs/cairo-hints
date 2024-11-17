@@ -5,12 +5,15 @@ use alexandria_math::is_power_of_two::is_power_of_two;
 use oracle::ShirtsOracle;
 use shirts::{Request, Response, Size, request::Inner};
 
-fn main() -> bool {
+fn main() -> Array<felt252> {
     is_power_of_two(0) == false;
     let r = Request { inner: Option::Some(Inner { color: Size::Large }) } ;
     let result = ShirtsOracle::shirt(r);
 
-    result.color == Size::Large
+    let res_check = (result.color == Size::Large);
+    let mut output: Array<felt252> = ArrayTrait::new();
+    res_check.serialize(ref output);
+    output
 }
 
 #[cfg(test)]
