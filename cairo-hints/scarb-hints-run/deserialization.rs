@@ -43,29 +43,6 @@ impl Args {
     }
 }
 
-// impl Clone for Args {
-//     fn clone(&self) -> Self {
-//         Self(
-//             self.0
-//                 .iter()
-//                 .map(|arg| match arg {
-//                     Arg::Value(value) => Arg::Value(value.to_owned()),
-//                     Arg::Array(array) => {
-//                         let args_array: Vec<Arg> = array
-//                             .iter()
-//                             .map(|v| {
-//                                 let cloned: Arg = v.to_owned();
-//                                 cloned
-//                             })
-//                             .collect();
-//                         Arg::Array(args_array)
-//                     }
-//                 })
-//                 .collect(),
-//         )
-//     }
-// }
-
 impl Deref for Args {
     type Target = Vec<Arg>;
     fn deref(&self) -> &Self::Target {
