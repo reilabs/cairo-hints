@@ -2,10 +2,13 @@
 //! secp256r1 curve.
 
 use core::option::OptionTrait;
+use core::gas::GasBuiltin;
+#[allow(unused_imports)]
 use starknet::{
     EthAddress, secp256_trait::{Secp256Trait, Secp256PointTrait}, SyscallResult, SyscallResultTrait
 };
 
+/// A point on the Secp256r1 curve.
 #[derive(Copy, Drop)]
 pub extern type Secp256r1Point;
 
@@ -72,3 +75,14 @@ extern fn secp256r1_get_point_from_x_syscall(
 extern fn secp256r1_get_xy_syscall(
     p: Secp256r1Point
 ) -> SyscallResult<(u256, u256)> implicits(GasBuiltin, System) nopanic;
+
+impl Secp256r1PointSerde of Serde<Secp256r1Point> {
+    fn serialize(self: @Secp256r1Point, ref output: Array<felt252>) {
+        let point = (*self).get_coordinates().unwrap();
+        point.serialize(ref output)
+    }
+    fn deserialize(ref serialized: Span<felt252>) -> Option<Secp256r1Point> {
+        let (x, y) = Serde::<(u256, u256)>::deserialize(ref serialized)?;
+        secp256r1_new_syscall(x, y).unwrap_syscall()
+    }
+}

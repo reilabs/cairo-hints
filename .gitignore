@@ -1,1 +1,5 @@
 target/
+
+*.trace
+*.memory
+*.proof

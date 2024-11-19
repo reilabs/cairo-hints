@@ -1,23 +1,25 @@
-use core::array::ArrayTrait;
-use core::traits::Into;
-use core::option::Option;
+#[allow(unused_imports)]
+use crate::array::ArrayTrait;
+use crate::traits::Into;
+#[allow(unused_imports)]
+use crate::option::Option;
 
-// Usage:
-//
-// use core::debug::PrintTrait;
-//
-// 1.print();
-//
-// (1 == 2).print();
-//
-// get_caller_address().print();
-//
-// let mut arr = array![];
-// arr.append('1234567890123456789012345678901');
-// arr.append('Sca');
-// arr.append('SomeVeryLongMessage');
-// arr.print();
-
+/// Usage:
+/// ```
+/// use crate::debug::PrintTrait;
+///
+/// 1.print();
+///
+/// (1 == 2).print();
+///
+/// get_caller_address().print();
+///
+/// let mut arr = array![];
+/// arr.append('1234567890123456789012345678901');
+/// arr.append('Sca');
+/// arr.append('SomeVeryLongMessage');
+/// arr.print();
+/// ```
 pub(crate) extern fn print(message: Array<felt252>) nopanic;
 
 fn print_felt252(message: felt252) {
@@ -125,7 +127,7 @@ pub(crate) impl ArrayGenericPrintImpl of PrintTrait<Array<felt252>> {
 
 /// Prints a byte array as a string.
 pub fn print_byte_array_as_string(self: @ByteArray) {
-    let mut serialized = array![core::byte_array::BYTE_ARRAY_MAGIC];
+    let mut serialized = array![crate::byte_array::BYTE_ARRAY_MAGIC];
     self.serialize(ref serialized);
     print(serialized)
 }

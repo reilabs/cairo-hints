@@ -43,20 +43,6 @@ impl Args {
     }
 }
 
-impl Clone for Args {
-    fn clone(&self) -> Self {
-        Self(
-            self.0
-                .iter()
-                .map(|arg| match arg {
-                    Arg::Value(value) => Arg::Value(value.to_owned()),
-                    Arg::Array(array) => Arg::Array(array.iter().map(ToOwned::to_owned).collect()),
-                })
-                .collect(),
-        )
-    }
-}
-
 impl Deref for Args {
     type Target = Vec<Arg>;
     fn deref(&self) -> &Self::Target {
@@ -93,23 +79,29 @@ impl Args {
             match arg {
                 Value::Number(n) => {
                     let n = n.as_u64().ok_or(ArgsError::NumberOutOfRange)?;
-                    args.push(Arg::Value(Felt252::from(n)));
+                    let arg = Arg::Value(cairo_vm::Felt252::from(n));
+                    args.push(arg);
                 }
                 Value::String(n) => {
                     let n = num_bigint::BigUint::from_str(n)?;
-                    args.push(Arg::Value(Felt252::from_bytes_be(&n.to_bytes_be())));
+                    let arg = Arg::Value(cairo_vm::Felt252::from_bytes_be_slice(&n.to_bytes_be()));
+                    args.push(arg);
                 }
                 Value::Array(arr) => {
-                    let mut inner_args = Vec::new();
+                    let mut inner_args: Vec<Arg> = Vec::new();
                     for a in arr {
                         match a {
                             Value::Number(n) => {
                                 let n = n.as_u64().ok_or(ArgsError::NumberOutOfRange)?;
-                                inner_args.push(Felt252::from(n));
+                                let arg = Arg::Value(cairo_vm::Felt252::from(n));
+                                inner_args.push(arg);
                             }
                             Value::String(n) => {
                                 let n = num_bigint::BigUint::from_str(n)?;
-                                inner_args.push(Felt252::from_bytes_be(&n.to_bytes_be()));
+                                let arg = Arg::Value(cairo_vm::Felt252::from_bytes_be_slice(
+                                    &n.to_bytes_be(),
+                                ));
+                                inner_args.push(arg);
                             }
                             _ => (),
                         }

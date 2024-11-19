@@ -1,4 +1,7 @@
 pub mod traits;
+#[feature("deprecated-index-traits")]
+#[feature("deprecated-op-assign-traits")]
+#[allow(unused_imports)]
 use traits::{
     Add, AddEq, BitAnd, BitNot, BitOr, BitXor, Copy, Div, DivEq, DivRem, Drop, Mul, MulEq,
     PartialEq, PartialOrd, Rem, RemEq, Sub, SubEq, TupleSize0Copy, TupleSize0Drop, Not, Neg, Into,
@@ -99,12 +102,15 @@ impl BoolIntoFelt252 of Into<bool, felt252> {
 }
 pub mod boolean;
 
-// General purpose implicits.
+pub mod circuit;
+
+/// General purpose implicits.
 pub extern type RangeCheck;
 pub extern type SegmentArena;
 
-// felt252.
+/// felt252.
 mod felt_252;
+#[allow(unused_imports)]
 use felt_252::{Felt252One, Felt252Zero};
 
 #[derive(Copy, Drop)]
@@ -117,7 +123,7 @@ impl Felt252Serde of Serde<felt252> {
     }
     fn deserialize(ref serialized: Span<felt252>) -> Option<felt252> {
         let mut snapshot = serialized.snapshot;
-        match core::array::array_snapshot_pop_front(ref snapshot) {
+        match crate::array::array_snapshot_pop_front(ref snapshot) {
             Option::Some(x) => {
                 serialized = Span { snapshot };
                 Option::Some(*x.unbox())
@@ -190,10 +196,6 @@ impl Felt252PartialEq of PartialEq<felt252> {
             _ => false,
         }
     }
-    #[inline(always)]
-    fn ne(lhs: @felt252, rhs: @felt252) -> bool {
-        !(*lhs == *rhs)
-    }
 }
 
 extern fn felt252_is_zero(lhs: felt252) -> zeroable::IsZeroResult<felt252> nopanic;
@@ -225,71 +227,91 @@ impl Felt252Felt252DictValue of Felt252DictValue<felt252> {
 extern fn dup<T>(obj: T) -> (T, T) nopanic;
 extern fn drop<T>(obj: T) nopanic;
 
-// Boxes.
+/// Boxes.
 pub mod box;
+#[allow(unused_imports)]
 use box::{Box, BoxTrait};
 
-// Nullable
+/// Nullable
 pub mod nullable;
+#[allow(unused_imports)]
 use nullable::{Nullable, NullableTrait, match_nullable, null, nullable_from_box};
 
-// Array.
+/// Module for `Array` and other continuous same type collections.
 pub mod array;
+#[allow(unused_imports)]
 use array::{Array, ArrayTrait};
 
-// Span.
+/// Span.
+#[allow(unused_imports)]
 use array::{Span, SpanTrait};
 
-// Dictionary.
+/// Dictionary.
 pub mod dict;
+#[allow(unused_imports)]
 use dict::{
     Felt252Dict, SquashedFelt252Dict, felt252_dict_new, felt252_dict_squash, Felt252DictTrait
 };
 
-// Result.
+/// Result.
 pub mod result;
+#[allow(unused_imports)]
 use result::{Result, ResultTrait};
 
-// Option.
+/// Option.
 pub mod option;
+#[allow(unused_imports)]
 use option::{Option, OptionTrait};
 
-// Clone.
+/// Clone.
 pub mod clone;
+#[allow(unused_imports)]
 use clone::Clone;
 
-// EC.
+/// EC.
 pub mod ec;
+#[allow(unused_imports)]
 use ec::{EcOp, EcPoint, EcState};
 
 pub mod ecdsa;
 
-// Integer.
+/// Integer.
+#[feature("corelib-internal-use")]
 pub mod integer;
+#[allow(unused_imports)]
 use integer::{
     i8, I8IntoFelt252, i16, I16IntoFelt252, i32, I32IntoFelt252, i64, I64IntoFelt252, i128,
-    I128IntoFelt252, NumericLiteral, u128, u128_sqrt, u128_is_zero, u8, u16, u32, u64, u256,
-    u256_sqrt, Felt252TryIntoU8, U8IntoFelt252, Felt252TryIntoU16, U16IntoFelt252,
-    Felt252TryIntoU32, U32IntoFelt252, Felt252TryIntoU64, U64IntoFelt252, Felt252TryIntoU128,
-    U128IntoFelt252, Felt252IntoU256, Bitwise
+    I128IntoFelt252, NumericLiteral, u128, u128_is_zero, u8, u16, u32, u64, u256, Felt252TryIntoU8,
+    U8IntoFelt252, Felt252TryIntoU16, U16IntoFelt252, Felt252TryIntoU32, U32IntoFelt252,
+    Felt252TryIntoU64, U64IntoFelt252, Felt252TryIntoU128, U128IntoFelt252, Felt252IntoU256, Bitwise
 };
+#[feature("corelib-internal-use")]
+#[deprecated(feature: "corelib-internal-use", note: "Use `core::num::traits::Sqrt` instead")]
+#[allow(unused_imports)]
+use integer::{u128_sqrt, u256_sqrt};
 
-// Math.
+/// Math.
+#[feature("corelib-internal-use")]
 pub mod math;
 
-// Num.
+/// Module containing the traits for relevant for numeric types.
 pub mod num;
 
-// Cmp.
+/// Module containing the operations that can be performed on the different types.
+pub mod ops;
+
+/// Module for comparison operations.
 pub mod cmp;
 
-// Gas.
+/// Module for handling gas operations.
 pub mod gas;
+#[allow(unused_imports)]
 use gas::{BuiltinCosts, GasBuiltin, get_builtin_costs};
 
 
-// Panics.
+/// Panics.
 pub mod panics;
+#[allow(unused_imports)]
 use panics::{panic, Panic, PanicResult};
 
 pub enum never {}
@@ -306,64 +328,78 @@ pub fn assert(cond: bool, err_code: felt252) {
     }
 }
 
-// Serialization and Deserialization.
+/// Serialization and Deserialization.
 pub mod serde;
 
-// Hash functions.
+/// Hash functions.
 pub mod hash;
 
 pub mod keccak;
 
-// Pedersen
+pub mod sha256;
+
+/// Pedersen
 pub mod pedersen;
+#[allow(unused_imports)]
 use pedersen::Pedersen;
 
-// Poseidon
+/// Poseidon
 pub mod poseidon;
+#[allow(unused_imports)]
 use poseidon::Poseidon;
 
-// Debug.
+/// Debug.
 pub mod debug;
 
 pub mod fmt;
 
-// Starknet
+/// Starknet
+#[feature("corelib-internal-use")]
 pub mod starknet;
+#[allow(unused_imports)]
 use starknet::System;
 
-// Internals.
+/// Internals.
 pub mod internal;
 
-// Zeroable.
+/// Zeroable.
 pub mod zeroable;
+#[allow(unused_imports)]
 use zeroable::{Zeroable, NonZero};
 
-// bytes31.
+/// bytes31.
 pub mod bytes_31;
+#[allow(unused_imports)]
 use bytes_31::{
     bytes31, bytes31_const, Bytes31IndexView, Bytes31IntoFelt252, Bytes31Trait,
     Felt252TryIntoBytes31
 };
 
-// BytesArray.
+/// BytesArray.
 pub mod byte_array;
+#[allow(unused_imports)]
 use byte_array::{ByteArray, ByteArrayIndexView, ByteArrayStringLiteral, ByteArrayTrait};
 
-// String.
+/// String.
 pub mod string;
+#[allow(unused_imports)]
 use string::StringLiteral;
 
-// to_byte_array.
+/// to_byte_array.
 pub mod to_byte_array;
 
 #[cfg(test)]
 mod test;
 
-// Module for testing only.
+/// Module for testing only.
 pub mod testing;
 
-// Metaprogramming.
+/// Metaprogramming.
 pub mod metaprogramming;
 
-// Preludes.
+/// Preludes.
+#[allow(unused_imports)]
 mod prelude;
+
+/// Iterators.
+pub mod iter;

@@ -1,6 +1,8 @@
-use core::traits::{Into, TryInto};
-use core::option::OptionTrait;
-use core::integer::{u128_safe_divmod, u128_to_felt252};
+use crate::traits::{Into, TryInto};
+use crate::option::OptionTrait;
+#[allow(unused_imports)]
+use crate::integer::{u128_safe_divmod, u128_to_felt252};
+use crate::RangeCheck;
 
 pub(crate) const BYTES_IN_BYTES31: usize = 31;
 const BYTES_IN_U128: usize = 16;
@@ -16,8 +18,8 @@ extern fn bytes31_to_felt252(value: bytes31) -> felt252 nopanic;
 
 #[generate_trait]
 pub impl Bytes31Impl of Bytes31Trait {
-    // Gets the byte at the given index (LSB's index is 0), assuming that
-    // `index < BYTES_IN_BYTES31`. If the assumption is not met, the behavior is undefined.
+    /// Gets the byte at the given index (LSB's index is 0), assuming that
+    /// `index < BYTES_IN_BYTES31`. If the assumption is not met, the behavior is undefined.
     fn at(self: @bytes31, index: usize) -> u8 {
         let u256 { low, high } = (*self).into();
         let res_u128 = if index < BYTES_IN_U128 {
@@ -29,13 +31,14 @@ pub impl Bytes31Impl of Bytes31Trait {
     }
 }
 
-pub(crate) impl Bytes31IndexView of IndexView<bytes31, usize, u8> {
+#[feature("deprecated-index-traits")]
+pub(crate) impl Bytes31IndexView of crate::traits::IndexView<bytes31, usize, u8> {
     fn index(self: @bytes31, index: usize) -> u8 {
         self.at(index)
     }
 }
 
-impl Bytes31BitSize of core::num::traits::BitSize<bytes31> {
+impl Bytes31BitSize of crate::num::traits::BitSize<bytes31> {
     fn bits() -> usize {
         248
     }
@@ -60,42 +63,42 @@ pub(crate) impl Felt252TryIntoBytes31 of TryInto<felt252, bytes31> {
     }
 }
 
-impl Bytes31Serde = core::serde::into_felt252_based::SerdeImpl<bytes31>;
+impl Bytes31Serde = crate::serde::into_felt252_based::SerdeImpl<bytes31>;
 
 pub(crate) impl U8IntoBytes31 of Into<u8, bytes31> {
     fn into(self: u8) -> bytes31 {
-        core::integer::upcast(self)
+        crate::integer::upcast(self)
     }
 }
 impl U16IntoBytes31 of Into<u16, bytes31> {
     fn into(self: u16) -> bytes31 {
-        core::integer::upcast(self)
+        crate::integer::upcast(self)
     }
 }
 impl U32IntoBytes31 of Into<u32, bytes31> {
     fn into(self: u32) -> bytes31 {
-        core::integer::upcast(self)
+        crate::integer::upcast(self)
     }
 }
 impl U64IntoBytes31 of Into<u64, bytes31> {
     fn into(self: u64) -> bytes31 {
-        core::integer::upcast(self)
+        crate::integer::upcast(self)
     }
 }
 pub(crate) impl U128IntoBytes31 of Into<u128, bytes31> {
     fn into(self: u128) -> bytes31 {
-        core::integer::upcast(self)
+        crate::integer::upcast(self)
     }
 }
 
-// Splits a bytes31 into two bytes31s at the given index (LSB's index is 0).
-// The bytes31s are represented using felt252s to improve performance.
-// Note: this function assumes that:
-// 1. `word` is validly convertible to a bytes31 which has no more than `len` bytes of data.
-// 2. index <= len.
-// 3. len <= BYTES_IN_BYTES31.
-// If these assumptions are not met, it can corrupt the ByteArray. Thus, this should be a
-// private function. We could add masking/assertions but it would be more expansive.
+/// Splits a bytes31 into two bytes31s at the given index (LSB's index is 0).
+/// The bytes31s are represented using felt252s to improve performance.
+/// Note: this function assumes that:
+/// 1. `word` is validly convertible to a bytes31 which has no more than `len` bytes of data.
+/// 2. index <= len.
+/// 3. len <= BYTES_IN_BYTES31.
+/// If these assumptions are not met, it can corrupt the ByteArray. Thus, this should be a
+/// private function. We could add masking/assertions but it would be more expansive.
 pub(crate) fn split_bytes31(word: felt252, len: usize, index: usize) -> (felt252, felt252) {
     if index == 0 {
         return (0, word);
@@ -136,11 +139,11 @@ pub(crate) fn split_bytes31(word: felt252, len: usize, index: usize) -> (felt252
 }
 
 
-// Returns 1 << (8 * `n_bytes`) as felt252, assuming that `n_bytes < BYTES_IN_BYTES31`.
-//
-// Note: if `n_bytes >= BYTES_IN_BYTES31`, the behavior is undefined. If one wants to assert that in
-// the callsite, it's sufficient to assert that `n_bytes != BYTES_IN_BYTES31` because if
-// `n_bytes > 31` then `n_bytes - 16 > 15` and `one_shift_left_bytes_u128` would panic.
+/// Returns 1 << (8 * `n_bytes`) as felt252, assuming that `n_bytes < BYTES_IN_BYTES31`.
+///
+/// Note: if `n_bytes >= BYTES_IN_BYTES31`, the behavior is undefined. If one wants to
+/// assert that in the callsite, it's sufficient to assert that `n_bytes != BYTES_IN_BYTES31`
+/// because if `n_bytes > 31` then `n_bytes - 16 > 15` and `one_shift_left_bytes_u128` would panic.
 pub(crate) fn one_shift_left_bytes_felt252(n_bytes: usize) -> felt252 {
     if n_bytes < BYTES_IN_U128 {
         one_shift_left_bytes_u128(n_bytes).into()
@@ -149,9 +152,9 @@ pub(crate) fn one_shift_left_bytes_felt252(n_bytes: usize) -> felt252 {
     }
 }
 
-// Returns 1 << (8 * `n_bytes`) as u128, where `n_bytes` must be < BYTES_IN_U128.
-//
-// Panics if `n_bytes >= BYTES_IN_U128`.
+/// Returns 1 << (8 * `n_bytes`) as u128, where `n_bytes` must be < BYTES_IN_U128.
+///
+/// Panics if `n_bytes >= BYTES_IN_U128`.
 pub(crate) fn one_shift_left_bytes_u128(n_bytes: usize) -> u128 {
     match n_bytes {
         0 => 0x1,
@@ -170,7 +173,7 @@ pub(crate) fn one_shift_left_bytes_u128(n_bytes: usize) -> u128 {
         13 => 0x100000000000000000000000000,
         14 => 0x10000000000000000000000000000,
         15 => 0x1000000000000000000000000000000,
-        _ => core::panic_with_felt252('n_bytes too big'),
+        _ => crate::panic_with_felt252('n_bytes too big'),
     }
 }
 
@@ -179,8 +182,5 @@ impl Bytes31PartialEq of PartialEq<bytes31> {
         let lhs_as_felt252: felt252 = (*lhs).into();
         let rhs_as_felt252: felt252 = (*rhs).into();
         lhs_as_felt252 == rhs_as_felt252
-    }
-    fn ne(lhs: @bytes31, rhs: @bytes31) -> bool {
-        !(lhs == rhs)
     }
 }

@@ -7,5 +7,4 @@ pub extern fn require_implicit<Implicit>() implicits(Implicit) nopanic;
 
 extern type index_enum_type<const NUM_VARIANTS: felt252>;
 
-extern type BoundedInt<const MIN: felt252, const MAX: felt252>;
-
+pub(crate) mod bounded_int;

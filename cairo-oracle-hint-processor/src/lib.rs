@@ -75,6 +75,10 @@ pub enum Error {
         param_index: usize,
         arg_index: usize,
     },
+    #[error("Only programs returning `Array<Felt252>` can be currently proven. Try serializing the final values before returning them")]
+    IlegalReturnValue,
+    #[error("Only programs with `Array<Felt252>` as an input can be currently proven. Try inputing the serialized version of the input and deserializing it on main")]
+    IlegalInputValue,
 }
 
 #[allow(dead_code)]
@@ -143,13 +147,15 @@ pub fn run_1(
     let cairo_run_config = Cairo1RunConfig {
         proof_mode: proof_mode,
         relocate_mem: memory_file.is_some(), //|| air_public_input.is_some(),
-        layout: layout,
+        layout: *layout,
         trace_enabled: trace_file.is_some(), //|| args.air_public_input.is_some(),
         args: &args.0,
         finalize_builtins: false, //args.air_private_input.is_some() || args.cairo_pie_output.is_some(),
+        serialize_output: false,
+        append_return_values: false,
     };
 
-    let (runner, _vm, return_values) = cairo_run::cairo_run_program(
+    let (runner, return_values, _) = cairo_run::cairo_run_program(
         &sierra_program,
         cairo_run_config,
         service_config,
