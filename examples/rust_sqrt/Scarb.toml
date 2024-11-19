@@ -9,6 +9,6 @@ edition = "2024_07"
 
 [tool.hints]
 definitions = "proto/oracle.proto"  # required
-# cairo_output = "src"
-# oracle_lock = "Oracle.lock"
+#cairo_output = "src"
+#oracle_lock = "Oracle.lock"
 
